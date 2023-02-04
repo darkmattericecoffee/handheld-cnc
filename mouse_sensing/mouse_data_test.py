@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 
 # decimal vendor and product values
 #dev = usb.core.find(idVendor=1133, idProduct=49271)
-dev = usb.core.find(idVendor=9583, idProduct=50772)         # nice mouse
+#dev = usb.core.find(idVendor=9583, idProduct=50772)         # nice mouse
+dev = usb.core.find(idVendor=1578, idProduct=22808)             # mid mouse
 # or, uncomment the next line to search instead by the hexidecimal equivalent
 #dev = usb.core.find(idVendor=0x45e, idProduct=0x77d)
 # first endpoint
