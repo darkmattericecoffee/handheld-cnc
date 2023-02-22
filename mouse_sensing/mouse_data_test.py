@@ -4,6 +4,7 @@ import usb.core
 import usb.util
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 # decimal vendor and product values
 # Micelist
@@ -11,9 +12,10 @@ import matplotlib.pyplot as plt
 #   1 - nice mouse (CadMouse)
 #   2 - mid mouse (from Jacobs)
 #   3 - free mouse (from Chris)
-mouse = 3
-idsVendor = [1133, 9583, 1578, 6700]
-idsProduct = [49271, 50772, 22808, 66]
+#   4 - free mouse (from Etch bin)
+mouse = 4
+idsVendor = [1133, 9583, 1578, 6700, 1203]
+idsProduct = [49271, 50772, 22808, 66, 12555]
 dev = usb.core.find(idVendor=idsVendor[mouse], idProduct=idsProduct[mouse])
 # or, uncomment the next line to search instead by the hexidecimal equivalent
 #dev = usb.core.find(idVendor=0x45e, idProduct=0x77d)
@@ -35,6 +37,7 @@ y_vel = []
 y_dir = []
 x_pos = [0]
 y_pos = [0]
+t = []
 #print(data_array)
 i = 0
 
@@ -44,6 +47,8 @@ while collected < attempts :
         data = dev.read(endpoint.bEndpointAddress,endpoint.wMaxPacketSize)
         collected += 1
         print(data)
+        if len(t) == 0:
+            t0 = time.time_ns() // 1000000
 
         if (mouse == 0):
             # nothing yet
@@ -61,6 +66,13 @@ while collected < attempts :
             # nothing yet
             mouse = 2       # nonsense
         elif (mouse == 3):
+            t.append(time.time_ns() // 1000000)
+            x_vel.append(np.interp(data[1], [0,255],[-1,1]))
+            y_vel.append(np.interp(data[2], [0,255],[-1,1]))
+            x_pos.append(x_pos[-1] + x_vel[-1])
+            y_pos.append(y_pos[-1] + y_vel[-1])
+        elif (mouse == 4):
+            t.append(time.time_ns() // 1000000)
             x_vel.append(np.interp(data[1], [0,255],[-1,1]))
             y_vel.append(np.interp(data[2], [0,255],[-1,1]))
             x_pos.append(x_pos[-1] + x_vel[-1])
@@ -78,9 +90,9 @@ dev.attach_kernel_driver(interface)
 # Plot
 # Plot 1
 fig1 = plt.figure()
-fig1.add_subplot(1, 1, 1)
+fig1.add_subplot(3, 1, 1)
 
-print(x_vel)
+#print(x_vel)
 
 # fig1.axes[0].plot(x_vel, label=f'X velocity')
 # fig1.axes[0].plot(y_vel, label=f'Y velocity')
@@ -89,5 +101,11 @@ fig1.axes[0].plot(x_pos, y_pos, label=f'Mouse position')
 # fig1.axes[0].set_xlabel('Time (s)')
 # fig1.axes[0].set_ylabel('Rate Gyro (rad/s)')
 # fig1.axes[0].legend(loc = 'upper left')
+
+fig1.add_subplot(3, 1, 2)
+fig1.axes[1].plot(t, x_vel)
+
+fig1.add_subplot(3, 1, 3)
+fig1.axes[2].plot(t, y_vel)
 
 plt.show()
