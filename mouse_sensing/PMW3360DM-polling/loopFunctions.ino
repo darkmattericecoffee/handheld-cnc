@@ -95,8 +95,8 @@ void UpdatePointer(void){
 
 int convTwosComp(int b){
   //Convert from 2's complement
-  if(b & 0x80){
-    b = -1 * ((b ^ 0xff) + 1);
+  if(b & 0x80){                     // 0x80 (hex) = 10000000 (bin) = 128 (dec)
+    b = -1 * ((b ^ 0xff) + 1);      // 0xff (hex) = 11111111 (bin) = 255 (dec)
   }
   return b;
 }
