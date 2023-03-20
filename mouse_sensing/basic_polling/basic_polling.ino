@@ -44,7 +44,7 @@ int CPI = 2500;               // This value changes calibration coefficients
 float Cx[4] = {0.01003310926f,0.00996611521f,0.01008674602f,0.00997506234f};
 float Cy[4] = {0.01026588646f,0.01019056354f,0.01016570093f,0.01011531459f};
 
-int mmMode = 0;
+int mmMode = 1;
 int x = 0;
 int y = 0;
 float xmm = 0;
