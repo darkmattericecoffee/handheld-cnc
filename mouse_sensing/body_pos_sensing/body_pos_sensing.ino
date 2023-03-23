@@ -1,10 +1,10 @@
 #include <PMW3360.h>
 /*
 Sensor configuration:
-2 --- 0           ^ y (unsure whether or not x and y are flipped)
-|  x  |       x <-|
-1 --- 3
-    NOTE: this doesn't obey the right hand rule!!
+0 --- 1              ^ y
+|  x  |   (old x <-) |-> x
+2 --- 3
+    NOTE: old config didn't obey the right hand rule. We are now flipping x.
 */
 
 #define SS1   10   // Slave Select pin. Connect this to SS on the module.
@@ -20,8 +20,8 @@ float Cy[4] = {0.01011531459f,0.01026588646f,0.01019056354f,0.01016570093f};
 float l = 100.0f;                // length of square sensor configuration
 
 // Constants ------------------------------------------------------------------------
-const float xOff[4] = {-l/2,l/2,l/2,-l/2};
-const float yOff[4] = {l/2,-l/2,l/2,-l/2};
+const float xOff[4] = {-l/2,l/2,-l/2,l/2};
+const float yOff[4] = {l/2,l/2,-l/2,-l/2};
 
 // Variables ------------------------------------------------------------------------
 int plotting = 1;
@@ -39,13 +39,17 @@ float vXmm[4] = {0.0f,0.0f,0.0f,0.0f};        // velocity (mm/s)(dXmm/dt)
 float vYmm[4] = {0.0f,0.0f,0.0f,0.0f};
 
 // Estimated quantities
-float xmm[4] = {0.0f,0.0f,0.0f,0.0f};
-float ymm[4] = {0.0f,0.0f,0.0f,0.0f};
-float estPosX[6] = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};      // Position estimation from each sensor combination
-float estPosY[6] = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};      // Position estimation from each sensor combination
-float estPosX1 = 0.0f;
-float estPosY1 = 0.0f;
-float estAng[6] = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};      // Angle estimation from each sensor combination
+float xmm[4] = {0.0f,0.0f,0.0f,0.0f};         // *not significant*
+float ymm[4] = {0.0f,0.0f,0.0f,0.0f};         // *not significant*
+float estVelX[4] = {0.0f,0.0f,0.0f,0.0f};
+float estVelY[4] = {0.0f,0.0f,0.0f,0.0f};
+float estVelX1 = 0.0f;
+float estVelY1 = 0.0f;
+float estPosX = 0.0f;
+float estPosY = 0.0f;
+float estAngVel[8] = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
+float estAngVel1 = 0.0f;
+float estYaw = 0.0f;                          // Angle estimation
 
 // Control Constants ----------------------------------------------------------------
 
@@ -114,7 +118,7 @@ void loop() {
       // Only checking sensor 1 rn (TODO: check all of them and account for misreads)
 
       // Sensor velocity sensing
-      dXmm[0] = convTwosComp(data0.dx)*Cx[0];
+      dXmm[0] = convTwosComp(data0.dx)*Cx[0];       // maybe divide by dt (would be slower, but more robust?)
       dXmm[1] = convTwosComp(data1.dx)*Cx[1];
       dXmm[2] = convTwosComp(data2.dx)*Cx[2];
       dXmm[3] = convTwosComp(data3.dx)*Cx[3];
@@ -127,40 +131,53 @@ void loop() {
 //      dYmm = dY*Cy[3];
 
       // Sensor position estimation
-      if(firstPoint) {
-        // make sure first point (x,y) is (0,0) (there could be a better way to do this)
-        firstPoint = 0;
-      }else{
-        for (int i = 0; i<4; i++) {
-          xmm[i] = xmm[i] + dXmm[i];
-          ymm[i] = ymm[i] + dYmm[i];
-        }
-      }
+//      if(firstPoint) {
+//        // make sure first point (x,y) is (0,0) (there could be a better way to do this)
+//        firstPoint = 0;
+//      }else{
+//        for (int i = 0; i<4; i++) {
+//          xmm[i] = xmm[i] + dXmm[i];
+//          ymm[i] = ymm[i] + dYmm[i];
+//        }
+//      }
 
       // Body angle estimation
-      
+      estAngVel[0] = (dXmm[2] - dXmm[0])/l;
+      estAngVel[1] = (dXmm[3] - dXmm[0])/l;
+      estAngVel[2] = (dXmm[2] - dXmm[1])/l;
+      estAngVel[3] = (dXmm[3] - dXmm[1])/l;
+      estAngVel[4] = (dYmm[1] - dYmm[0])/l;
+      estAngVel[5] = (dYmm[3] - dYmm[0])/l;
+      estAngVel[6] = (dYmm[1] - dYmm[2])/l;
+      estAngVel[7] = (dYmm[3] - dYmm[2])/l;
+      float sumAngVel = 0.0f;
+      for (int i = 0; i<8; i++) {
+        // Simple average of angular velocities
+        sumAngVel = sumAngVel + estAngVel[i];
+      }
+      estAngVel1 = sumAngVel / 8.0f;
+      estYaw = estYaw + estAngVel1;
 
       // Body position estimation
-//      estPosX[0] = (xmm[0] + xmm[1])/2;       // Needs to be updated with new sensor indexing
-//      estPosX[1] = (xmm[0] + xmm[2])/2;
-//      estPosX[2] = (xmm[0] + xmm[3])/2;
-//      estPosX[3] = (xmm[1] + xmm[2])/2;
-//      estPosX[4] = (xmm[1] + xmm[3])/2;
-//      estPosX[5] = (xmm[2] + xmm[3])/2;
-//      estPosY[0] = (ymm[0] + ymm[1])/2;
-//      estPosY[1] = (ymm[0] + ymm[2])/2;
-//      estPosY[2] = (ymm[0] + ymm[3])/2;
-//      estPosY[3] = (ymm[1] + ymm[2])/2;
-//      estPosY[4] = (ymm[1] + ymm[3])/2;
-//      estPosY[5] = (ymm[2] + ymm[3])/2;
-      float sumX = 0.0f;
-      float sumY = 0.0f;
+      estVelX[0] =  dXmm[0]*cosf(estYaw) - dYmm[0]*sinf(estYaw) + 0.5*estAngVel*l*(-sinf(estYaw)+cosf(estYaw));
+      estVelX[1] =  dXmm[1]*cosf(estYaw) - dYmm[1]*sinf(estYaw) + 0.5*estAngVel*l*(sinf(estYaw)+cosf(estYaw));
+      estVelX[2] =  dXmm[2]*cosf(estYaw) - dYmm[2]*sinf(estYaw) + 0.5*estAngVel*l*(-sinf(estYaw)-cosf(estYaw));
+      estVelX[3] =  dXmm[3]*cosf(estYaw) - dYmm[3]*sinf(estYaw) + 0.5*estAngVel*l*(sinf(estYaw)-cosf(estYaw));
+      estVelY[0] =  dXmm[0]*sinf(estYaw) + dYmm[0]*cosf(estYaw) + 0.5*estAngVel*l*(cosf(estYaw)+sinf(estYaw));
+      estVelY[1] =  dXmm[1]*sinf(estYaw) + dYmm[1]*cosf(estYaw) + 0.5*estAngVel*l*(-cosf(estYaw)+sinf(estYaw));
+      estVelY[2] =  dXmm[2]*sinf(estYaw) + dYmm[2]*cosf(estYaw) + 0.5*estAngVel*l*(cosf(estYaw)-sinf(estYaw));
+      estVelY[3] =  dXmm[3]*sinf(estYaw) + dYmm[3]*cosf(estYaw) + 0.5*estAngVel*l*(-cosf(estYaw)-sinf(estYaw));
+      float sumVelX = 0.0f;
+      float sumVelY = 0.0f;
       for (int i = 0; i<4; i++) {
-        sumX = sumX + xmm[i];
-        sumY = sumY + ymm[i];
+        // Simple average of angular velocities
+        sumVelX = sumVelX + estVelX[i];
+        sumVelY = sumVelY + estVelY[i];
       }
-      estPosX1 = sumX / 6.0f;
-      estPosY1 = sumY / 6.0f;
+      estVelX1 = sumVelX / 4.0f;
+      estVelY1 = sumVelY / 4.0f;
+      estPosX = estPosX + estVelX1;
+      estPosY = estPosY + estVelY1;
       
       //Serial.printf("dx:%f,dy:%f,",dXmm,dYmm);
       //Serial.printf("dx:%i,dy:%i,",data.dx,data.dy);
