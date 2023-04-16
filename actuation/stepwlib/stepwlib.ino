@@ -2,10 +2,20 @@
 #include <AccelStepper.h>
 
 // Define pin connections
-const int dirPin = 27;
-const int stepPin = 33;
-const int MS1 = 21;
-const int MS2 = 14;
+//const int PIN_STEP_ENABLE 13;
+//const int dirPin = 27;
+//const int stepPin = 33;
+#define MS1  21
+#define MS2  14
+#define PIN_STEP_ENABLE 13
+//#define RX2 0
+//#define TX2 1
+//#define DIAG_PIN 12
+#define dirPin 27
+#define stepPin 33
+#define SERIAL_PORT        Serial1    // TMC2208/TMC2224 HardwareSerial port
+#define DRIVER_ADDRESS     0b00       // TMC2209 Driver address according to MS1 and MS2
+#define R_SENSE            0.11f 
 int count = 0;
 // Define motor interface type
 #define motorInterfaceType 1
