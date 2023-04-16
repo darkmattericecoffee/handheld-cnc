@@ -21,7 +21,6 @@ int Conv = 250*64;
 int myArray[] = {5,-2,2,-5};
 int vel[] = {2,1,3,4};
 int size = 4;
-int count = 0;
 // Define motor interface type
 #define motorInterfaceType 1
 
@@ -46,8 +45,8 @@ void setup() {
 }
 
 void loop() {
-  myStepper.setSpeed(arr1[count]*Conv);
-  myStepper.moveTo(Conv*arr[count]);
+  myStepper.setSpeed(vel[count]*Conv);
+  myStepper.moveTo(Conv*myArray[count]);
   count = count + 1;
   if(count == size - 1) {
     count = 0;
