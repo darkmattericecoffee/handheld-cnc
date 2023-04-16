@@ -18,7 +18,9 @@
 #define R_SENSE            0.11f 
 int count = 0;
 int Conv = 250*64;
-
+int myArray[] = {5,-2,2,-5};
+int vel[] = {2,1,3,4};
+int size = 4;
 // Define motor interface type
 #define motorInterfaceType 1
 
@@ -37,9 +39,7 @@ void setup() {
  // myStepper.setSpeed(200);
   //myStepper.moveTo(200);
   myStepper.setCurrentPosition(0);
-  int myArray[] = {5,-2,2,-5};
-  int vel[] = {2,1,3,4};
-  int size = 4;
+ 
   
 
 }
@@ -61,7 +61,7 @@ void loop() {
 //
 //  // Move the motor one step
 //  myStepper.run();
-    iterate();
+    iterate(myArray, vel, size);
 //  if (count == 5){
 //    exit(0);
 //  }
