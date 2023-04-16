@@ -17,6 +17,8 @@
 #define DRIVER_ADDRESS     0b00       // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE            0.11f 
 int count = 0;
+int Conv = 250*64;
+
 // Define motor interface type
 #define motorInterfaceType 1
 
@@ -35,7 +37,18 @@ void setup() {
  // myStepper.setSpeed(200);
   //myStepper.moveTo(200);
   myStepper.setCurrentPosition(0);
+  int myArray[] = {5,-2,2,-5};
+  int vel[] = {2,1,3,4};
+  int size = 4;
+  
 
+}
+void iterate(int arr[], int arr1[], int size){
+  delay(2000);
+  for (int i = 0; i<size; i++){
+    myStepper.setMaxSpeed(arr1[i]*Conv);
+    myStepper.moveTo(Conv*arr[i]);
+  }
 }
 
 void loop() {
@@ -45,16 +58,17 @@ void loop() {
 //
 //  // Move the motor one step
 //  myStepper.run();
-  if (count == 5){
-    exit(0);
-  }
-  myStepper.move(-1600*8*10); //One revolution at 64 microsteps is 1600*8
-  while (myStepper.distanceToGo() != 0){
-    myStepper.run();
-  }
-  myStepper.move(1600*8*10); //One revolution at 64 microsteps is 1600*8
-  while (myStepper.distanceToGo() != 0){
-    myStepper.run();
-  }
-  count = count + 1;
+    iterate();
+//  if (count == 5){
+//    exit(0);
+//  }
+//  myStepper.move(-1600*8*10); //One revolution at 64 microsteps is 1600*8
+//  while (myStepper.distanceToGo() != 0){
+//    myStepper.run();
+//  }
+//  myStepper.move(1600*8*10); //One revolution at 64 microsteps is 1600*8
+//  while (myStepper.distanceToGo() != 0){
+//    myStepper.run();
+//  }
+//  count = count + 1;
 }
