@@ -48,6 +48,9 @@ void iterate(int arr[], int arr1[], int size){
   for (int i = 0; i<size; i++){
     myStepper.setMaxSpeed(arr1[i]*Conv);
     myStepper.moveTo(Conv*arr[i]);
+    while (myStepper.distanceToGo() != 0){
+      myStepper.run();
+    }
   }
 }
 
