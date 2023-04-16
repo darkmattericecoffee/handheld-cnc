@@ -47,6 +47,7 @@ void setup() {
 void loop() {
   myStepper.setSpeed(vel[count]*Conv);
   myStepper.moveTo(Conv*myArray[count]);
+  myStepper.runToPosition();
   count = count + 1;
   if(count == size - 1) {
     count = 0;
