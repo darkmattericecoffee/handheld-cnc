@@ -17,9 +17,9 @@
 #define DRIVER_ADDRESS     0b00       // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE            0.11f 
 int count = 0;
-int Conv = 250*64;
+int Conv = 25*64;
 int myArray[] = {5,-2,2,-5};
-int vel[] = {2,1,3,4};
+int vel[] = {20,10,30,40};
 int size = 4;
 // Define motor interface type
 #define motorInterfaceType 1
@@ -47,9 +47,10 @@ void iterate(int arr[], int arr1[], int size){
   delay(2000);
   for (int i = 0; i<size; i++){
     myStepper.setMaxSpeed(arr1[i]*Conv);
+    //myStepper.setSpeed(arr1[i]*Conv);
     myStepper.moveTo(Conv*arr[i]);
     while (myStepper.distanceToGo() != 0){
-      myStepper.run();
+      myStepper.runSpeed();
     }
   }
 }

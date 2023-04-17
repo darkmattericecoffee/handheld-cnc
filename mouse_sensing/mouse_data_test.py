@@ -13,9 +13,10 @@ import time
 #   2 - mid mouse (from Jacobs)
 #   3 - free mouse (from Chris)
 #   4 - free mouse (from Etch bin)
-mouse = 4
-idsVendor = [1133, 9583, 1578, 6700, 1203]
-idsProduct = [49271, 50772, 22808, 66, 12555]
+#   5 - Amazon basics mouse
+mouse = 5
+idsVendor = [1133, 9583, 1578, 6700, 1203, 12538]
+idsProduct = [49271, 50772, 22808, 66, 12555, 768]
 dev = usb.core.find(idVendor=idsVendor[mouse], idProduct=idsProduct[mouse])
 # or, uncomment the next line to search instead by the hexidecimal equivalent
 #dev = usb.core.find(idVendor=0x45e, idProduct=0x77d)
@@ -78,6 +79,8 @@ while collected < attempts :
             y_vel.append(np.interp(data[2], [0,255],[-1,1]))
             x_pos.append(x_pos[-1] + x_vel[-1])
             y_pos.append(y_pos[-1] + y_vel[-1])
+        elif (mouse == 4):
+            t.append(time.time_ns() // 1000000)
 
     except usb.core.USBError as e:
         data = None
