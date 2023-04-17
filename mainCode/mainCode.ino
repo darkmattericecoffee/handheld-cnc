@@ -8,21 +8,23 @@ Sensor configuration:
 */
 
 // Pin definitions
-#define SS0   41   // Chip select pin. Connect this to SS on the module.
-#define SS1   39
-#define SS2   10
-#define SS3   40
+#define SS0   10   // Chip select pin. Connect this to SS on the module.
+#define SS1   41
+#define SS2   40
+#define SS3   39
+int butt_mach0 = 12;        // TODO: change to reflect actual pin
 
 
 // Sensor properties
 int CPI = 2500;               // This value changes calibration coefficients
 float Cx[4] = {0.00997506234f,0.01003310926f,0.00996611521f,0.01008674602f};
 float Cy[4] = {0.01011531459f,0.01026588646f,0.01019056354f,0.01016570093f};
-float l = 100.0f;                // length of square sensor configuration
+float lx = 120.0f;                // x length of rectangular sensor configuration
+float ly = 140.0f;                // y length of rectangular sensor configuration
 
 // Constants ------------------------------------------------------------------------
-const float xOff[4] = {-l/2,l/2,-l/2,l/2};
-const float yOff[4] = {l/2,l/2,-l/2,-l/2};
+const float xOff[4] = {-lx/2,lx/2,-lx/2,lx/2};
+const float yOff[4] = {ly/2,ly/2,-ly/2,-ly/2};
 
 // Variables ------------------------------------------------------------------------
 int plotting = 1;
@@ -146,14 +148,14 @@ void loop() {
 //      }
 
       // Body angle estimation
-      estAngVel[0] = (dXmm[2] - dXmm[0])/l;
-      estAngVel[1] = (dXmm[3] - dXmm[0])/l;
-      estAngVel[2] = (dXmm[2] - dXmm[1])/l;
-      estAngVel[3] = (dXmm[3] - dXmm[1])/l;
-      estAngVel[4] = (dYmm[1] - dYmm[0])/l;
-      estAngVel[5] = (dYmm[3] - dYmm[0])/l;
-      estAngVel[6] = (dYmm[1] - dYmm[2])/l;
-      estAngVel[7] = (dYmm[3] - dYmm[2])/l;
+      estAngVel[0] = (dXmm[2] - dXmm[0])/ly;
+      estAngVel[1] = (dXmm[3] - dXmm[0])/ly;
+      estAngVel[2] = (dXmm[2] - dXmm[1])/ly;
+      estAngVel[3] = (dXmm[3] - dXmm[1])/ly;
+      estAngVel[4] = (dYmm[1] - dYmm[0])/lx;
+      estAngVel[5] = (dYmm[3] - dYmm[0])/lx;
+      estAngVel[6] = (dYmm[1] - dYmm[2])/lx;
+      estAngVel[7] = (dYmm[3] - dYmm[2])/lx;
       float sumAngVel = 0.0f;
       for (int i = 0; i<8; i++) {
         // Simple average of angular velocities
@@ -165,14 +167,14 @@ void loop() {
       //Serial.printf("w:%f",estAngVel1);
 
       // Body position estimation
-      estVelX[0] = dXmm[0]*cosf(estYaw)-dYmm[0]*sinf(estYaw) + 0.5*estAngVel1*l*(-sinf(estYaw)+cosf(estYaw));
-      estVelX[1] = dXmm[1]*cosf(estYaw)-dYmm[1]*sinf(estYaw) + 0.5*estAngVel1*l*(sinf(estYaw)+cosf(estYaw));
-      estVelX[2] = dXmm[2]*cosf(estYaw)-dYmm[2]*sinf(estYaw) + 0.5*estAngVel1*l*(-sinf(estYaw)-cosf(estYaw));
-      estVelX[3] = dXmm[3]*cosf(estYaw)-dYmm[3]*sinf(estYaw) + 0.5*estAngVel1*l*(sinf(estYaw)-cosf(estYaw));
-      estVelY[0] = dXmm[0]*sinf(estYaw)+dYmm[0]*cosf(estYaw) + 0.5*estAngVel1*l*(cosf(estYaw)+sinf(estYaw));
-      estVelY[1] = dXmm[1]*sinf(estYaw)+dYmm[1]*cosf(estYaw) + 0.5*estAngVel1*l*(-cosf(estYaw)+sinf(estYaw));
-      estVelY[2] = dXmm[2]*sinf(estYaw)+dYmm[2]*cosf(estYaw) + 0.5*estAngVel1*l*(cosf(estYaw)-sinf(estYaw));
-      estVelY[3] = dXmm[3]*sinf(estYaw)+dYmm[3]*cosf(estYaw) + 0.5*estAngVel1*l*(-cosf(estYaw)-sinf(estYaw));
+      estVelX[0] = dXmm[0]*cosf(estYaw)-dYmm[0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-ly*sinf(estYaw));
+      estVelX[1] = dXmm[1]*cosf(estYaw)-dYmm[1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+ly*sinf(estYaw));
+      estVelX[2] = dXmm[2]*cosf(estYaw)-dYmm[2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-ly*sinf(estYaw));
+      estVelX[3] = dXmm[3]*cosf(estYaw)-dYmm[3]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)+ly*sinf(estYaw));
+      estVelY[0] = dXmm[0]*sinf(estYaw)+dYmm[0]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)+lx*sinf(estYaw));
+      estVelY[1] = dXmm[1]*sinf(estYaw)+dYmm[1]*cosf(estYaw) + 0.5*estAngVel1*(-ly*cosf(estYaw)+lx*sinf(estYaw));
+      estVelY[2] = dXmm[2]*sinf(estYaw)+dYmm[2]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)-lx*sinf(estYaw));
+      estVelY[3] = dXmm[3]*sinf(estYaw)+dYmm[3]*cosf(estYaw) + 0.5*estAngVel1*(-ly*cosf(estYaw)-lx*sinf(estYaw));
       float sumVelX = 0.0f;
       float sumVelY = 0.0f;
       for (int i = 0; i<4; i++) {
