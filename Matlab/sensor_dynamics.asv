@@ -36,7 +36,7 @@ V3E = v3x*E1 + v3y*E2;
 X0E = (-lx*E1 + ly*E2)/2;
 X1E = (lx*E1 + ly*E2)/2;
 X2E = (-lx*E1 - ly*E2)/2;
-X3E = (lx*E1 - ly*E2)/2;
+X3E = (lx*E1 - ly*E2/2;
 
 % Body velocity calculations
 V(:,1) = V0 + cross(w, -X0);
