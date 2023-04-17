@@ -19,8 +19,12 @@
 // #include "ADNS2620.h"
 // #include "ADNS2083.h"
 
-#define SCLK 20                            // Serial clock pin on the Arduino
-#define SDIO 21                            // Serial data (I/O) pin on the Arduino
+// Teensy pinout
+//#define SCLK 20                            // Serial clock pin on the Arduino
+//#define SDIO 21                            // Serial data (I/O) pin on the Arduino
+// ESP32 pinout
+#define SCLK 12                            // Serial clock pin on the Arduino
+#define SDIO 27                            // Serial data (I/O) pin on the Arduino
 
 // PAN3101 Optical1 = PAN3101(SCLK, SDIO);   // Create an instance of the PAN3101 object
 // ADNS2051 Optical1 = ADNS2051(SCLK, SDIO);
@@ -35,7 +39,7 @@ int c = 0;                                // Counter variable for coordinate rep
 
 void setup()
 {
-  Serial.begin(38400);
+  Serial.begin(115200);
   Optical1.begin();                       // Resync (not really necessary?)
 }
 
