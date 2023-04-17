@@ -13,10 +13,15 @@ Sensor configuration:
 #define SS1 39
 #define SS2 10
 #define SS3 40
-#define STEP_PIN 20
-#define DIR_PIN 19
-#define MS1 23
-#define MS2 22
+#define MS1  21
+#define MS2  14
+#define PIN_STEP_ENABLE 13
+#define dirPin 27
+#define stepPin 33
+#define SERIAL_PORT        Serial1    // TMC2208/TMC2224 HardwareSerial port
+#define DRIVER_ADDRESS     0b00       // TMC2209 Driver address according to MS1 and MS2
+#define R_SENSE            0.11f 
+#define motorInterfaceType 1
 
 
 
@@ -30,6 +35,7 @@ float l = 100.0f; // length of square sensor configuration
 // Constants ------------------------------------------------------------------------
 const float xOff[4] = {-l/2,l/2,-l/2,l/2};
 const float yOff[4] = {l/2,l/2,-l/2,-l/2};
+const Conv = 25*64;
 
 // Variables ------------------------------------------------------------------------
 int plotting = 1;
@@ -92,7 +98,7 @@ PMW3360 sensor0;
 PMW3360 sensor1;
 PMW3360 sensor2;
 PMW3360 sensor3;
-AccelStepper myStepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
+AccelStepper myStepper(motorInterfaceType, stepPin, dirPin);
 
 void setup() {
  Serial.begin(9600); 
@@ -113,8 +119,8 @@ void setup() {
  digitalWrite(MS1, LOW);
  pinMode(MS2, OUTPUT);
  digitalWrite(MS2, HIGH);
- myStepper.setMaxSpeed(12800*2); //these values have to be adjusted
- myStepper.setAcceleration(100*16*3*10); // these values have to be adjusted
+ myStepper.setMaxSpeed(12800*20);
+ myStepper.setAcceleration(100*16*2*10);
  myStepper.setCurrentPosition(0);
  
  while(!Serial);
@@ -298,11 +304,8 @@ void loop() {
  normVelpa = sqrt(normVelpa);
  velgant = normVelpe / (gf[0] / gf[1]) - normVelpa;
  
- myStepper.setSpeed(velgant);
- unsigned long startTime = millis();
- while (millis() - startTime<100) {
-
- }
+ myStepper.setSpeed(velgant*Conv);
+ myStepper.runSpeed();
 
  //Serial.printf("dx:%f,dy:%f",dXmm,dYmm);
  //Serial.printf("dx:%i,dy:%i",data.dx,data.dy);
