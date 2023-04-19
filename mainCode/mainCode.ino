@@ -8,10 +8,10 @@ Sensor configuration:
 */
 
 // Pin definitions
-#define SS0   10   // Chip select pin. Connect this to SS on the module.
-#define SS1   41
+#define SS0   39   // Chip select pin. Connect this to SS on the module.
+#define SS1   10
 #define SS2   40
-#define SS3   39
+#define SS3   32
 int butt_mach0 = 12;        // TODO: change to reflect actual pin
 
 

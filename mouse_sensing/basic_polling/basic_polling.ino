@@ -37,7 +37,7 @@ Module   Arduino
                                raw data values within normal operating ranges.
  */
 
-#define SS  39   // Slave Select pin. Connect this to SS on the module.
+#define SS  32   // Slave Select pin. Connect this to SS on the module.
 
 // Sensor properties
 int CPI = 2500;               // This value changes calibration coefficients
