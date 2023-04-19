@@ -108,6 +108,7 @@ void setup() {
  float end = 50;
  float step = (end - start) / (len - 1);
 
+// sine path
  for (int i = 0; i < len; i++) {
     x[i] = start + i * step;
     y[i] = sin(0.2 * x[i]) + 1.5;

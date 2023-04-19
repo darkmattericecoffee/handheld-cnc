@@ -1,4 +1,6 @@
+// Libraries to include
 #include <PMW3360.h>
+#include <AccelStepper.h>
 /*
 Sensor configuration (USING 3 SENSORS NOW!!):
 0 --- 1              ^ y
@@ -7,7 +9,8 @@ Sensor configuration (USING 3 SENSORS NOW!!):
     NOTE: old config didn't obey the right hand rule. We are now flipping x.
 */
 
-// Pin definitions
+// Pin definitions -------------------------------------------------------------------------------
+// Sensor pins
 #define SS0   39   // Chip select pin. Connect this to SS on the module.
 #define SS1   10
 #define SS2   40
@@ -15,7 +18,15 @@ Sensor configuration (USING 3 SENSORS NOW!!):
 #define BUTT_HANDLE 7
 //#define SS3   32
 //int butt_mach0 = 12;        // TODO: change to reflect actual pin
-
+// Motor Pins
+#define MS1  37
+#define MS2  38
+//#define PIN_STEP_ENABLE 13
+//#define RX2 0
+//#define TX2 1
+//#define DIAG_PIN 12
+#define dirPin 36
+#define stepPin 33
 
 
 // Sensor properties
@@ -25,6 +36,18 @@ float Cx[3] = {0.00997506234f,0.01003310926f,0.00996611521f};
 float Cy[3] = {0.01011531459f,0.01026588646f,0.01019056354f};
 float lx = 120.0f;                // x length of rectangular sensor configuration
 float ly = 140.0f;                // y length of rectangular sensor configuration
+
+// Motor properties
+int count = 0;
+int uSteps = 64;
+int Conv = 25*uSteps;
+//int pos[] = {20,-20,20,-20};
+//int vel[] = {10,-20,10,-40};
+float maxVel = 40.0f;           // max velocity motor can move at
+//int num = 4;
+bool began = false;
+// Define motor interface type
+#define motorInterfaceType 1
 
 // Constants ------------------------------------------------------------------------
 const float xOff[3] = {-lx/2,lx/2,-lx/2};
@@ -59,21 +82,28 @@ float estAngVel1 = 0.0f;
 float estYaw = 0.0f;                          // Angle estimation
 
 // Control Constants ----------------------------------------------------------------
+const int len = 1000;       // length of path array
 
 // Control Variables ----------------------------------------------------------------
+// Motor control variables
+float distDes = 0.0f;
 
 // Object Initialization ------------------------------------------------------------
+// Sensor object creation
 PMW3360 sensor0;
 PMW3360 sensor1;
 PMW3360 sensor2;
 //PMW3360 sensor3;
+
+// Motor object creation
+AccelStepper myStepper(motorInterfaceType, stepPin, dirPin);
 
 void setup() {
   Serial.begin(9600);  
   while(!Serial);
 
   // Button initialization
-  pinMode(LIMIT_SWITCH_PIN, INPUT);
+  pinMode(LIMIT_X0, INPUT);
   pinMode(BUTT_HANDLE, INPUT);
   
   // Sensor initialization
@@ -104,6 +134,19 @@ void setup() {
     Serial.printf("%i(%.2f,%.2f),",i+1,xmm[i],ymm[i]);
   }
   Serial.println();
+
+  // Setup motors
+  // set the maximum speed, acceleration factor,
+  // initial speed and the target position
+  pinMode(MS1, OUTPUT);
+  digitalWrite(MS1, LOW);
+  pinMode(MS2, OUTPUT);
+  digitalWrite(MS2, HIGH);
+  myStepper.setMaxSpeed(12800*20);
+  myStepper.setAcceleration(100*16*2*10);
+ // myStepper.setSpeed(200);
+  //myStepper.moveTo(200);
+  myStepper.setCurrentPosition(0);
   
   delay(500);
 }
@@ -184,6 +227,10 @@ void loop() {
       estPosX = estPosX + estVelX1*dt;
       estPosY = estPosY + estVelY1*dt;
       
+      float absVel = sqrt(pow(dXmm[0],2) + pow(dYmm[0],2));
+      //Serial.printf("Absolute velocity = %f",absVel);
+      //Serial.println();
+      
       //Serial.printf("dx:%f,dy:%f",dXmm,dYmm);
       //Serial.printf("dx:%i,dy:%i",data.dx,data.dy);
       Serial.printf("x:%f,y:%f,theta:%f",estPosX,estPosY,estYaw);
@@ -195,12 +242,33 @@ void loop() {
   }
 
   // Motor Control ---------------------------------------------------------------------------------
+  distDes = estPosX*cos(estYaw);
+  
   if (digitalRead(BUTT_HANDLE) == LOW)
   {
+    //Serial.println("User in control!");
     // User is in control of device, run control code
+    if (began == false) {
+      began = true;
+      myStepper.moveTo(Conv*distDes);
+      myStepper.setMaxSpeed(Conv*maxVel);
+    } else {
+      if (myStepper.distanceToGo() != 0) {
+        //delay(100);
+        myStepper.run();
+      } else {
+        began = false;
+        //count = count + 1;
+        //delay(1000);
+//        if(count == num) {
+//          count = 0;
+//        }
+      }
+    }
   }else{
+    //Serial.println("User not in control!");
     // User is not in control of device, cancel everything
-    
+    myStepper.setSpeed(0);
   }
   
   //delay(10);
