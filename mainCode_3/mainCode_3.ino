@@ -11,8 +11,10 @@ Sensor configuration (USING 3 SENSORS NOW!!):
 #define SS0   39   // Chip select pin. Connect this to SS on the module.
 #define SS1   10
 #define SS2   40
+#define LIMIT_X0 8
+#define BUTT_HANDLE 7
 //#define SS3   32
-int butt_mach0 = 12;        // TODO: change to reflect actual pin
+//int butt_mach0 = 12;        // TODO: change to reflect actual pin
 
 
 
@@ -69,6 +71,10 @@ PMW3360 sensor2;
 void setup() {
   Serial.begin(9600);  
   while(!Serial);
+
+  // Button initialization
+  pinMode(LIMIT_SWITCH_PIN, INPUT);
+  pinMode(BUTT_HANDLE, INPUT);
   
   // Sensor initialization
   if(sensor0.begin(SS0, CPI)) {  // 10 is the pin connected to SS of the module.
@@ -186,6 +192,15 @@ void loop() {
       //Serial.printf("x:%f,y:%f",xmm[1],ymm[1]);
       Serial.println();
     }
+  }
+
+  // Motor Control ---------------------------------------------------------------------------------
+  if (digitalRead(BUTT_HANDLE) == LOW)
+  {
+    // User is in control of device, run control code
+  }else{
+    // User is not in control of device, cancel everything
+    
   }
   
   //delay(10);
