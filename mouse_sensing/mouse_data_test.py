@@ -8,7 +8,7 @@ import time
 
 # decimal vendor and product values
 # Micelist
-#   0 - 
+#   0 -
 #   1 - nice mouse (CadMouse)
 #   2 - mid mouse (from Jacobs)
 #   3 - free mouse (from Chris)
@@ -21,6 +21,7 @@ dev = usb.core.find(idVendor=idsVendor[mouse], idProduct=idsProduct[mouse])
 # or, uncomment the next line to search instead by the hexidecimal equivalent
 #dev = usb.core.find(idVendor=0x45e, idProduct=0x77d)
 # first endpoint
+print(usb.core.show_devices())
 interface = 0
 endpoint = dev[0][(0,0)][0]
 # if the OS kernel already claimed the device, which is most likely true
