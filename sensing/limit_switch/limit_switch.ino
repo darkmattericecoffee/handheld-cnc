@@ -1,9 +1,9 @@
 #include <ezButton.h>
 
-ezButton limitSwitch(18);  // create ezButton object that attach to pin 7;
+ezButton limitSwitch(8);  // create ezButton object that attach to pin 7;
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   limitSwitch.setDebounceTime(50); // set debounce time to 50 milliseconds
 }
 
