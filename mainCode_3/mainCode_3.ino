@@ -14,10 +14,15 @@ Sensor configuration (USING 3 SENSORS NOW!!):
 #define SS0   39   // Chip select pin. Connect this to SS on the module.
 #define SS1   10
 #define SS2   40
-#define LIMIT_X0 8
-#define BUTT_HANDLE 7
 //#define SS3   32
-//int butt_mach0 = 12;        // TODO: change to reflect actual pin
+#define LIMIT_MACH_X0   8
+#define BUTT_MACH_X0    4
+#define BUTT_MACH_Z0    3
+#define BUTT_WORK_X0Y0   6
+#define BUTT_WORK_Z0   5
+#define BUTT_HANDLE     7
+#define POT_THICK   31
+
 // Motor Pins
 #define MS1  37
 #define MS2  38
@@ -25,17 +30,19 @@ Sensor configuration (USING 3 SENSORS NOW!!):
 //#define RX2 0
 //#define TX2 1
 //#define DIAG_PIN 12
-#define dirPin 36
-#define stepPin 33
+int dirPin = 36;
+int stepPin = 33;
 
-
+// Constants ------------------------------------------------------------------------
 // Sensor properties
-int ns = 3;                   // number of sensors
-int CPI = 2500;               // This value changes calibration coefficients
-float Cx[3] = {0.00997506234f,0.01003310926f,0.00996611521f};
-float Cy[3] = {0.01011531459f,0.01026588646f,0.01019056354f};
-float lx = 120.0f;                // x length of rectangular sensor configuration
-float ly = 140.0f;                // y length of rectangular sensor configuration
+const int ns = 3;                   // number of sensors
+const int CPI = 2500;               // This value changes calibration coefficients
+const float Cx[3] = {0.00997506234f,0.01003310926f,0.00996611521f};
+const float Cy[3] = {0.01011531459f,0.01026588646f,0.01019056354f};
+const float lx = 120.0f;                // x length of rectangular sensor configuration
+const float ly = 140.0f;                // y length of rectangular sensor configuration
+const float xOff[3] = {-lx/2,lx/2,-lx/2};
+const float yOff[3] = {ly/2,ly/2,-ly/2};
 
 // Motor properties
 int count = 0;
@@ -44,17 +51,25 @@ int Conv = 25*uSteps;
 //int pos[] = {20,-20,20,-20};
 //int vel[] = {10,-20,10,-40};
 float maxVel = 40.0f;           // max velocity motor can move at
-//int num = 4;
+float retract = 5;                // (mm)
+float speed_x0 = 20.0 * Conv;             // x zeroing speed (mm/s)
+float speed_x1 = 4.0 * Conv;              // x secondary zeroing speed
+float maxAccel = 100*16*2*10;
 bool began = false;
-// Define motor interface type
 #define motorInterfaceType 1
 
-// Constants ------------------------------------------------------------------------
-const float xOff[3] = {-lx/2,lx/2,-lx/2};
-const float yOff[3] = {ly/2,ly/2,-ly/2};
+// Gantry geometry
+float gantryLength = 106.0;       // (mm)
+float xLimitOffset = 2.54;         // distance from wall of stepper when zeroed (mm)
 
 // Variables ------------------------------------------------------------------------
 int plotting = 1;
+
+// Button states
+int readyOrNot = 0;
+
+// Zeroing variables
+int x0_count = 2;           // x zeroing count variable (start as "false")
 
 int firstPoint = 1;
 long unsigned timeLastPoll = 0;
@@ -103,9 +118,156 @@ void setup() {
   while(!Serial);
 
   // Button initialization
-  pinMode(LIMIT_X0, INPUT);
+  pinMode(LIMIT_MACH_X0, INPUT);
+  pinMode(BUTT_MACH_X0, INPUT);
+  pinMode(BUTT_WORK_X0Y0, INPUT);
   pinMode(BUTT_HANDLE, INPUT);
+  //pinMode(LIMIT_WOR
+
+  sensorSetup();
+
+  motorSetup();
   
+  delay(500);
+}
+
+void loop() {
+  // System Initialization ------------------------------------------------------------------------
+  // Machine X Zeroing
+  if (digitalRead(BUTT_MACH_X0) == LOW) {
+    x0_count = 0;
+  }
+  if (x0_count == 0) {
+    Serial.println("Init limit switch");
+    machineZeroX_1();
+  } else if (x0_count == 1) {
+    machineZeroX_2();
+  }
+
+  // Workpiece zeroing
+  if (digitalRead(BUTT_WORK_X0Y0) == LOW) {
+    readyOrNot = 1;
+  }
+
+  // Sensor polling
+  if (readyOrNot) {
+    if(micros() - timeLastPoll >= dt) {
+      //Serial.println(micros() - timeLastPoll);
+      timeLastPoll = micros();
+  
+      // Sensing ---------------------------------------------------------------------
+      // Collect sensor data
+      PMW3360_DATA data0 = sensor0.readBurst_simple();
+      PMW3360_DATA data1 = sensor1.readBurst_simple();
+      PMW3360_DATA data2 = sensor2.readBurst_simple();
+      //PMW3360_DATA data3 = sensor3.readBurst_simple();
+  
+      int yup = 1;
+      if(yup) {
+      //if(data1.isOnSurface && data1.isMotion) {   // If movement...
+        // **Only checking sensor 1 rn (TODO: check all of them and account for misreads)**
+  
+        // Sensor velocity sensing
+        dXmm[0] = -convTwosComp(data0.dx)*Cx[0] / dt;       // maybe divide by dt (would be slower, but more robust?)
+        dXmm[1] = -convTwosComp(data1.dx)*Cx[1] / dt;
+        dXmm[2] = -convTwosComp(data2.dx)*Cx[2] / dt;
+        //dXmm[3] = -convTwosComp(data3.dx)*Cx[3] / dt;
+        dYmm[0] = convTwosComp(data0.dy)*Cx[0] / dt;
+        dYmm[1] = convTwosComp(data1.dy)*Cx[1] / dt;
+        dYmm[2] = convTwosComp(data2.dy)*Cx[2] / dt;
+        //dYmm[3] = convTwosComp(data3.dy)*Cx[3] / dt;
+  
+  //      dXmm = dX*Cx[3];
+  //      dYmm = dY*Cy[3];
+  
+        // Sensor position estimation
+  //      if(firstPoint) {
+  //        // make sure first point (x,y) is (0,0) (there could be a better way to do this)
+  //        firstPoint = 0;
+  //      }else{
+  //        for (int i = 0; i<4; i++) {
+  //          xmm[i] = xmm[i] + dXmm[i];
+  //          ymm[i] = ymm[i] + dYmm[i];
+  //        }
+  //      }
+  
+        // Body angle estimation
+        estAngVel[0] = (dXmm[2] - dXmm[0])/ly;
+        estAngVel[1] = (dXmm[2] - dXmm[1])/ly;
+        estAngVel[2] = (dYmm[1] - dYmm[0])/lx;
+        estAngVel[3] = (dYmm[1] - dYmm[2])/lx;
+        // Simple average of angular velocities
+        float sumAngVel = 0.0f;
+        for (int i = 0; i<4; i++) {
+          sumAngVel = sumAngVel + estAngVel[i];
+          //Serial.printf("w%i:%f,",i,estAngVel[i]);
+        }
+        estAngVel1 = sumAngVel / 4.0f;
+        estYaw = estYaw + estAngVel1*dt;
+        //Serial.printf("w:%f",estAngVel1);
+  
+        // Body position estimation
+        estVelX[0] = dXmm[0]*cosf(estYaw)-dYmm[0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-ly*sinf(estYaw));
+        estVelX[1] = dXmm[1]*cosf(estYaw)-dYmm[1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+ly*sinf(estYaw));
+        estVelX[2] = dXmm[2]*cosf(estYaw)-dYmm[2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-ly*sinf(estYaw));
+        estVelY[0] = dXmm[0]*sinf(estYaw)+dYmm[0]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)+lx*sinf(estYaw));
+        estVelY[1] = dXmm[1]*sinf(estYaw)+dYmm[1]*cosf(estYaw) + 0.5*estAngVel1*(-ly*cosf(estYaw)+lx*sinf(estYaw));
+        estVelY[2] = dXmm[2]*sinf(estYaw)+dYmm[2]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)-lx*sinf(estYaw));
+        // Simple average of linear velocities
+        float sumVelX = 0.0f;
+        float sumVelY = 0.0f;
+        for (int i = 0; i<ns; i++) {
+          sumVelX = sumVelX + estVelX[i];
+          sumVelY = sumVelY + estVelY[i];
+        }
+        estVelX1 = sumVelX / ns;
+        estVelY1 = sumVelY / ns;
+        estPosX = estPosX + estVelX1*dt;
+        estPosY = estPosY + estVelY1*dt;
+        
+        float absVel = sqrt(pow(dXmm[0],2) + pow(dYmm[0],2));
+        //Serial.printf("Absolute velocity = %f",absVel);
+        //Serial.println();
+  
+        // Sensor plotting
+        if (plotting) {
+          sensorPlotting();
+        }
+      }
+    }
+  
+    // Motor Control ---------------------------------------------------------------------------------
+    distDes = estPosX*cos(estYaw);
+    
+    if (digitalRead(BUTT_HANDLE) == LOW) {
+      Serial.println("User in control!");
+      // User is in control of device, run control code
+      if (began == false) {
+        began = true;
+        myStepper.moveTo(Conv*distDes);
+        //myStepper.setMaxSpeed(Conv*maxVel);
+      } else {
+        if (myStepper.distanceToGo() != 0) {
+          //delay(100);
+          myStepper.run();
+        } else {
+          began = false;
+        }
+      }
+    } else {
+      // User is not in control of device, cancel everything
+      myStepper.setSpeed(0);
+      //readyOrNot = 0;
+      Serial.println("User not in control!");
+    }
+    
+    //delay(10);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+// Setup subfunctions -----------------------------------------------------------------------------
+void sensorSetup() {
   // Sensor initialization
   if(sensor0.begin(SS0, CPI)) {  // 10 is the pin connected to SS of the module.
     Serial.print("Sensor0 initialization successed, with CPI = ");
@@ -134,7 +296,9 @@ void setup() {
     Serial.printf("%i(%.2f,%.2f),",i+1,xmm[i],ymm[i]);
   }
   Serial.println();
+}
 
+void motorSetup() {
   // Setup motors
   // set the maximum speed, acceleration factor,
   // initial speed and the target position
@@ -142,139 +306,12 @@ void setup() {
   digitalWrite(MS1, LOW);
   pinMode(MS2, OUTPUT);
   digitalWrite(MS2, HIGH);
-  myStepper.setMaxSpeed(12800*20);
-  myStepper.setAcceleration(100*16*2*10);
- // myStepper.setSpeed(200);
-  //myStepper.moveTo(200);
+  myStepper.setMaxSpeed(speed_x0);
+  myStepper.setAcceleration(maxAccel);
   myStepper.setCurrentPosition(0);
-  
-  delay(500);
 }
 
-void loop() {
-  if(micros() - timeLastPoll >= dt) {
-    //Serial.println(micros() - timeLastPoll);
-    timeLastPoll = micros();
-
-    // Sensing ---------------------------------------------------------------------
-    // Collect sensor data
-    PMW3360_DATA data0 = sensor0.readBurst_simple();
-    PMW3360_DATA data1 = sensor1.readBurst_simple();
-    PMW3360_DATA data2 = sensor2.readBurst_simple();
-    //PMW3360_DATA data3 = sensor3.readBurst_simple();
-
-    int yup = 1;
-    if(yup) {
-    //if(data1.isOnSurface && data1.isMotion) {   // If movement...
-      // **Only checking sensor 1 rn (TODO: check all of them and account for misreads)**
-
-      // Sensor velocity sensing
-      dXmm[0] = -convTwosComp(data0.dx)*Cx[0] / dt;       // maybe divide by dt (would be slower, but more robust?)
-      dXmm[1] = -convTwosComp(data1.dx)*Cx[1] / dt;
-      dXmm[2] = -convTwosComp(data2.dx)*Cx[2] / dt;
-      //dXmm[3] = -convTwosComp(data3.dx)*Cx[3] / dt;
-      dYmm[0] = convTwosComp(data0.dy)*Cx[0] / dt;
-      dYmm[1] = convTwosComp(data1.dy)*Cx[1] / dt;
-      dYmm[2] = convTwosComp(data2.dy)*Cx[2] / dt;
-      //dYmm[3] = convTwosComp(data3.dy)*Cx[3] / dt;
-
-//      dXmm = dX*Cx[3];
-//      dYmm = dY*Cy[3];
-
-      // Sensor position estimation
-//      if(firstPoint) {
-//        // make sure first point (x,y) is (0,0) (there could be a better way to do this)
-//        firstPoint = 0;
-//      }else{
-//        for (int i = 0; i<4; i++) {
-//          xmm[i] = xmm[i] + dXmm[i];
-//          ymm[i] = ymm[i] + dYmm[i];
-//        }
-//      }
-
-      // Body angle estimation
-      estAngVel[0] = (dXmm[2] - dXmm[0])/ly;
-      estAngVel[1] = (dXmm[2] - dXmm[1])/ly;
-      estAngVel[2] = (dYmm[1] - dYmm[0])/lx;
-      estAngVel[3] = (dYmm[1] - dYmm[2])/lx;
-      float sumAngVel = 0.0f;
-      for (int i = 0; i<4; i++) {
-        // Simple average of angular velocities
-        sumAngVel = sumAngVel + estAngVel[i];
-        //Serial.printf("w%i:%f,",i,estAngVel[i]);
-      }
-      estAngVel1 = sumAngVel / 4.0f;
-      estYaw = estYaw + estAngVel1*dt;
-      //Serial.printf("w:%f",estAngVel1);
-
-      // Body position estimation
-      estVelX[0] = dXmm[0]*cosf(estYaw)-dYmm[0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-ly*sinf(estYaw));
-      estVelX[1] = dXmm[1]*cosf(estYaw)-dYmm[1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+ly*sinf(estYaw));
-      estVelX[2] = dXmm[2]*cosf(estYaw)-dYmm[2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-ly*sinf(estYaw));
-      estVelY[0] = dXmm[0]*sinf(estYaw)+dYmm[0]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)+lx*sinf(estYaw));
-      estVelY[1] = dXmm[1]*sinf(estYaw)+dYmm[1]*cosf(estYaw) + 0.5*estAngVel1*(-ly*cosf(estYaw)+lx*sinf(estYaw));
-      estVelY[2] = dXmm[2]*sinf(estYaw)+dYmm[2]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)-lx*sinf(estYaw));
-      float sumVelX = 0.0f;
-      float sumVelY = 0.0f;
-      for (int i = 0; i<ns; i++) {
-        // Simple average of angular velocities
-        sumVelX = sumVelX + estVelX[i];
-        sumVelY = sumVelY + estVelY[i];
-      }
-      
-      estVelX1 = sumVelX / ns;
-      estVelY1 = sumVelY / ns;
-      estPosX = estPosX + estVelX1*dt;
-      estPosY = estPosY + estVelY1*dt;
-      
-      float absVel = sqrt(pow(dXmm[0],2) + pow(dYmm[0],2));
-      //Serial.printf("Absolute velocity = %f",absVel);
-      //Serial.println();
-      
-      //Serial.printf("dx:%f,dy:%f",dXmm,dYmm);
-      //Serial.printf("dx:%i,dy:%i",data.dx,data.dy);
-      Serial.printf("x:%f,y:%f,theta:%f",estPosX,estPosY,estYaw);
-//      Serial.printf("w1:%f,w2:%f,w3:%f,w4:%f,w5:%f,w6:%f,w7:%f,w8:%f",estAngVel[0],estAngVel[1],
-//        estAngVel[2],estAngVel[3],estAngVel[4],estAngVel[5],estAngVel[6],estAngVel[7]);
-      //Serial.printf("x:%f,y:%f",xmm[1],ymm[1]);
-      Serial.println();
-    }
-  }
-
-  // Motor Control ---------------------------------------------------------------------------------
-  distDes = estPosX*cos(estYaw);
-  
-  if (digitalRead(BUTT_HANDLE) == LOW)
-  {
-    //Serial.println("User in control!");
-    // User is in control of device, run control code
-    if (began == false) {
-      began = true;
-      myStepper.moveTo(Conv*distDes);
-      myStepper.setMaxSpeed(Conv*maxVel);
-    } else {
-      if (myStepper.distanceToGo() != 0) {
-        //delay(100);
-        myStepper.run();
-      } else {
-        began = false;
-        //count = count + 1;
-        //delay(1000);
-//        if(count == num) {
-//          count = 0;
-//        }
-      }
-    }
-  }else{
-    //Serial.println("User not in control!");
-    // User is not in control of device, cancel everything
-    myStepper.setSpeed(0);
-  }
-  
-  //delay(10);
-}
-
-
+// Loop subfunctions -----------------------------------------------------------------------------
 int convTwosComp(int b){
   //Convert from 2's complement
   //if(sizeof(b) > 
@@ -282,4 +319,60 @@ int convTwosComp(int b){
     b = -1 * ((b ^ 0xff) + 1);      // 0xff (hex) = 11111111 (bin) = 255 (dec)
   }
   return b;
+}
+
+void machineZeroX_1() {
+  // First calibration run
+  //myStepper.moveTo(Conv*retract);
+  myStepper.move(-Conv*gantryLength);
+  myStepper.run();
+  if (digitalRead(LIMIT_MACH_X0) == LOW) {
+    myStepper.setSpeed(0);              // stop motor
+    myStepper.setCurrentPosition(0);
+    x0_count += 1;
+    Serial.println("Limit reached");
+  }
+}
+
+void machineZeroX_2() {
+  //myStepper.setMaxSpeed(speed_x0);
+  // Retract
+  myStepper.move(Conv*retract);
+  while (myStepper.distanceToGo() != 0) {
+    myStepper.run();
+  }
+  myStepper.setSpeed(0);
+  myStepper.runSpeed();
+  delay(100);
+
+  // Move in for second calibration
+  myStepper.setSpeed(-speed_x1);
+  while (digitalRead(LIMIT_MACH_X0) == HIGH) {
+    // Run until you hit the limit switch
+    myStepper.runSpeed();
+  }
+  myStepper.setSpeed(0);              // stop motor
+  myStepper.runSpeed();
+  myStepper.setCurrentPosition(0);
+  Serial.println(myStepper.currentPosition());
+
+  myStepper.move(Conv*((gantryLength/2) - xLimitOffset));
+  while (myStepper.distanceToGo() != 0) {
+    myStepper.run();
+  }
+  myStepper.setCurrentPosition(0);
+
+  // Go back to standard settings
+  myStepper.setMaxSpeed(Conv*maxVel);
+  x0_count += 1;      // Stop limit switch function (should go back to 0 for main code)
+}
+
+void sensorPlotting() {
+  //Serial.printf("dx:%f,dy:%f",dXmm,dYmm);
+  //Serial.printf("dx:%i,dy:%i",data.dx,data.dy);
+  Serial.printf("x:%f,y:%f,theta:%f",estPosX,estPosY,estYaw);
+//      Serial.printf("w1:%f,w2:%f,w3:%f,w4:%f,w5:%f,w6:%f,w7:%f,w8:%f",estAngVel[0],estAngVel[1],
+//        estAngVel[2],estAngVel[3],estAngVel[4],estAngVel[5],estAngVel[6],estAngVel[7]);
+  //Serial.printf("x:%f,y:%f",xmm[1],ymm[1]);
+  Serial.println();
 }
