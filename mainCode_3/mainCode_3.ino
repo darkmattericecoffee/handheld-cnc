@@ -1,6 +1,8 @@
 // Libraries to include
 #include <PMW3360.h>
 #include <AccelStepper.h>
+
+// Files to include
 /*
 Sensor configuration (USING 3 SENSORS NOW!!):
 0 --- 1              ^ y
@@ -80,7 +82,7 @@ int dX[3] = {0,0,0};
 int dY[3] = {0,0,0};
 float dXmm[3] = {0.0f,0.0f,0.0f};
 float dYmm[3] = {0.0f,0.0f,0.0f};
-float vXmm[3] = {0.0f,0.0f,0.0f};        // velocity (mm/s)(dXmm/dt)
+float vXmm[3] = {0.0f,0.0f,0.0f};        // velocity (mm/s)(dXmm/dt) (unused)
 float vYmm[3] = {0.0f,0.0f,0.0f};
 
 // Estimated quantities
@@ -240,14 +242,14 @@ void loop() {
     }
   
     // Motor Control ---------------------------------------------------------------------------------
-    distDes = estPosX*cos(estYaw);
+    distDes = -estPosX*cos(estYaw);
     
     if (digitalRead(BUTT_HANDLE) == LOW) {
       Serial.println("User in control!");
       // User is in control of device, run control code
       if (began == false) {
         began = true;
-        myStepper.moveTo(Conv*distDes);
+        myStepper.moveTo(-Conv*distDes);
         //myStepper.setMaxSpeed(maxVel);
       } else {
         if (myStepper.distanceToGo() != 0) {
@@ -325,13 +327,20 @@ int convTwosComp(int b){
   return b;
 }
 
+void stopStepper() {
+  // Stop stepper motor (not using acceleration. If acceleration is desired, user library's stop() function)
+  myStepper.setSpeed(0);
+  myStepper.runSpeed();
+}
+
 void machineZeroX_1() {
   // First calibration run
   //myStepper.moveTo(Conv*retract);
   myStepper.move(-Conv*gantryLength);
   myStepper.run();
   if (digitalRead(LIMIT_MACH_X0) == LOW) {
-    myStepper.setSpeed(0);              // stop motor
+    // myStepper.setSpeed(0);              // stop motor
+    stopStepper();
     myStepper.setCurrentPosition(0);
     x0_count += 1;
     Serial.println("Limit reached");
@@ -345,8 +354,7 @@ void machineZeroX_2() {
   while (myStepper.distanceToGo() != 0) {
     myStepper.run();
   }
-  myStepper.setSpeed(0);
-  myStepper.runSpeed();
+  stopStepper();
   delay(100);
 
   // Move in for second calibration
@@ -355,8 +363,7 @@ void machineZeroX_2() {
     // Run until you hit the limit switch
     myStepper.runSpeed();
   }
-  myStepper.setSpeed(0);              // stop motor
-  myStepper.runSpeed();
+  stopStepper();
   myStepper.setCurrentPosition(0);
   Serial.println(myStepper.currentPosition());
 
