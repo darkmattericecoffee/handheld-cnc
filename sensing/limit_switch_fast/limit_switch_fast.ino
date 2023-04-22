@@ -1,3 +1,4 @@
+//#include <SpeedyStepper.h>
 #include <AccelStepper.h>
 
 // NOTE: "positive" movement for the stepper is away from the motor, so NEGATIVE in our setup
@@ -6,7 +7,7 @@
 #define BUTT_HANDLE 7
 #define MS1  37
 #define MS2  38
-//#define PIN_STEP_ENABLE 13
+#define PIN_STEP_ENABLE 41
 //#define RX2 0
 //#define TX2 1
 //#define DIAG_PIN 12
@@ -15,6 +16,7 @@
 
 int x0_count = 0;
 int buttPressed = 0;
+int loopCount = 0;
 
 int uSteps = 64;                  // microstep configuration
 int Conv = 25*uSteps;             // conversion coefficient (steps/mm)
@@ -31,16 +33,22 @@ float limitOffset = 2.54;         // distance from wall of stepper when zeroed (
 
 // Motor object creation
 AccelStepper myStepper(motorInterfaceType, stepPin, dirPin);
+//SpeedyStepper myStepper;
  
 void setup() {
   Serial.begin(115200);
   pinMode(LIMIT_SWITCH_PIN, INPUT);
   pinMode(BUTT_HANDLE, INPUT);
+  pinMode(PIN_STEP_ENABLE, OUTPUT);
+
+//  myStepper.connectToPins(stepPin, dirPin);
+//  myStepper.setStepsPerMillimeter(uConv);
 
   pinMode(MS1, OUTPUT);
   digitalWrite(MS1, LOW);
   pinMode(MS2, OUTPUT);
   digitalWrite(MS2, HIGH);
+  digitalWrite(PIN_STEP_ENABLE, LOW);
   myStepper.setMaxSpeed(speed_x0);
   myStepper.setAcceleration(maxAccel);
   myStepper.setCurrentPosition(0);
@@ -49,6 +57,9 @@ void setup() {
 }
  
 void loop() {
+  if (digitalRead(LIMIT_SWITCH_PIN) == LOW) {
+    Serial.println("Limit engaged!");
+  }
   if (digitalRead(BUTT_HANDLE) == LOW) {
     buttPressed = 1;
   }
@@ -63,6 +74,10 @@ void loop() {
       //myStepper.moveTo(Conv*retract);
       myStepper.move(-Conv*gantryLength);
       myStepper.run();
+      if (loopCount == 0) {
+        delay(100);
+        loopCount += 1;
+      }
       if (digitalRead(LIMIT_SWITCH_PIN) == LOW) {
         myStepper.setSpeed(0);              // stop motor
         myStepper.setCurrentPosition(0);

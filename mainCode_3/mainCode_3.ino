@@ -26,7 +26,7 @@ Sensor configuration (USING 3 SENSORS NOW!!):
 // Motor Pins
 #define MS1  37
 #define MS2  38
-//#define PIN_STEP_ENABLE 13
+#define STEP_ENABLE 41
 //#define RX2 0
 //#define TX2 1
 //#define DIAG_PIN 12
@@ -50,11 +50,11 @@ int uSteps = 64;
 int Conv = 25*uSteps;
 //int pos[] = {20,-20,20,-20};
 //int vel[] = {10,-20,10,-40};
-float maxVel = 40.0f;           // max velocity motor can move at
+float maxVel = 40.0 * Conv;           // max velocity motor can move at
+float maxAccel = 200.0 * Conv;
 float retract = 5;                // (mm)
 float speed_x0 = 20.0 * Conv;             // x zeroing speed (mm/s)
 float speed_x1 = 4.0 * Conv;              // x secondary zeroing speed
-float maxAccel = 100*16*2*10;
 bool began = false;
 #define motorInterfaceType 1
 
@@ -122,6 +122,7 @@ void setup() {
   pinMode(BUTT_MACH_X0, INPUT);
   pinMode(BUTT_WORK_X0Y0, INPUT);
   pinMode(BUTT_HANDLE, INPUT);
+  pinMode(STEP_ENABLE, OUTPUT);
   //pinMode(LIMIT_WOR
 
   sensorSetup();
@@ -132,19 +133,21 @@ void setup() {
 }
 
 void loop() {
+  //Serial.println(digitalRead(LIMIT_MACH_X0));
   // System Initialization ------------------------------------------------------------------------
   // Machine X Zeroing
   if (digitalRead(BUTT_MACH_X0) == LOW) {
     x0_count = 0;
   }
   if (x0_count == 0) {
-    Serial.println("Init limit switch");
+    //Serial.println("Init limit switch");
     machineZeroX_1();
   } else if (x0_count == 1) {
     machineZeroX_2();
   }
 
   // Workpiece zeroing
+  //Serial.println(digitalRead(BUTT_WORK_X0Y0));
   if (digitalRead(BUTT_WORK_X0Y0) == LOW) {
     readyOrNot = 1;
   }
@@ -245,7 +248,7 @@ void loop() {
       if (began == false) {
         began = true;
         myStepper.moveTo(Conv*distDes);
-        //myStepper.setMaxSpeed(Conv*maxVel);
+        //myStepper.setMaxSpeed(maxVel);
       } else {
         if (myStepper.distanceToGo() != 0) {
           //delay(100);
@@ -306,6 +309,7 @@ void motorSetup() {
   digitalWrite(MS1, LOW);
   pinMode(MS2, OUTPUT);
   digitalWrite(MS2, HIGH);
+  digitalWrite(STEP_ENABLE, LOW);
   myStepper.setMaxSpeed(speed_x0);
   myStepper.setAcceleration(maxAccel);
   myStepper.setCurrentPosition(0);
@@ -363,7 +367,7 @@ void machineZeroX_2() {
   myStepper.setCurrentPosition(0);
 
   // Go back to standard settings
-  myStepper.setMaxSpeed(Conv*maxVel);
+  myStepper.setMaxSpeed(maxVel);
   x0_count += 1;      // Stop limit switch function (should go back to 0 for main code)
 }
 
