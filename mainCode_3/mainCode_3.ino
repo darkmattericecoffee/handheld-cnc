@@ -38,9 +38,9 @@ int stepPin = 33;
 // Constants ------------------------------------------------------------------------
 // Path properties (sine wave)
 const int num_points = 1000;             // length of path array
-const float sinAmp = 20.0;
-const float sinPeriod = 200.0;
-const float pathMax_y = 200.0;
+const float sinAmp = 5.0;
+const float sinPeriod = 60.0;
+const float pathMax_y = 300.0;
 float pathArrayX[num_points];
 float pathArrayY[num_points];
 
@@ -111,7 +111,7 @@ float estTraj = 0.0f;
 float estVelAbs = 0.0f;
 
 // Control Constants ----------------------------------------------------------------
-const int num_queries = 10;       // number of points to query for min distance calculation
+const int num_queries = 2;       // number of points to query for min distance calculation
 
 // Control Variables ----------------------------------------------------------------
 // Path following
@@ -254,7 +254,7 @@ void loop() {
         estVelY1 = sumVelY / ns;              // velocity w.r.t. intertial frame
         estPosX = estPosX + estVelX1*dt;      // position w.r.t. intertial frame
         estPosY = estPosY + estVelY1*dt;      // position w.r.t. intertial frame
-        estTraj = atan(estVelY1/estVelX1);    // trajectory angle w.r.t inertial frame
+        estTraj = atanf(estVelY1/estVelX1);    // trajectory angle w.r.t inertial frame
         estVelAbs = sqrt(pow(estVelX1,2) + pow(estVelY1,2));
         //Serial.println(estTraj);
         
@@ -284,20 +284,22 @@ void loop() {
 
     nextX = pathArrayX[closest_point_index];
     nextY = pathArrayY[closest_point_index];
-    nextTraj = atan((nextY - estPosY)/(nextX - estPosX));
-    Serial.println(nextX);
+    nextTraj = atanf((nextY - estPosY)/(nextX - estPosX));
 
     if (generalMode) {
       // Desired quantities (for general drawing)
-      desPos = -distance(estPosX,estPosY,nextX,nextY)*cos(nextTraj - estYaw);
+      // desPos = -distance(estPosX,estPosY,nextX,nextY)*cosf(nextTraj - estYaw);
+      // desPos = -distance(estPosX,estPosY,nextX,nextY);
+      // desPos = -(nextX - estPosX);
+      desPos = sinAmp * sinf((TWO_PI/sinPeriod)*estPosY);     // cheat mode
       if (!isnan(estTraj)) {
-        desVel = estVelAbs * cos(estTraj - estYaw) * 1000000;
+        desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;
       }
     } else {
       // Desired quantities (for line drawing)
-      desPos = -estPosX*cos(estYaw);
+      desPos = -estPosX*cosf(estYaw);
       if (!isnan(estTraj)) {
-        desVel = estVelAbs * cos(estTraj - estYaw) * 1000000;
+        desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;
   //      Serial.printf("desVel:%f,estVelAbs:%f,beta:%f",desVel,estVelAbs,estTraj - estYaw);
   //      Serial.println();
       }
@@ -378,7 +380,7 @@ void sinGenerator() {
   // Generate sine path to cut
   for (int i = 0; i < num_points; ++i) {
     float y = (pathMax_y) * (float)i / (num_points - 1);
-    float x = sinAmp * sin((TWO_PI/sinPeriod)*y);
+    float x = sinAmp * sinf((TWO_PI/sinPeriod)*y);
     pathArrayX[i] = x;
     pathArrayY[i] = y;
   }
@@ -395,7 +397,7 @@ int convTwosComp(int b){
 }
 
 float distance(float x1, float y1, float x2, float y2) {
-    return sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+  return sqrt(pow(x1 - x2,2) + pow(y1 - y2,2));
 }
 
 void stopStepper() {
@@ -459,4 +461,8 @@ void sensorPlotting() {
 //        estAngVel[2],estAngVel[3],estAngVel[4],estAngVel[5],estAngVel[6],estAngVel[7]);
   //Serial.printf("x:%f,y:%f",xmm[1],ymm[1]);
   Serial.println();
+}
+
+void debugging() {
+  // Put all Serial print lines here to view
 }
