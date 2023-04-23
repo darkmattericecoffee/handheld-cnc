@@ -36,9 +36,18 @@ int dirPin = 36;
 int stepPin = 33;
 
 // Constants ------------------------------------------------------------------------
+// Path properties (sine wave)
+const int num_points = 1000;             // length of path array
+const float sinAmp = 20.0;
+const float sinPeriod = 200.0;
+const float pathMax_y = 200.0;
+float pathArrayX[num_points];
+float pathArrayY[num_points];
+
 // Sensor properties
 const int ns = 3;                   // number of sensors
 const int CPI = 2500;               // This value changes calibration coefficients
+long unsigned dt = 500;       // microseconds (freq = 1,000,000/timestepPoll [Hz])
 const float Cx[3] = {0.00997506234f,0.01003310926f,0.00996611521f};
 const float Cy[3] = {0.01011531459f,0.01026588646f,0.01019056354f};
 const float lx = 120.0f;                // x length of rectangular sensor configuration
@@ -48,15 +57,17 @@ const float yOff[3] = {ly/2,ly/2,-ly/2};
 
 // Motor properties
 int count = 0;
-int uSteps = 64;
+int uSteps = 8;
 int Conv = 25*uSteps;
 //int pos[] = {20,-20,20,-20};
 //int vel[] = {10,-20,10,-40};
+float stepPulseWidth = 20.0;          // min pulse width (from Mark Rober's code)
 float maxVel = 40.0 * Conv;           // max velocity motor can move at
-float maxAccel = 200.0 * Conv;
+float maxAccel = 600.0 * Conv;
 float retract = 5;                // (mm)
 float speed_x0 = 20.0 * Conv;             // x zeroing speed (mm/s)
 float speed_x1 = 4.0 * Conv;              // x secondary zeroing speed
+float accel_x0 = 200.0 * Conv;
 bool began = false;
 #define motorInterfaceType 1
 
@@ -65,7 +76,8 @@ float gantryLength = 106.0;       // (mm)
 float xLimitOffset = 2.54;         // distance from wall of stepper when zeroed (mm)
 
 // Variables ------------------------------------------------------------------------
-int plotting = 1;
+int plotting = 0;
+int generalMode = 1;                // use general mode (sine wave) = 1; line drawing = 0;
 
 // Button states
 int readyOrNot = 0;
@@ -73,9 +85,9 @@ int readyOrNot = 0;
 // Zeroing variables
 int x0_count = 2;           // x zeroing count variable (start as "false")
 
+// Timing variables
 int firstPoint = 1;
 long unsigned timeLastPoll = 0;
-long unsigned dt = 500;       // microseconds (freq = 1,000,000/timestepPoll [Hz])
 
 // Measured quantities
 int dX[3] = {0,0,0};
@@ -86,24 +98,31 @@ float vXmm[3] = {0.0f,0.0f,0.0f};        // velocity (mm/s)(dXmm/dt) (unused)
 float vYmm[3] = {0.0f,0.0f,0.0f};
 
 // Estimated quantities
-float xmm[3] = {0.0f,0.0f,0.0f};         // *not significant*
-float ymm[3] = {0.0f,0.0f,0.0f};         // *not significant*
 float estVelX[3] = {0.0f,0.0f,0.0f};
 float estVelY[3] = {0.0f,0.0f,0.0f};
-float estVelX1 = 0.0f;
-float estVelY1 = 0.0f;
+float estVelX1 = 0.0f;                    // (mm/us)
+float estVelY1 = 0.0f;                    // (mm/us)
 float estPosX = 0.0f;                         // router center position - x
 float estPosY = 0.0f;                         // router center position - y
-float estAngVel[8] = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
+float estAngVel[4] = {0.0f,0.0f,0.0f,0.0f};
 float estAngVel1 = 0.0f;
 float estYaw = 0.0f;                          // Angle estimation
+float estTraj = 0.0f;
+float estVelAbs = 0.0f;
 
 // Control Constants ----------------------------------------------------------------
-const int len = 1000;       // length of path array
+const int num_queries = 10;       // number of points to query for min distance calculation
 
 // Control Variables ----------------------------------------------------------------
+// Path following
+int closest_point_index = 0;
+float nextX = 0.0f;
+float nextY = 0.0f;
+float nextTraj = 0.0f;
+
 // Motor control variables
-float distDes = 0.0f;
+float desPos = 0.0f;
+float desVel = 0.0f;
 
 // Object Initialization ------------------------------------------------------------
 // Sensor object creation
@@ -115,6 +134,8 @@ PMW3360 sensor2;
 // Motor object creation
 AccelStepper myStepper(motorInterfaceType, stepPin, dirPin);
 
+// -------------------------------------------------------------------------------------------------
+// Setup and Main Loop -----------------------------------------------------------------------------
 void setup() {
   Serial.begin(9600);  
   while(!Serial);
@@ -130,6 +151,10 @@ void setup() {
   sensorSetup();
 
   motorSetup();
+
+  sinGenerator();       // Make path
+
+  Serial.println("Handheld CNC Router set up!");
   
   delay(500);
 }
@@ -173,7 +198,7 @@ void loop() {
         // **Only checking sensor 1 rn (TODO: check all of them and account for misreads)**
   
         // Sensor velocity sensing
-        dXmm[0] = -convTwosComp(data0.dx)*Cx[0] / dt;       // maybe divide by dt (would be slower, but more robust?)
+        dXmm[0] = -convTwosComp(data0.dx)*Cx[0] / dt;
         dXmm[1] = -convTwosComp(data1.dx)*Cx[1] / dt;
         dXmm[2] = -convTwosComp(data2.dx)*Cx[2] / dt;
         //dXmm[3] = -convTwosComp(data3.dx)*Cx[3] / dt;
@@ -225,14 +250,17 @@ void loop() {
           sumVelX = sumVelX + estVelX[i];
           sumVelY = sumVelY + estVelY[i];
         }
-        estVelX1 = sumVelX / ns;
-        estVelY1 = sumVelY / ns;
-        estPosX = estPosX + estVelX1*dt;
-        estPosY = estPosY + estVelY1*dt;
+        estVelX1 = sumVelX / ns;              // velocity w.r.t. intertial frame
+        estVelY1 = sumVelY / ns;              // velocity w.r.t. intertial frame
+        estPosX = estPosX + estVelX1*dt;      // position w.r.t. intertial frame
+        estPosY = estPosY + estVelY1*dt;      // position w.r.t. intertial frame
+        estTraj = atan(estVelY1/estVelX1);    // trajectory angle w.r.t inertial frame
+        estVelAbs = sqrt(pow(estVelX1,2) + pow(estVelY1,2));
+        //Serial.println(estTraj);
         
-        float absVel = sqrt(pow(dXmm[0],2) + pow(dYmm[0],2));
-        //Serial.printf("Absolute velocity = %f",absVel);
-        //Serial.println();
+//        float absVel = sqrt(pow(dXmm[0],2) + pow(dYmm[0],2)) * (1000000.0);
+//        Serial.printf("Absolute velocity = %f",absVel);
+//        Serial.println();
   
         // Sensor plotting
         if (plotting) {
@@ -242,28 +270,56 @@ void loop() {
     }
   
     // Motor Control ---------------------------------------------------------------------------------
-    distDes = -estPosX*cos(estYaw);
+    // Find closest point
+    float min_distance = 1000;                  // ridiculously large initial min distance (mm)
+    int start_point = closest_point_index;
+    int end_point = min(start_point + num_queries, num_points);
+    for (int i = start_point; i < end_point; ++i) {
+      float dist = distance(estPosX, estPosY, pathArrayX[i], pathArrayY[i]);
+      if (dist < min_distance) {
+        min_distance = dist;
+        closest_point_index = i;
+      }
+    }
+
+    nextX = pathArrayX[closest_point_index];
+    nextY = pathArrayY[closest_point_index];
+    nextTraj = atan((nextY - estPosY)/(nextX - estPosX));
+    Serial.println(nextX);
+
+    if (generalMode) {
+      // Desired quantities (for general drawing)
+      desPos = -distance(estPosX,estPosY,nextX,nextY)*cos(nextTraj - estYaw);
+      if (!isnan(estTraj)) {
+        desVel = estVelAbs * cos(estTraj - estYaw) * 1000000;
+      }
+    } else {
+      // Desired quantities (for line drawing)
+      desPos = -estPosX*cos(estYaw);
+      if (!isnan(estTraj)) {
+        desVel = estVelAbs * cos(estTraj - estYaw) * 1000000;
+  //      Serial.printf("desVel:%f,estVelAbs:%f,beta:%f",desVel,estVelAbs,estTraj - estYaw);
+  //      Serial.println();
+      }
+    }
     
-    if (digitalRead(BUTT_HANDLE) == LOW) {
-      Serial.println("User in control!");
+    if (digitalRead(BUTT_HANDLE) == LOW  && closest_point_index + 1 < num_points) {
+      //Serial.println("User in control!");
       // User is in control of device, run control code
-      if (began == false) {
-        began = true;
-        myStepper.moveTo(-Conv*distDes);
-        //myStepper.setMaxSpeed(maxVel);
-      } else {
-        if (myStepper.distanceToGo() != 0) {
-          //delay(100);
-          myStepper.run();
-        } else {
-          began = false;
-        }
+      myStepper.moveTo(-Conv*desPos);
+//        if (Conv*desVel <= maxVel) {
+//          myStepper.setMaxSpeed(Conv*desVel);
+//        }
+      //myStepper.setMaxSpeed(maxVel);
+      if (myStepper.distanceToGo() != 0) {
+        //delay(100);
+        myStepper.run();
       }
     } else {
       // User is not in control of device, cancel everything
-      myStepper.setSpeed(0);
+      stopStepper();
       //readyOrNot = 0;
-      Serial.println("User not in control!");
+      //Serial.println("User not in control!");
     }
     
     //delay(10);
@@ -293,14 +349,14 @@ void sensorSetup() {
     Serial.println("Sensor2 initialization failed");
   }
 
-  // Initialize sensor locations relative to body
-  Serial.print("Initial locations of sensors: ");
-  for (int i = 0; i<ns; i++) {
-    xmm[i] = xmm[i] + xOff[i];
-    ymm[i] = ymm[i] + yOff[i];
-    Serial.printf("%i(%.2f,%.2f),",i+1,xmm[i],ymm[i]);
-  }
-  Serial.println();
+//  // Initialize sensor locations relative to body
+//  Serial.print("Initial locations of sensors: ");
+//  for (int i = 0; i<ns; i++) {
+//    xmm[i] = xmm[i] + xOff[i];
+//    ymm[i] = ymm[i] + yOff[i];
+//    Serial.printf("%i(%.2f,%.2f),",i+1,xmm[i],ymm[i]);
+//  }
+//  Serial.println();
 }
 
 void motorSetup() {
@@ -310,11 +366,22 @@ void motorSetup() {
   pinMode(MS1, OUTPUT);
   digitalWrite(MS1, LOW);
   pinMode(MS2, OUTPUT);
-  digitalWrite(MS2, HIGH);
+  digitalWrite(MS2, LOW);
   digitalWrite(STEP_ENABLE, LOW);
+  myStepper.setMinPulseWidth(stepPulseWidth);
   myStepper.setMaxSpeed(speed_x0);
   myStepper.setAcceleration(maxAccel);
   myStepper.setCurrentPosition(0);
+}
+
+void sinGenerator() {
+  // Generate sine path to cut
+  for (int i = 0; i < num_points; ++i) {
+    float y = (pathMax_y) * (float)i / (num_points - 1);
+    float x = sinAmp * sin((TWO_PI/sinPeriod)*y);
+    pathArrayX[i] = x;
+    pathArrayY[i] = y;
+  }
 }
 
 // Loop subfunctions -----------------------------------------------------------------------------
@@ -327,6 +394,10 @@ int convTwosComp(int b){
   return b;
 }
 
+float distance(float x1, float y1, float x2, float y2) {
+    return sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+}
+
 void stopStepper() {
   // Stop stepper motor (not using acceleration. If acceleration is desired, user library's stop() function)
   myStepper.setSpeed(0);
@@ -336,6 +407,7 @@ void stopStepper() {
 void machineZeroX_1() {
   // First calibration run
   //myStepper.moveTo(Conv*retract);
+  myStepper.setAcceleration(accel_x0);
   myStepper.move(-Conv*gantryLength);
   myStepper.run();
   if (digitalRead(LIMIT_MACH_X0) == LOW) {
@@ -375,6 +447,7 @@ void machineZeroX_2() {
 
   // Go back to standard settings
   myStepper.setMaxSpeed(maxVel);
+  myStepper.setAcceleration(maxAccel);
   x0_count += 1;      // Stop limit switch function (should go back to 0 for main code)
 }
 
