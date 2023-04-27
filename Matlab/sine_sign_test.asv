@@ -1,0 +1,21 @@
+clear; clc;
+
+% Define points
+amp = 20;
+period = 200;
+y = linspace(0,200,1000);
+x = amp*sin((2*pi/period)*y);
+
+C = ;
+
+A = [12,22];
+
+beta = atan((A(2) - C(2))/(A(1) - C(1)));
+
+theta = atan(C(2)/C(1));
+
+alpha = (pi/2) - beta - theta
+
+
+plot([C(1) A(1)],[C(2) A(2)])
+axis equal
