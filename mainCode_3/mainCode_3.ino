@@ -47,6 +47,11 @@ Angle signage: +CCW
 //#define DIAG_PIN 12
 
 // Constants ------------------------------------------------------------------------
+int plotting = 0;
+int debugMode = 1;
+int generalMode = 0;          // use general mode (sine wave) = 1; line drawing = 0;
+int designMode = 2;           // 1 = sin wave; 2 = circle
+
 // Path properties (sine wave)
 const int num_points = 1000;             // length of path array
 const float sinAmp = 5.0;
@@ -54,6 +59,8 @@ const float sinPeriod = 100.0;
 const float pathMax_y = 300.0;
 float pathArrayX[num_points];
 float pathArrayY[num_points];
+// Path properties (circle)
+const float circleDiameter = 200.0;       // Diameter of the circle
 
 // Button properties
 long debounceDelay = 50;    // the debounce time; increase if the output flickers
@@ -77,7 +84,7 @@ int Conv = 25*uSteps;
 //int vel[] = {10,-20,10,-40};
 float stepPulseWidth = 20.0;          // min pulse width (from Mark Rober's code)
 float maxVel = 40.0 * Conv;           // max velocity motor can move at
-float maxAccel = 600.0 * Conv;
+float maxAccel = 800.0 * Conv;
 float retract = 5;                // (mm)
 float speed_x0 = 20.0 * Conv;             // x zeroing speed (mm/s)
 float speed_x1 = 4.0 * Conv;              // x secondary zeroing speed
@@ -88,17 +95,15 @@ bool began = false;
 // Gantry geometry
 float gantryLength = 106.0;       // (mm)
 float xLimitOffset = 2.54;         // distance from wall of stepper when zeroed (mm)
+float xBuffer = 3.0;
 float zLength = 34.0;
 float zLimitOffset = 2.13;
 float maxHeight = zLength;
 
 // Variables ------------------------------------------------------------------------
-int plotting = 0;
-int debugMode = 1;
-int generalMode = 1;                // use general mode (sine wave) = 1; line drawing = 0;
-
 // Run states
 int cutStarted = 0;
+int raised = 0;
 
 // Button states
 int readyOrNot = 0;
@@ -188,7 +193,16 @@ void setup() {
 
   motorSetup();
 
-  sinGenerator();       // Make path
+  // Make path
+  switch (designMode) {
+    case 1:
+      sinGenerator();
+    case 2:
+      circleGenerator();
+  }
+//  for (int i = 1; i < num_points; i++) {
+//    Serial.printf("x(%i) = 
+//  }
 
   Serial.println("Handheld CNC Router set up!");
   
@@ -305,14 +319,17 @@ void loop() {
     }
   
     // Motor Control ---------------------------------------------------------------------------------
-    if (digitalRead(BUTT_HANDLE) == LOW  && closest_point_index + 1 < num_points) {
+    if (digitalRead(BUTT_HANDLE) == LOW  && closest_point_index + 1 < num_points &&
+        abs(motorPosX/Conv) < (0.5*gantryLength - xBuffer) {
       cutStarted = 1;
+      //Serial.println(cutStarted);
       
       motorPosX = - stepperX.currentPosition() / (float)Conv;
       estPosRoutX = estPosX + motorPosX*cosf(estYaw);
       estPosRoutY = estPosY + motorPosX*cosf(estYaw);
       
       // Find closest point
+      // TO-DO: find closest point by going to the next point in the array after crossing a point
       float min_distance = 1000;                  // ridiculously large initial min distance (mm)
       int start_point = closest_point_index;
       int end_point = min(start_point + num_queries, num_points);
@@ -339,16 +356,8 @@ void loop() {
       // Desired actuation
       if (generalMode) {
         // Desired quantities (for general drawing)
-        desPos = (deltaX - tanf(estYaw)*deltaY)*cosf(estYaw);       // Sanzhar equation
-        //desPos = myDist(estPosX,estPosY,nextX,nextY)*sinf(nextTrajC);
-//        if (closest_point_index == 0 && nextX == 0 && nextY == 0) {
-//          desPos = 0;
-//        } else {
-//          desPos = desPosIntersect(estPosX,estPosY,estYaw,lastX,lastY,nextX,nextY);
-//        }
-        // desPos = -distance(estPosX,estPosY,nextX,nextY);
-        // desPos = -(nextX - estPosX);
-        // desPos = sinAmp * sinf((TWO_PI/sinPeriod)*estPosY);     // cheat mode
+        desPos = desiredPosition(deltaX,deltaY,estYaw);
+        //desPos = (deltaX - tanf(estYaw)*deltaY)*cosf(estYaw); 
         if (!isnan(estTraj)) {
           desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;
         }
@@ -357,8 +366,6 @@ void loop() {
         desPos = -estPosX*cosf(estYaw);
         if (!isnan(estTraj)) {
           desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;
-    //      Serial.printf("desVel:%f,estVelAbs:%f,beta:%f",desVel,estVelAbs,estTraj - estYaw);
-    //      Serial.println();
         }
       }
 
@@ -385,10 +392,7 @@ void loop() {
       //Serial.println("User not in control!");
 
       // Z-up
-      stepperZ.moveTo(Conv*(maxHeight - 2));
-      while (stepperZ.distanceToGo() != 0) {
-        stepperZ.run();
-      }
+      raiseZ();
 
       // Reset
       cutStarted = 0;
@@ -484,6 +488,17 @@ void sinGenerator() {
     float x = sinAmp * sinf((TWO_PI/sinPeriod)*y);
     pathArrayX[i] = x;
     pathArrayY[i] = y;
+  }
+}
+
+void circleGenerator() {
+  float radius = circleDiameter / 2.0;
+  float angle_step = 2.0 * PI / num_points;
+
+  for (int i = 0; i < num_points; i++) {
+    float angle = i * angle_step;
+    pathArrayX[i] = -radius + (radius * cosf(angle));
+    pathArrayY[i] = radius * sinf(angle);
   }
 }
 
@@ -686,12 +701,33 @@ void workZeroZ_man() {
       }
 
       stepperZ.setMaxSpeed(speed_x0);
-      disableStepperZ();
+      //disableStepperZ();
       z0_count += 1;      // Stop limit switch function (should go back to 0 for main code)
     }
   }
 }
 
+void raiseZ() {
+  stepperZ.moveTo(Conv*(maxHeight - 1));
+  while (stepperZ.distanceToGo() != 0) {
+    stepperZ.run();
+  }
+  raised = 1;
+}
+
+float desiredPosition(float dX,float dY,float theta) {
+  desPos = (dX - tanf(theta)*dY)*cosf(theta);       // Sanzhar equation
+//desPos = myDist(estPosX,estPosY,nextX,nextY)*sinf(nextTrajC);
+//        if (closest_point_index == 0 && nextX == 0 && nextY == 0) {
+//          desPos = 0;
+//        } else {
+//          desPos = desPosIntersect(estPosX,estPosY,estYaw,lastX,lastY,nextX,nextY);
+//        }
+// desPos = -distance(estPosX,estPosY,nextX,nextY);
+// desPos = -(nextX - estPosX);
+// desPos = sinAmp * sinf((TWO_PI/sinPeriod)*estPosY);     // cheat mode
+  return desPos;
+}
 
 void sensorPlotting() {
   //Serial.printf("dx:%f,dy:%f",dXmm,dYmm);
@@ -705,8 +741,9 @@ void sensorPlotting() {
 
 void debugging() {
   // Put all Serial print lines here to view
-  Serial.printf("motorPos:%f,desPos:%f,index:%i,theta:%f,alpha:%f",motorPosX,desPos,
-    closest_point_index,estYaw,nextTrajC);
+//  Serial.printf("motorPos:%f,desPos:%f,index:%i,theta:%f,alpha:%f",motorPosX,desPos,
+//    closest_point_index,estYaw,nextTrajC);
+  Serial.printf("x:%f,y:%f,nextX:%f,nextY:%f,desPos:%i",estPosRoutX,estPosRoutY,nextX,nextY,desPos);
 
   Serial.println();
 }
