@@ -318,16 +318,17 @@ void loop() {
       }
     }
   
-    // Motor Control ---------------------------------------------------------------------------------
+    // Control ---------------------------------------------------------------------------------
     if (digitalRead(BUTT_HANDLE) == LOW  && closest_point_index + 1 < num_points &&
         abs(motorPosX/Conv) < (0.5*gantryLength - xBuffer) {
       cutStarted = 1;
       //Serial.println(cutStarted);
-      
+
+      // Router position
       motorPosX = - stepperX.currentPosition() / (float)Conv;
       estPosRoutX = estPosX + motorPosX*cosf(estYaw);
       estPosRoutY = estPosY + motorPosX*cosf(estYaw);
-      
+
       // Find closest point
       // TO-DO: find closest point by going to the next point in the array after crossing a point
       float min_distance = 1000;                  // ridiculously large initial min distance (mm)
@@ -353,7 +354,7 @@ void loop() {
       float deltaX = nextX - estPosX;
       float deltaY = nextY - estPosY;
       
-      // Desired actuation
+      // Determine desired actuation
       if (generalMode) {
         // Desired quantities (for general drawing)
         desPos = desiredPosition(deltaX,deltaY,estYaw);
@@ -385,8 +386,10 @@ void loop() {
         lastX = nextX;
         lastY = nextY;
       }
-    } else if (cutStarted) {
-      // User is not in control of device, cancel everything
+    }
+    // React to non-operational state ---------------------------------------------------------------
+    else if (cutStarted) {
+      // USER IS NOT IN CONTROL OF DEVICE -> cancel everything
       stopStepperX();
       //readyOrNot = 0;
       //Serial.println("User not in control!");
@@ -397,8 +400,19 @@ void loop() {
       // Reset
       cutStarted = 0;
     }
+    if (x0_count == 2 && digitalWrite(LIMIT_MACH_X0) == LOW) {
+      // If X carriage runs into X limit switch
+      stopStepperX();
+      raiseZ();
+      cutStarted = 0;
+    }
+    if (z0_count == 2 && digitalWrite(LIMIT_MACH_Z0) == LOW) {
+      // If Z carriage runs into Z limit switch
+      stopStepperZ();
+      cutStarted = 0;
+    }
     
-    // Debugging
+    // Debugging -----------------------------------------------------------------------------------
     if(millis() - timeLastPoll >= dtDebug) {
       timeLastDebug = millis();
       if (debugMode) {
