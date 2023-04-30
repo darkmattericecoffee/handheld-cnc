@@ -50,7 +50,8 @@ Angle signage: +CCW
 int plotting = 0;
 int debugMode = 1;
 int generalMode = 0;          // use general mode (sine wave) = 1; line drawing = 0;
-int designMode = 2;           // 1 = sin wave; 2 = circle
+int designMode = 1;           // 1 = sin wave; 2 = circle0
+int cheatMode = 0;
 
 // Path properties (sine wave)
 const int num_points = 1000;             // length of path array
@@ -117,6 +118,7 @@ int firstPoint = 1;
 long dtDebug = 500;         // (ms)
 long unsigned timeLastPoll = 0;
 long unsigned timeLastDebug = 0;
+long unsigned lastDebounceTime = 0;   // (ms)
 
 // Measured quantities
 int dX[3] = {0,0,0};
@@ -320,8 +322,9 @@ void loop() {
   
     // Control ---------------------------------------------------------------------------------
     if (digitalRead(BUTT_HANDLE) == LOW  && closest_point_index + 1 < num_points &&
-        abs(motorPosX/Conv) < (0.5*gantryLength - xBuffer) {
+        abs(motorPosX/Conv) < (0.5*gantryLength - xBuffer)) {
       cutStarted = 1;
+      lastDebounceTime = millis();
       //Serial.println(cutStarted);
 
       // Router position
@@ -357,8 +360,12 @@ void loop() {
       // Determine desired actuation
       if (generalMode) {
         // Desired quantities (for general drawing)
-        desPos = desiredPosition(deltaX,deltaY,estYaw);
-        //desPos = (deltaX - tanf(estYaw)*deltaY)*cosf(estYaw); 
+        if (!cheatMode) {
+          desPos = desiredPosition(deltaX,deltaY,estYaw);
+          // desPos = (deltaX - tanf(estYaw)*deltaY)*cosf(estYaw);
+        } else {
+          desPos = sinAmp * sinf((TWO_PI/sinPeriod)*estPosY);     // cheat mode
+        }
         if (!isnan(estTraj)) {
           desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;
         }
@@ -388,7 +395,7 @@ void loop() {
       }
     }
     // React to non-operational state ---------------------------------------------------------------
-    else if (cutStarted) {
+    else if (cutStarted  && (millis() - lastDebounceTime) > debounceDelay) {
       // USER IS NOT IN CONTROL OF DEVICE -> cancel everything
       stopStepperX();
       //readyOrNot = 0;
@@ -399,17 +406,26 @@ void loop() {
 
       // Reset
       cutStarted = 0;
+
+      Serial.println("User is no longer in control");
+      debugMode = 0;
     }
-    if (x0_count == 2 && digitalWrite(LIMIT_MACH_X0) == LOW) {
+    if (x0_count == 2 && digitalRead(LIMIT_MACH_X0) == LOW) {
       // If X carriage runs into X limit switch
       stopStepperX();
       raiseZ();
       cutStarted = 0;
+      
+      Serial.println("X limit reached");
+      debugMode = 0;
     }
-    if (z0_count == 2 && digitalWrite(LIMIT_MACH_Z0) == LOW) {
+    if (z0_count == 2 && digitalRead(LIMIT_MACH_Z0) == LOW) {
       // If Z carriage runs into Z limit switch
       stopStepperZ();
       cutStarted = 0;
+      
+      Serial.println("Z limit reached");
+      debugMode = 0;
     }
     
     // Debugging -----------------------------------------------------------------------------------
