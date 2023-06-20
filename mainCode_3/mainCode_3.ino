@@ -47,24 +47,26 @@ Angle signage: +CCW
 //#define DIAG_PIN 12
 
 // Constants ------------------------------------------------------------------------
-int plotting = 0;
-int debugMode = 1;
-int generalMode = 0;          // use general mode (sine wave) = 1; line drawing = 0;
-int designMode = 1;           // 1 = sin wave; 2 = circle0
-int cheatMode = 0;
+int plotting = 0;             // plot values  (1 = yes; 0 = no)
+// Modes
+int debugMode = 1;            // print values (1 = yes; 0 = no)
+int generalMode = 0;          // use general mode (sine_wave = 1; line_drawing = 0)
+int designMode = 1;           // choose the design - from hardcode (sine_wave = 1; circle = 2)
+int cheatMode = 0;            // disregard orientation for sine drawing (1 = yes; 0 = no)
 
-// Path properties (sine wave)
+// Path properties
 const int num_points = 1000;             // length of path array
-const float sinAmp = 5.0;
-const float sinPeriod = 100.0;
-const float pathMax_y = 300.0;
 float pathArrayX[num_points];
 float pathArrayY[num_points];
+// Path properties (sine wave)
+const float sinAmp = 5.0;
+const float sinPeriod = 100.0;
+const float pathMax_y = 300.0;            // x-length of entire path (mm)
 // Path properties (circle)
 const float circleDiameter = 200.0;       // Diameter of the circle
 
 // Button properties
-long debounceDelay = 50;    // the debounce time; increase if the output flickers
+long debounceDelay = 50;      // the debounce time; increase if the output flickers
 
 // Sensor properties
 const int ns = 3;                   // number of sensors
@@ -78,28 +80,28 @@ const float xOff[3] = {-lx/2,lx/2,-lx/2};
 const float yOff[3] = {ly/2,ly/2,-ly/2};
 
 // Motor properties
-int count = 0;
-int uSteps = 8;
-int Conv = 25*uSteps;
-//int pos[] = {20,-20,20,-20};
-//int vel[] = {10,-20,10,-40};
+// Note: Constants are in units (steps/*) whereas variables are (mm/*). Kind of
+// confusing, but whenedver the variables are used within an accelStepper function,
+// multiply by Conv. This can be made simpler by using SpeedyStepper library.
+int uSteps = 8;                       // microstep configuration
+int Conv = 25*uSteps;                 // conversion factor (mm -> steps)
 float stepPulseWidth = 20.0;          // min pulse width (from Mark Rober's code)
-float maxVel = 40.0 * Conv;           // max velocity motor can move at
-float maxAccel = 800.0 * Conv;
-float retract = 5;                // (mm)
-float speed_x0 = 20.0 * Conv;             // x zeroing speed (mm/s)
-float speed_x1 = 4.0 * Conv;              // x secondary zeroing speed
-float accel_x0 = 200.0 * Conv;
-bool began = false;
+float maxVel = 40.0 * Conv;           // max velocity motor can move at (step/s)
+float maxAccel = 800.0 * Conv;        // max acceleration (step/s^2)
+float retract = 5;                    // distance to retract (mm)
+float speed_x0 = 20.0 * Conv;             // x zeroing speed (step/s)
+float speed_x1 = 4.0 * Conv;              // x secondary zeroing speed (step/s)
+float accel_x0 = 200.0 * Conv;            // x zeroing acceleration (step/s^2)
 #define motorInterfaceType 1
 
 // Gantry geometry
-float gantryLength = 106.0;       // (mm)
-float xLimitOffset = 2.54;         // distance from wall of stepper when zeroed (mm)
-float xBuffer = 3.0;
-float zLength = 34.0;
-float zLimitOffset = 2.13;
-float maxHeight = zLength;
+float gantryLength = 106.0;         // usable length of x-gantry (mm)
+float xLimitOffset = 2.54;          // distance from wall of stepper when zeroed (mm)
+float xBuffer = 3.0;                // safety buffer between tool body and walls (mm)
+float zLength = 34.0;               // usable length of z-gantry (mm)
+float zLimitOffset = 2.13;          // distance from wall when zeroed (mm)
+float maxHeight = zLength;          // max height that z can actuate without collision
+                                    // (really depends on zeroed position)
 
 // Variables ------------------------------------------------------------------------
 // Run states
@@ -115,53 +117,48 @@ int z0_count = 2;           // z zeroing count variable (start as "false")
 
 // Timing variables
 int firstPoint = 1;
-long dtDebug = 500;         // (ms)
+long dtDebug = 500;                   // (ms)
 long unsigned timeLastPoll = 0;
 long unsigned timeLastDebug = 0;
 long unsigned lastDebounceTime = 0;   // (ms)
 
 // Measured quantities
-int dX[3] = {0,0,0};
-int dY[3] = {0,0,0};
-float dXmm[3] = {0.0f,0.0f,0.0f};
-float dYmm[3] = {0.0f,0.0f,0.0f};
-float vXmm[3] = {0.0f,0.0f,0.0f};        // velocity (mm/s)(dXmm/dt) (unused)
-float vYmm[3] = {0.0f,0.0f,0.0f};
+float measVelX[3] = {0.0f,0.0f,0.0f};     // BFF x velocity of each sensor (mm/us)
+float measVelY[3] = {0.0f,0.0f,0.0f};     // BFF y velocity of each sensor (mm/us)
 
 // Estimated quantities
-float estVelX[3] = {0.0f,0.0f,0.0f};
-float estVelY[3] = {0.0f,0.0f,0.0f};
-float estVelX1 = 0.0f;                    // (mm/us)
-float estVelY1 = 0.0f;                    // (mm/us)
-float estPosX = 0.0f;                         // frame center position - x
-float estPosY = 0.0f;                         // frame center position - y
-float estPosRoutX = 0.0f;                     // router center position - x
-float estPosRoutY = 0.0f;                     // router center position - y
-float estAngVel[4] = {0.0f,0.0f,0.0f,0.0f};
-float estAngVel1 = 0.0f;
-float estYaw = 0.0f;                          // Angle estimation
-float estTraj = 0.0f;
-float estVelAbs = 0.0f;
+float estVelX[3] = {0.0f,0.0f,0.0f};      // world frame x velocity of router (mm/us)
+float estVelY[3] = {0.0f,0.0f,0.0f};      // world frame y velocity of router (mm/us)
+float estVelX1 = 0.0f;                    // averaged x velocity calculation (mm/us)
+float estVelY1 = 0.0f;                    // averaged y velocity calculation (mm/us)
+float estPosX = 0.0f;                         // router center position - x
+float estPosY = 0.0f;                         // router center position - y
+float estPosToolX = 0.0f;                     // tool center position - x
+float estPosToolY = 0.0f;                     // tool center position - y
+float estAngVel[4] = {0.0f,0.0f,0.0f,0.0f};   // angular velocity of router (rad/s)
+float estAngVel1 = 0.0f;                      // averaged velocity calculation (rad/s)
+float estYaw = 0.0f;                          // orientation of router (rad)
+float estTraj = 0.0f;                     // (..?) trajectory angle wrt. world frame
+float estVelAbs = 0.0f;                   // (unsure why used..?) absolute velocity
 
 // Motor quantities
-float motorPosX = 0.0f;
-float motorPosZ = 0.0f;
+float motorPosX = 0.0f;                       // motor position (in steps)
+float motorPosZ = 0.0f;                       // motor position (in steps)
 
 // Control Constants ----------------------------------------------------------------
-const int num_queries = 2;       // number of points to query for min distance calculation
+const int num_queries = 2;        // number of points to query for min distance calculation
 
 // Control Variables ----------------------------------------------------------------
 // Path following
-int closest_point_index = 0;
-float nextX = 0.0f;
-float nextY = 0.0f;
-float lastX = 0.0f;
-float lastY = 0.0f;
-float nextTrajC = 0.0f;           // trajectory in BFF from BFF y-axis (goes through BFF (0,0))
+int closest_point_index = 0;      // index of closest point
+float nextX = 0.0f;               // goal point x coordinate (mm)
+float nextY = 0.0f;               // goal point y coordinate (mm)
+float lastX = 0.0f;               // (unsure if needed) last goal point
+float lastY = 0.0f;               // (unsure if needed) last goal point
 
 // Motor control variables
-float desPos = 0.0f;
-float desVel = 0.0f;
+float desPos = 0.0f;              // desired position of tool (mm - 0 is center of gantry)
+float desVel = 0.0f;              // desired velocity of tool (mm/s)
 
 // Object Initialization ------------------------------------------------------------
 // Sensor object creation
@@ -213,7 +210,8 @@ void setup() {
 
 void loop() {
   // System Initialization ------------------------------------------------------------------------
-  // Machine X Zeroing
+  // If zeroing operations are needed, they are excecuted here.
+  // Machine X zeroing
   if (digitalRead(BUTT_MACH_X0) == LOW) {
     x0_count = 0;
   }
@@ -224,7 +222,7 @@ void loop() {
     machineZeroX_2();
   }
 
-  // Machine Z Zeroing
+  // Machine Z zeroing
   if (digitalRead(BUTT_MACH_Z0) == LOW) {
     z0_count = 0;
     enableStepperZ();
@@ -251,49 +249,48 @@ void loop() {
       timeLastPoll = micros();
   
       // Sensing ---------------------------------------------------------------------
-      // Collect sensor data
+      // Collect sensor data (raw)
       PMW3360_DATA data0 = sensor0.readBurst_simple();
       PMW3360_DATA data1 = sensor1.readBurst_simple();
       PMW3360_DATA data2 = sensor2.readBurst_simple();
       //PMW3360_DATA data3 = sensor3.readBurst_simple();
   
-      int yup = 1;
+      int yup = 1;        // filling in for good motion detection boolean
       if(yup) {
       //if(data1.isOnSurface && data1.isMotion) {   // If movement...
         // **Only checking sensor 1 rn (TODO: check all of them and account for misreads)**
   
         // Sensor velocity sensing
-        dXmm[0] = -convTwosComp(data0.dx)*Cx[0] / dt;
-        dXmm[1] = -convTwosComp(data1.dx)*Cx[1] / dt;
-        dXmm[2] = -convTwosComp(data2.dx)*Cx[2] / dt;
-        //dXmm[3] = -convTwosComp(data3.dx)*Cx[3] / dt;
-        dYmm[0] = convTwosComp(data0.dy)*Cx[0] / dt;
-        dYmm[1] = convTwosComp(data1.dy)*Cx[1] / dt;
-        dYmm[2] = convTwosComp(data2.dy)*Cx[2] / dt;
-        //dYmm[3] = convTwosComp(data3.dy)*Cx[3] / dt;
+        measVelX[0] = -convTwosComp(data0.dx)*Cx[0] / dt;
+        measVelX[1] = -convTwosComp(data1.dx)*Cx[1] / dt;
+        measVelX[2] = -convTwosComp(data2.dx)*Cx[2] / dt;
+        //measVelX[3] = -convTwosComp(data3.dx)*Cx[3] / dt;
+        measVelY[0] = convTwosComp(data0.dy)*Cx[0] / dt;
+        measVelY[1] = convTwosComp(data1.dy)*Cx[1] / dt;
+        measVelY[2] = convTwosComp(data2.dy)*Cx[2] / dt;
+        //measVelY[3] = convTwosComp(data3.dy)*Cx[3] / dt;
   
         // Body angle estimation
-        estAngVel[0] = (dXmm[2] - dXmm[0])/ly;
-        estAngVel[1] = (dXmm[2] - dXmm[1])/ly;
-        estAngVel[2] = (dYmm[1] - dYmm[0])/lx;
-        estAngVel[3] = (dYmm[1] - dYmm[2])/lx;
+        estAngVel[0] = (measVelX[2] - measVelX[0])/ly;
+        estAngVel[1] = (measVelX[2] - measVelX[1])/ly;
+        estAngVel[2] = (measVelY[1] - measVelY[0])/lx;
+        estAngVel[3] = (measVelY[1] - measVelY[2])/lx;
         // Simple average of angular velocities
         float sumAngVel = 0.0f;
         for (int i = 0; i<4; i++) {
           sumAngVel = sumAngVel + estAngVel[i];
-          //Serial.printf("w%i:%f,",i,estAngVel[i]);
         }
         estAngVel1 = sumAngVel / 4.0f;
+        // Integrate angular velocity to get angle
         estYaw = estYaw + estAngVel1*dt;
-        //Serial.printf("w:%f",estAngVel1);
   
         // Body position estimation
-        estVelX[0] = dXmm[0]*cosf(estYaw)-dYmm[0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-ly*sinf(estYaw));
-        estVelX[1] = dXmm[1]*cosf(estYaw)-dYmm[1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+ly*sinf(estYaw));
-        estVelX[2] = dXmm[2]*cosf(estYaw)-dYmm[2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-ly*sinf(estYaw));
-        estVelY[0] = dXmm[0]*sinf(estYaw)+dYmm[0]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)+lx*sinf(estYaw));
-        estVelY[1] = dXmm[1]*sinf(estYaw)+dYmm[1]*cosf(estYaw) + 0.5*estAngVel1*(-ly*cosf(estYaw)+lx*sinf(estYaw));
-        estVelY[2] = dXmm[2]*sinf(estYaw)+dYmm[2]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)-lx*sinf(estYaw));
+        estVelX[0] = measVelX[0]*cosf(estYaw)-measVelY[0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-ly*sinf(estYaw));
+        estVelX[1] = measVelX[1]*cosf(estYaw)-measVelY[1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+ly*sinf(estYaw));
+        estVelX[2] = measVelX[2]*cosf(estYaw)-measVelY[2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-ly*sinf(estYaw));
+        estVelY[0] = measVelX[0]*sinf(estYaw)+measVelY[0]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)+lx*sinf(estYaw));
+        estVelY[1] = measVelX[1]*sinf(estYaw)+measVelY[1]*cosf(estYaw) + 0.5*estAngVel1*(-ly*cosf(estYaw)+lx*sinf(estYaw));
+        estVelY[2] = measVelX[2]*sinf(estYaw)+measVelY[2]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)-lx*sinf(estYaw));
         // Simple average of linear velocities
         float sumVelX = 0.0f;
         float sumVelY = 0.0f;
@@ -301,17 +298,15 @@ void loop() {
           sumVelX = sumVelX + estVelX[i];
           sumVelY = sumVelY + estVelY[i];
         }
-        estVelX1 = sumVelX / ns;              // velocity w.r.t. intertial frame
-        estVelY1 = sumVelY / ns;              // velocity w.r.t. intertial frame
-        estPosX = estPosX + estVelX1*dt;      // position w.r.t. intertial frame
-        estPosY = estPosY + estVelY1*dt;      // position w.r.t. intertial frame
+        estVelX1 = sumVelX / ns;
+        estVelY1 = sumVelY / ns;
+        // Integrate linear velocities to get position
+        estPosX = estPosX + estVelX1*dt;
+        estPosY = estPosY + estVelY1*dt;
+
+        // Additional values
         estTraj = atanf(estVelY1/estVelX1);    // trajectory angle w.r.t inertial frame
         estVelAbs = sqrt(pow(estVelX1,2) + pow(estVelY1,2));
-        //Serial.println(estTraj);
-        
-//        float absVel = sqrt(pow(dXmm[0],2) + pow(dYmm[0],2)) * (1000000.0);
-//        Serial.printf("Absolute velocity = %f",absVel);
-//        Serial.println();
   
         // Sensor plotting
         if (plotting) {
@@ -323,14 +318,18 @@ void loop() {
     // Control ---------------------------------------------------------------------------------
     if (digitalRead(BUTT_HANDLE) == LOW  && closest_point_index + 1 < num_points &&
         abs(motorPosX/Conv) < (0.5*gantryLength - xBuffer)) {
+      // If statement makes sure:
+      //    - user has both hands on device (BUTT_HANDLE)
+      //    - the path hasn't finished (num_points)
+      //    - the tool is not colliding with the wall
+
       cutStarted = 1;
       lastDebounceTime = millis();
-      //Serial.println(cutStarted);
 
-      // Router position
-      motorPosX = - stepperX.currentPosition() / (float)Conv;
-      estPosRoutX = estPosX + motorPosX*cosf(estYaw);
-      estPosRoutY = estPosY + motorPosX*cosf(estYaw);
+      // Tool position
+      motorPosX = - stepperX.currentPosition() / (float)Conv;   // !!maybe shouldn't be negative now!!
+      estPosToolX = estPosX + motorPosX*cosf(estYaw);
+      estPosToolY = estPosY + motorPosX*cosf(estYaw);
 
       // Find closest point
       // TO-DO: find closest point by going to the next point in the array after crossing a point
@@ -339,46 +338,41 @@ void loop() {
       int end_point = min(start_point + num_queries, num_points);
       for (int i = start_point; i < end_point; ++i) {
         // float dist = distance(estPosX, estPosY, pathArrayX[i], pathArrayY[i]);
-        float dist = myDist(estPosRoutX, estPosRoutY, pathArrayX[i], pathArrayY[i]);
+        float dist = myDist(estPosToolX, estPosToolY, pathArrayX[i], pathArrayY[i]);
         if (dist < min_distance) {
           min_distance = dist;
           closest_point_index = i;
         }
       }
   
-      nextX = pathArrayX[closest_point_index];
-      nextY = pathArrayY[closest_point_index];
-      // nextTraj = atanf((nextY - estPosRoutY)/(nextX - estPosRoutX));
-      if (nextX == estPosX) {
-        nextTrajC = - estYaw;
-      } else {
-        nextTrajC = (PI/2) - atanf((nextY - estPosY)/(nextX - estPosX)) - estYaw;
-      }
-      float deltaX = nextX - estPosX;
-      float deltaY = nextY - estPosY;
+      nextX = pathArrayX[closest_point_index];      // x coordinate of closest point
+      nextY = pathArrayY[closest_point_index];      // y coordinate of closest point
+      float deltaX = nextX - estPosX;               // x distance from current router position
+      float deltaY = nextY - estPosY;               // y distance from current router position
       
       // Determine desired actuation
       if (generalMode) {
-        // Desired quantities (for general drawing)
         if (!cheatMode) {
+          // General path drawing
           desPos = desiredPosition(deltaX,deltaY,estYaw);
           // desPos = (deltaX - tanf(estYaw)*deltaY)*cosf(estYaw);
         } else {
+          // Cheat mode sine drawing
           desPos = sinAmp * sinf((TWO_PI/sinPeriod)*estPosY);     // cheat mode
         }
         if (!isnan(estTraj)) {
-          desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;
+          desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;    // unused right now
         }
       } else {
-        // Desired quantities (for line drawing)
+        // Simple line drawing
         desPos = -estPosX*cosf(estYaw);
         if (!isnan(estTraj)) {
-          desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;
+          desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;    // unused right now
         }
       }
 
       // Motor actuation ---------------------------------------------------------------------------
-      stepperX.moveTo(Conv*desPos);
+      stepperX.moveTo(Conv*desPos);           // actuate tool to desired position
 //        if (Conv*desVel <= maxVel) {
 //          myStepper.setMaxSpeed(Conv*desVel);
 //        }
@@ -388,7 +382,7 @@ void loop() {
         stepperX.run();
       }
 
-      // Save last point
+      // Save last point (not being used)
       if (start_point != closest_point_index) {
         lastX = nextX;
         lastY = nextY;
@@ -397,6 +391,8 @@ void loop() {
     // React to non-operational state ---------------------------------------------------------------
     else if (cutStarted  && (millis() - lastDebounceTime) > debounceDelay) {
       // USER IS NOT IN CONTROL OF DEVICE -> cancel everything
+      // TO-DO: this is where we would initiate a reset after someone is done demoing
+
       stopStepperX();
       //readyOrNot = 0;
       //Serial.println("User not in control!");
@@ -410,6 +406,7 @@ void loop() {
       Serial.println("User is no longer in control");
       debugMode = 0;
     }
+
     if (x0_count == 2 && digitalRead(LIMIT_MACH_X0) == LOW) {
       // If X carriage runs into X limit switch
       stopStepperX();
@@ -419,6 +416,7 @@ void loop() {
       Serial.println("X limit reached");
       debugMode = 0;
     }
+
     if (z0_count == 2 && digitalRead(LIMIT_MACH_Z0) == LOW) {
       // If Z carriage runs into Z limit switch
       stopStepperZ();
@@ -461,21 +459,10 @@ void sensorSetup() {
   }else{
     Serial.println("Sensor2 initialization failed");
   }
-
-//  // Initialize sensor locations relative to body
-//  Serial.print("Initial locations of sensors: ");
-//  for (int i = 0; i<ns; i++) {
-//    xmm[i] = xmm[i] + xOff[i];
-//    ymm[i] = ymm[i] + yOff[i];
-//    Serial.printf("%i(%.2f,%.2f),",i+1,xmm[i],ymm[i]);
-//  }
-//  Serial.println();
 }
 
 void motorSetup() {
-  // Setup motors
-  // set the maximum speed, acceleration factor,
-  // initial speed and the target position
+  // Set up motors
   // Initialize pins
   pinMode(MS1_X, OUTPUT);
   pinMode(MS2_X, OUTPUT);
@@ -496,7 +483,7 @@ void motorSetup() {
 
   // Disable motors
   delay(100);
-  disableStepperZ();
+  disableStepperZ();        // so that tool can be moved down manually to work surface
   //digitalWrite(MOT_EN_X, HIGH);
   //digitalWrite(MOT_EN_Z, HIGH);
 
@@ -522,6 +509,7 @@ void sinGenerator() {
 }
 
 void circleGenerator() {
+  // Generate a circle path to cut
   float radius = circleDiameter / 2.0;
   float angle_step = 2.0 * PI / num_points;
 
@@ -534,8 +522,9 @@ void circleGenerator() {
 
 // Loop subfunctions -----------------------------------------------------------------------------
 int convTwosComp(int b){
-  //Convert from 2's complement
-  //if(sizeof(b) > 
+  // Convert from 2's complement
+  // This is needed to convert the binary values from the sensor library to decimal
+
   if(b & 0x80){                     // 0x80 (hex) = 10000000 (bin) = 128 (dec)
     b = -1 * ((b ^ 0xff) + 1);      // 0xff (hex) = 11111111 (bin) = 255 (dec)
   }
@@ -543,10 +532,14 @@ int convTwosComp(int b){
 }
 
 float myDist(float x1, float y1, float x2, float y2) {
+  // Calculate the distance between two points
+
   return sqrt(pow(x1 - x2,2) + pow(y1 - y2,2));
 }
 
 float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4) {
+  // Determine where two lines intersect (one line will always be the gantry, made by xc, yc, and th)
+
   float x1 = xc - (cosf(th)*gantryLength/2);
   float y1 = yc - (sinf(th)*gantryLength/2);
   float x2 = xc + (cosf(th)*gantryLength/2);
@@ -598,7 +591,8 @@ void stopStepperZ() {
 }
 
 void machineZeroX_1() {
-  // First calibration run
+  // First x calibration run
+
   //myStepper.moveTo(Conv*retract);
   stepperX.setAcceleration(accel_x0);
   stepperX.move(Conv*gantryLength);
@@ -613,6 +607,8 @@ void machineZeroX_1() {
 }
 
 void machineZeroX_2() {
+  // Second x calibration run
+
   //myStepper.setMaxSpeed(speed_x0);
   // Retract
   stepperX.move(-Conv*retract);
@@ -632,7 +628,7 @@ void machineZeroX_2() {
   stepperX.setCurrentPosition(0);
   Serial.println(stepperZ.currentPosition());
 
-  stepperX.move(-Conv*((gantryLength/2) + xLimitOffset));
+  stepperX.move(-Conv*((gantryLength/2) - xLimitOffset));
   while (stepperX.distanceToGo() != 0) {
     stepperX.run();
   }
@@ -645,6 +641,8 @@ void machineZeroX_2() {
 }
 
 void machineZeroZ() {
+  // Z machine zeroing operation (not really necessary when using manual workpiece zeroing)
+
   if (z0_count == 0) { 
     // First calibration
     //stepperZ.moveTo(Conv*retract);
@@ -684,6 +682,8 @@ void machineZeroZ() {
 
 void workZeroZ_man() {
   // Manually set workpiece Z0
+  // This is initiated only after the user has manually moved the tool to the top of the surface.
+
   enableStepperZ();
   stepperZ.setCurrentPosition(0);
 
@@ -738,6 +738,8 @@ void workZeroZ_man() {
 }
 
 void raiseZ() {
+  // Raise tool to top of gantry
+
   stepperZ.moveTo(Conv*(maxHeight - 1));
   while (stepperZ.distanceToGo() != 0) {
     stepperZ.run();
@@ -746,7 +748,11 @@ void raiseZ() {
 }
 
 float desiredPosition(float dX,float dY,float theta) {
+  // Calculate the desired position for the tool
+
   desPos = (dX - tanf(theta)*dY)*cosf(theta);       // Sanzhar equation
+
+  // Alternative methods (preivous attempts):
 //desPos = myDist(estPosX,estPosY,nextX,nextY)*sinf(nextTrajC);
 //        if (closest_point_index == 0 && nextX == 0 && nextY == 0) {
 //          desPos = 0;
@@ -760,7 +766,9 @@ float desiredPosition(float dX,float dY,float theta) {
 }
 
 void sensorPlotting() {
-  //Serial.printf("dx:%f,dy:%f",dXmm,dYmm);
+  // Plot sensor data
+
+  //Serial.printf("dx:%f,dy:%f",measVelX,measVelY);
   //Serial.printf("dx:%i,dy:%i",data.dx,data.dy);
   Serial.printf("x:%f,y:%f,theta:%f",estPosX,estPosY,estYaw);
 //      Serial.printf("w1:%f,w2:%f,w3:%f,w4:%f,w5:%f,w6:%f,w7:%f,w8:%f",estAngVel[0],estAngVel[1],
@@ -770,10 +778,12 @@ void sensorPlotting() {
 }
 
 void debugging() {
+  // Print debug data
   // Put all Serial print lines here to view
+  
 //  Serial.printf("motorPos:%f,desPos:%f,index:%i,theta:%f,alpha:%f",motorPosX,desPos,
 //    closest_point_index,estYaw,nextTrajC);
-  Serial.printf("x:%f,y:%f,nextX:%f,nextY:%f,desPos:%i",estPosRoutX,estPosRoutY,nextX,nextY,desPos);
+  Serial.printf("x:%f,y:%f,nextX:%f,nextY:%f,desPos:%i",estPosToolX,estPosToolY,nextX,nextY,desPos);
 
   Serial.println();
 }
