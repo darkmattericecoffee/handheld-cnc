@@ -49,7 +49,7 @@ Angle signage: +CCW
 // Constants ------------------------------------------------------------------------
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 // Modes
-int debugMode = 1;            // print values (1 = yes; 0 = no)
+int debugMode = 0;            // print values (1 = yes; 0 = no)
 int generalMode = 1;          // use general mode (general_path = 1; line_drawing = 0)
 int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2)
 int cheatMode = 0;            // disregard orientation for sine drawing (1 = yes; 0 = no)
@@ -153,6 +153,8 @@ const int num_queries = 2;        // number of points to query for min distance 
 // Control Variables ----------------------------------------------------------------
 // Path following
 int closest_point_index = 0;      // index of closest point
+int prev_pnt_ind = 0;
+int next_pnt_ind = 1;
 float nextX = 0.0f;               // goal point x coordinate (mm)
 float nextY = 0.0f;               // goal point y coordinate (mm)
 float lastX = 0.0f;               // (unsure if needed) last goal point
@@ -311,7 +313,9 @@ void loop() {
         // Additional values
         estTraj = atanf(estVelY1/estVelX1);    // trajectory angle w.r.t inertial frame
         estVelAbs = sqrt(pow(estVelX1,2) + pow(estVelY1,2));
-  
+
+        debugging();
+
         // Sensor plotting
         if (plotting) {
           sensorPlotting();
@@ -326,7 +330,7 @@ void loop() {
     estPosToolY = estPosY + motorPosX*cosf(estYaw);
   
     // Control ---------------------------------------------------------------------------------
-    if (digitalRead(BUTT_HANDLE) == LOW  && closest_point_index + 1 < num_points &&
+    if (digitalRead(BUTT_HANDLE) == LOW  && next_pnt_ind + 1 < num_points &&
         abs(motorPosX) < (0.5*gantryLength - xBuffer) && !limitHitX) {
       // If statement makes sure:
       //    - user has both hands on device (BUTT_HANDLE)
@@ -337,22 +341,22 @@ void loop() {
       cutStarted = 1;
       lastDebounceTime = millis();
 
-      // Find closest point
+      // Find next point
       // TO-DO: find closest point by going to the next point in the array after crossing a point
-      float min_distance = 1000;                  // ridiculously large initial min distance (mm)
-      int start_point = closest_point_index;
-      int end_point = min(start_point + num_queries, num_points);
-      for (int i = start_point; i < end_point; ++i) {
-        // float dist = distance(estPosX, estPosY, pathArrayX[i], pathArrayY[i]);
-        float dist = myDist(estPosToolX, estPosToolY, pathArrayX[i], pathArrayY[i]);
-        if (dist < min_distance) {
-          min_distance = dist;
-          closest_point_index = i;
-        }
-      }
+      // float min_distance = 1000;                  // ridiculously large initial min distance (mm)
+      // int start_point = closest_point_index;
+      // int end_point = min(start_point + num_queries, num_points);
+      // for (int i = start_point; i < end_point; ++i) {
+      //   // float dist = distance(estPosX, estPosY, pathArrayX[i], pathArrayY[i]);
+      //   float dist = myDist(estPosToolX, estPosToolY, pathArrayX[i], pathArrayY[i]);
+      //   if (dist < min_distance) {
+      //     min_distance = dist;
+      //     closest_point_index = i;
+      //   }
+      // }
   
-      nextX = pathArrayX[closest_point_index];      // x coordinate of closest point
-      nextY = pathArrayY[closest_point_index];      // y coordinate of closest point
+      nextX = pathArrayX[next_pnt_ind];      // x coordinate of closest point
+      nextY = pathArrayY[next_pnt_ind];      // y coordinate of closest point
       float deltaX = nextX - estPosX;               // x distance from current router position
       float deltaY = nextY - estPosY;               // y distance from current router position
       
@@ -390,11 +394,11 @@ void loop() {
         stepperX.run();
       }
 
-      // Save last point (not being used)
-      if (start_point != closest_point_index) {
-        lastX = nextX;
-        lastY = nextY;
-      }
+      // // Save last point (not being used)
+      // if (start_point != closest_point_index) {
+      //   lastX = nextX;
+      //   lastY = nextY;
+      // }
     }
     // React to non-operational state ---------------------------------------------------------------
     else if (cutStarted  && (millis() - lastDebounceTime) > debounceDelay) {
@@ -553,6 +557,21 @@ float myDist(float x1, float y1, float x2, float y2) {
   // Calculate the distance between two points
 
   return sqrt(pow(x1 - x2,2) + pow(y1 - y2,2));
+}
+
+float signedDist(float xr, float yr, float xg, float yg, float th) {
+  // Calculate the signed distance between goal point and line of gantry
+  // Note: if the distance is:
+  //    < 0, the point is in front of the gantry (it is yet to be passed)
+  //    > 0, the point is behind the gantry (it has been passed)
+
+  float m = tan(th);
+  float b = yr - m*xr;
+  float A = m;
+  float B = -1;
+  float C = b;
+
+  return (A*xg + B*yg + C)/sqrt(pow(A,2) + pow(B,2));
 }
 
 float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4) {
@@ -799,10 +818,9 @@ void debugging() {
   // Print debug data
   // Put all Serial print lines here to view
   
-//  Serial.printf("motorPos:%f,desPos:%f,index:%i,theta:%f,alpha:%f",motorPosX,desPos,
-//    closest_point_index,estYaw,nextTrajC);
+  Serial.printf("x:%f,y:%f,theta:%f,dist:%f",estPosX,estPosY,estYaw,signedDist(estPosX,estPosY,0,10,estYaw));
   // Serial.printf("x:%f,y:%f,nextX:%f,nextY:%f,desPos:%i",estPosToolX,estPosToolY,nextX,nextY,desPos);
-  Serial.print(motorPosX);
+  // Serial.print(motorPosX);
 
   Serial.println();
 }
