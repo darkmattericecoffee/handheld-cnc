@@ -50,8 +50,8 @@ Angle signage: +CCW
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 // Modes
 int debugMode = 1;            // print values (1 = yes; 0 = no)
-int generalMode = 0;          // use general mode (sine_wave = 1; line_drawing = 0)
-int designMode = 1;           // choose the design - from hardcode (sine_wave = 1; circle = 2)
+int generalMode = 1;          // use general mode (general_path = 1; line_drawing = 0)
+int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2)
 int cheatMode = 0;            // disregard orientation for sine drawing (1 = yes; 0 = no)
 
 // Path properties
@@ -61,7 +61,7 @@ float pathArrayY[num_points];
 // Path properties (sine wave)
 const float sinAmp = 5.0;
 const float sinPeriod = 100.0;
-const float pathMax_y = 300.0;            // x-length of entire path (mm)
+const float pathMax_y = 300.0;            // x-length of entire path (mm) (used for line too)
 // Path properties (circle)
 const float circleDiameter = 200.0;       // Diameter of the circle
 
@@ -105,6 +105,8 @@ float maxHeight = zLength;          // max height that z can actuate without col
 
 // Variables ------------------------------------------------------------------------
 // Run states
+int limitHitX = 0;
+int limitHitZ = 0;
 int cutStarted = 0;
 int raised = 0;
 
@@ -142,8 +144,8 @@ float estTraj = 0.0f;                     // (..?) trajectory angle wrt. world f
 float estVelAbs = 0.0f;                   // (unsure why used..?) absolute velocity
 
 // Motor quantities
-float motorPosX = 0.0f;                       // motor position (in steps)
-float motorPosZ = 0.0f;                       // motor position (in steps)
+float motorPosX = 0.0f;                       // motor position (in mm!!)
+float motorPosZ = 0.0f;                       // motor position (in mm!!)
 
 // Control Constants ----------------------------------------------------------------
 const int num_queries = 2;        // number of points to query for min distance calculation
@@ -194,6 +196,8 @@ void setup() {
 
   // Make path
   switch (designMode) {
+    case 0:
+      lineGenerator();
     case 1:
       sinGenerator();
     case 2:
@@ -314,22 +318,24 @@ void loop() {
         }
       }
     }
+
+    // Motor position
+    motorPosX = stepperX.currentPosition() / (float)Conv;
+    // Tool position
+    estPosToolX = estPosX + motorPosX*cosf(estYaw);
+    estPosToolY = estPosY + motorPosX*cosf(estYaw);
   
     // Control ---------------------------------------------------------------------------------
     if (digitalRead(BUTT_HANDLE) == LOW  && closest_point_index + 1 < num_points &&
-        abs(motorPosX/Conv) < (0.5*gantryLength - xBuffer)) {
+        abs(motorPosX) < (0.5*gantryLength - xBuffer) && !limitHitX) {
       // If statement makes sure:
       //    - user has both hands on device (BUTT_HANDLE)
       //    - the path hasn't finished (num_points)
       //    - the tool is not colliding with the wall
+      //    - the tool hasn't hit a limit switch (limitHitX)
 
       cutStarted = 1;
       lastDebounceTime = millis();
-
-      // Tool position
-      motorPosX = - stepperX.currentPosition() / (float)Conv;   // !!maybe shouldn't be negative now!!
-      estPosToolX = estPosX + motorPosX*cosf(estYaw);
-      estPosToolY = estPosY + motorPosX*cosf(estYaw);
 
       // Find closest point
       // TO-DO: find closest point by going to the next point in the array after crossing a point
@@ -360,12 +366,14 @@ void loop() {
           // Cheat mode sine drawing
           desPos = sinAmp * sinf((TWO_PI/sinPeriod)*estPosY);     // cheat mode
         }
+        // Velocity control
         if (!isnan(estTraj)) {
           desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;    // unused right now
         }
       } else {
         // Simple line drawing
         desPos = -estPosX*cosf(estYaw);
+        // Velocity control
         if (!isnan(estTraj)) {
           desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;    // unused right now
         }
@@ -373,9 +381,9 @@ void loop() {
 
       // Motor actuation ---------------------------------------------------------------------------
       stepperX.moveTo(Conv*desPos);           // actuate tool to desired position
-//        if (Conv*desVel <= maxVel) {
-//          myStepper.setMaxSpeed(Conv*desVel);
-//        }
+      //  if (Conv*desVel <= maxVel) {
+      //    myStepper.setMaxSpeed(Conv*desVel);
+      //  }
       //myStepper.setMaxSpeed(maxVel);
       if (stepperX.distanceToGo() != 0) {
         //delay(100);
@@ -411,6 +419,7 @@ void loop() {
       // If X carriage runs into X limit switch
       stopStepperX();
       raiseZ();
+      limitHitX = 1;
       cutStarted = 0;
       
       Serial.println("X limit reached");
@@ -420,6 +429,7 @@ void loop() {
     if (z0_count == 2 && digitalRead(LIMIT_MACH_Z0) == LOW) {
       // If Z carriage runs into Z limit switch
       stopStepperZ();
+      limitHitZ = 1;
       cutStarted = 0;
       
       Serial.println("Z limit reached");
@@ -496,6 +506,14 @@ void motorSetup() {
   stepperZ.setMaxSpeed(speed_x0);
   stepperZ.setAcceleration(maxAccel);
   stepperZ.setCurrentPosition(0);
+}
+
+void lineGenerator() {
+  // Generate line path to cut
+  for (int i = 0; i < num_points; i++) {
+    pathArrayX[i] = 0;
+    pathArrayY[i] = (pathMax_y) * (float)i / (num_points - 1);
+  }
 }
 
 void sinGenerator() {
@@ -783,7 +801,8 @@ void debugging() {
   
 //  Serial.printf("motorPos:%f,desPos:%f,index:%i,theta:%f,alpha:%f",motorPosX,desPos,
 //    closest_point_index,estYaw,nextTrajC);
-  Serial.printf("x:%f,y:%f,nextX:%f,nextY:%f,desPos:%i",estPosToolX,estPosToolY,nextX,nextY,desPos);
+  // Serial.printf("x:%f,y:%f,nextX:%f,nextY:%f,desPos:%i",estPosToolX,estPosToolY,nextX,nextY,desPos);
+  Serial.print(motorPosX);
 
   Serial.println();
 }
