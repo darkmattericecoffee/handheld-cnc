@@ -49,7 +49,7 @@ Angle signage: +CCW
 // Constants ------------------------------------------------------------------------
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 // Modes
-int debugMode = 0;            // print values (1 = yes; 0 = no)
+int debugMode = 1;            // print values (1 = yes; 0 = no)
 int generalMode = 1;          // use general mode (general_path = 1; line_drawing = 0)
 int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2)
 int cheatMode = 0;            // disregard orientation for sine drawing (1 = yes; 0 = no)
@@ -154,9 +154,9 @@ const int num_queries = 2;        // number of points to query for min distance 
 // Path following
 int closest_point_index = 0;      // index of closest point
 int prev_pnt_ind = 0;
-int next_pnt_ind = 1;
-float nextX = 0.0f;               // goal point x coordinate (mm)
-float nextY = 0.0f;               // goal point y coordinate (mm)
+int goal_pnt_ind = 1;
+float goalX = 0.0f;               // goal point x coordinate (mm)
+float goalY = 0.0f;               // goal point y coordinate (mm)
 float lastX = 0.0f;               // (unsure if needed) last goal point
 float lastY = 0.0f;               // (unsure if needed) last goal point
 
@@ -314,7 +314,7 @@ void loop() {
         estTraj = atanf(estVelY1/estVelX1);    // trajectory angle w.r.t inertial frame
         estVelAbs = sqrt(pow(estVelX1,2) + pow(estVelY1,2));
 
-        debugging();
+        // debugging();       // debugging path following
 
         // Sensor plotting
         if (plotting) {
@@ -330,7 +330,7 @@ void loop() {
     estPosToolY = estPosY + motorPosX*cosf(estYaw);
   
     // Control ---------------------------------------------------------------------------------
-    if (digitalRead(BUTT_HANDLE) == LOW  && next_pnt_ind + 1 < num_points &&
+    if (digitalRead(BUTT_HANDLE) == LOW  && goal_pnt_ind + 1 < num_points &&
         abs(motorPosX) < (0.5*gantryLength - xBuffer) && !limitHitX) {
       // If statement makes sure:
       //    - user has both hands on device (BUTT_HANDLE)
@@ -341,24 +341,16 @@ void loop() {
       cutStarted = 1;
       lastDebounceTime = millis();
 
-      // Find next point
-      // TO-DO: find closest point by going to the next point in the array after crossing a point
-      // float min_distance = 1000;                  // ridiculously large initial min distance (mm)
-      // int start_point = closest_point_index;
-      // int end_point = min(start_point + num_queries, num_points);
-      // for (int i = start_point; i < end_point; ++i) {
-      //   // float dist = distance(estPosX, estPosY, pathArrayX[i], pathArrayY[i]);
-      //   float dist = myDist(estPosToolX, estPosToolY, pathArrayX[i], pathArrayY[i]);
-      //   if (dist < min_distance) {
-      //     min_distance = dist;
-      //     closest_point_index = i;
-      //   }
-      // }
-  
-      nextX = pathArrayX[next_pnt_ind];      // x coordinate of closest point
-      nextY = pathArrayY[next_pnt_ind];      // y coordinate of closest point
-      float deltaX = nextX - estPosX;               // x distance from current router position
-      float deltaY = nextY - estPosY;               // y distance from current router position
+      // Determine goal point
+      if (signedDist(estPosX,estPosY,goalX,goalY,estYaw) > 0) {
+        // If the goal point has been passed
+        goal_pnt_ind++;
+        goalX = pathArrayX[goal_pnt_ind];      // x coordinate of closest point
+        goalY = pathArrayY[goal_pnt_ind];      // y coordinate of closest point
+      }
+
+      float deltaX = goalX - estPosX;               // x distance of goal from current router position
+      float deltaY = goalY - estPosY;               // y distance of goal from current router position
       
       // Determine desired actuation
       if (generalMode) {
@@ -396,8 +388,8 @@ void loop() {
 
       // // Save last point (not being used)
       // if (start_point != closest_point_index) {
-      //   lastX = nextX;
-      //   lastY = nextY;
+      //   lastX = goalX;
+      //   lastY = goalY;
       // }
     }
     // React to non-operational state ---------------------------------------------------------------
@@ -562,8 +554,8 @@ float myDist(float x1, float y1, float x2, float y2) {
 float signedDist(float xr, float yr, float xg, float yg, float th) {
   // Calculate the signed distance between goal point and line of gantry
   // Note: if the distance is:
-  //    < 0, the point is in front of the gantry (it is yet to be passed)
-  //    > 0, the point is behind the gantry (it has been passed)
+  //    < 0 - the point is in front of the gantry (it is yet to be passed)
+  //    > 0 - the point is behind the gantry (it has been passed)
 
   float m = tan(th);
   float b = yr - m*xr;
@@ -790,14 +782,14 @@ float desiredPosition(float dX,float dY,float theta) {
   desPos = (dX - tanf(theta)*dY)*cosf(theta);       // Sanzhar equation
 
   // Alternative methods (preivous attempts):
-//desPos = myDist(estPosX,estPosY,nextX,nextY)*sinf(nextTrajC);
-//        if (closest_point_index == 0 && nextX == 0 && nextY == 0) {
+//desPos = myDist(estPosX,estPosY,goalX,goalY)*sinf(nextTrajC);
+//        if (closest_point_index == 0 && goalX == 0 && goalY == 0) {
 //          desPos = 0;
 //        } else {
-//          desPos = desPosIntersect(estPosX,estPosY,estYaw,lastX,lastY,nextX,nextY);
+//          desPos = desPosIntersect(estPosX,estPosY,estYaw,lastX,lastY,goalX,goalY);
 //        }
-// desPos = -distance(estPosX,estPosY,nextX,nextY);
-// desPos = -(nextX - estPosX);
+// desPos = -distance(estPosX,estPosY,goalX,goalY);
+// desPos = -(goalX - estPosX);
 // desPos = sinAmp * sinf((TWO_PI/sinPeriod)*estPosY);     // cheat mode
   return desPos;
 }
@@ -819,7 +811,9 @@ void debugging() {
   // Put all Serial print lines here to view
   
   Serial.printf("x:%f,y:%f,theta:%f,dist:%f",estPosX,estPosY,estYaw,signedDist(estPosX,estPosY,0,10,estYaw));
-  // Serial.printf("x:%f,y:%f,nextX:%f,nextY:%f,desPos:%i",estPosToolX,estPosToolY,nextX,nextY,desPos);
+  Serial.println();
+  Serial.printf("error:%f",motorPosX-desPos);
+  // Serial.printf("x:%f,y:%f,goalX:%f,goalY:%f,desPos:%i",estPosToolX,estPosToolY,goalX,goalY,desPos);
   // Serial.print(motorPosX);
 
   Serial.println();
