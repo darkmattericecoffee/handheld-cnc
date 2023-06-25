@@ -320,8 +320,6 @@ void loop() {
         estTraj = atanf(estVelY1/estVelX1);    // trajectory angle w.r.t inertial frame
         estVelAbs = sqrt(pow(estVelX1,2) + pow(estVelY1,2));
 
-        // debugging();       // debugging path following
-
         // Sensor plotting
         if (plotting) {
           sensorPlotting();
