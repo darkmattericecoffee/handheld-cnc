@@ -47,8 +47,8 @@ Angle signage: +CCW
 //#define DIAG_PIN 12
 
 // Constants ------------------------------------------------------------------------
-int plotting = 0;             // plot values  (1 = yes; 0 = no)
 // Modes
+int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
 int generalMode = 1;          // use general mode (general_path = 1; line_drawing = 0)
 int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2)
@@ -200,10 +200,16 @@ void setup() {
   switch (designMode) {
     case 0:
       lineGenerator();
+      Serial.println("Line path generated!");
+      break;
     case 1:
       sinGenerator();
+      Serial.println("Sine wave path generated!");
+      break;
     case 2:
       circleGenerator();
+      Serial.println("Circle path generated!");
+      break;
   }
 //  for (int i = 1; i < num_points; i++) {
 //    Serial.printf("x(%i) = 
@@ -810,9 +816,10 @@ void debugging() {
   // Print debug data
   // Put all Serial print lines here to view
   
-  Serial.printf("x:%f,y:%f,theta:%f,dist:%f",estPosX,estPosY,estYaw,signedDist(estPosX,estPosY,0,10,estYaw));
-  Serial.println();
-  Serial.printf("error:%f",motorPosX-desPos);
+  // Serial.printf("x:%f,y:%f,theta:%f,dist:%f",estPosX,estPosY,estYaw,signedDist(estPosX,estPosY,0,10,estYaw));
+  Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
+  // Serial.println();
+  // Serial.printf("error:%f",motorPosX-desPos);
   // Serial.printf("x:%f,y:%f,goalX:%f,goalY:%f,desPos:%i",estPosToolX,estPosToolY,goalX,goalY,desPos);
   // Serial.print(motorPosX);
 
