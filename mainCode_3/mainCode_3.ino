@@ -111,7 +111,7 @@ int cutStarted = 0;
 int raised = 0;
 
 // Button states
-int readyOrNot = 0;
+int readyOrNot = 0;                 // (0 = workpiece is unzeroed; 1 = z is zeroed; 2 = xy is zeroed)
 
 // Zeroing variables
 int x0_count = 2;           // x zeroing count variable (start as "false")
@@ -245,16 +245,13 @@ void loop() {
   // Workpiece zeroing
   // X and Y
   if (digitalRead(BUTT_WORK_X0Y0) == LOW) {
-    if (readyOrNot == 1) {
-      readyOrNot++;
-    }
-    goal_pnt_ind = 0;           // reset path to initial point
+    workZeroXY();
   }
   // Z
   if (digitalRead(BUTT_WORK_Z0) == LOW) {
     z0_count = 0;
     workZeroZ_man();
-    readyOrNot++;
+    readyOrNot = 1;
   }
 
   // Sensing and Control ---------------------------------------------------------------------------
@@ -345,6 +342,7 @@ void loop() {
       //    - the tool is not colliding with the wall
       //    - the tool hasn't hit a limit switch (limitHitX)
 
+      // Update states
       cutStarted = 1;
       timeLastDebounce = millis();
       if (isnan(float(timeLastDebug))) {
@@ -641,7 +639,7 @@ void stopStepperZ() {
 void machineZeroX_1() {
   // First x calibration run
 
-  //myStepper.moveTo(Conv*retract);
+  stepperX.setMaxSpeed(speed_x0);
   stepperX.setAcceleration(accel_x0);
   stepperX.move(Conv*gantryLength);
   stepperX.run();
@@ -725,6 +723,37 @@ void machineZeroZ() {
     
     z0_count += 1;      // Stop limit switch function (should go back to 0 for main code)
     disableStepperZ();  // disable so it can be zeroed to workpiece
+  }
+}
+
+void workZeroXY() {
+  if (readyOrNot == 1) {
+    readyOrNot++;
+
+    // Make sure tool is centered
+    stepperX.moveTo(0);
+    while (stepperX.distanceToGo() != 0) {
+      stepperX.run();
+    }
+
+    // Make sure tool is down
+    stepperZ.moveTo(0);           // brings tool down to top of surface (0)
+    while (abs(stepperZ.distanceToGo()) > (Conv*2)) {
+      stepperZ.run();
+    }
+    stepperZ.setMaxSpeed(round(speed_x1/2));
+    while (stepperZ.distanceToGo() !=0) {
+      stepperZ.run();
+    }
+    stepperZ.setMaxSpeed(speed_x0);
+
+    // Set all working position and orientation data to 0
+    estPosX = 0;
+    estPosY = 0;
+    estYaw = 0;
+    estPosToolX = 0;
+    estPosToolY = 0;
+    goal_pnt_ind = 0;           // reset path to initial point
   }
 }
 
