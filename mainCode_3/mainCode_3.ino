@@ -51,7 +51,7 @@ Angle signage: +CCW
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
 int generalMode = 1;          // use general mode (general_path = 1; line_drawing = 0)
-int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2)
+int designMode = 1;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2)
 int cheatMode = 0;            // disregard orientation for sine drawing (1 = yes; 0 = no)
 
 // Path properties
@@ -60,7 +60,7 @@ float pathArrayX[num_points];
 float pathArrayY[num_points];
 // Path properties (sine wave)
 const float sinAmp = 5.0;
-const float sinPeriod = 100.0;
+const float sinPeriod = 50.0;
 const float pathMax_y = 300.0;            // x-length of entire path (mm) (used for line too)
 // Path properties (circle)
 const float circleDiameter = 200.0;       // Diameter of the circle
@@ -122,7 +122,7 @@ int firstPoint = 1;
 long dtDebug = 500;                   // (ms)
 long unsigned timeLastPoll = 0;
 long unsigned timeLastDebug = 0;
-long unsigned lastDebounceTime = 0;   // (ms)
+long unsigned timeLastDebounce = 0;   // (ms)
 
 // Measured quantities
 float measVelX[3] = {0.0f,0.0f,0.0f};     // BFF x velocity of each sensor (mm/us)
@@ -154,7 +154,7 @@ const int num_queries = 2;        // number of points to query for min distance 
 // Path following
 int closest_point_index = 0;      // index of closest point
 int prev_pnt_ind = 0;
-int goal_pnt_ind = 1;
+int goal_pnt_ind = 0;
 float goalX = 0.0f;               // goal point x coordinate (mm)
 float goalY = 0.0f;               // goal point y coordinate (mm)
 float lastX = 0.0f;               // (unsure if needed) last goal point
@@ -245,13 +245,16 @@ void loop() {
   // Workpiece zeroing
   // X and Y
   if (digitalRead(BUTT_WORK_X0Y0) == LOW) {
-    readyOrNot += 1;
+    if (readyOrNot == 1) {
+      readyOrNot++;
+    }
+    goal_pnt_ind = 0;           // reset path to initial point
   }
   // Z
   if (digitalRead(BUTT_WORK_Z0) == LOW) {
     z0_count = 0;
     workZeroZ_man();
-    readyOrNot += 1;
+    readyOrNot++;
   }
 
   // Sensing and Control ---------------------------------------------------------------------------
@@ -343,7 +346,10 @@ void loop() {
       //    - the tool hasn't hit a limit switch (limitHitX)
 
       cutStarted = 1;
-      lastDebounceTime = millis();
+      timeLastDebounce = millis();
+      if (isnan(float(timeLastDebug))) {
+        timeLastDebug = millis();
+      }
 
       // Determine goal point
       if (signedDist(estPosX,estPosY,goalX,goalY,estYaw) > 0) {
@@ -397,7 +403,7 @@ void loop() {
       // }
     }
     // React to non-operational state ---------------------------------------------------------------
-    else if (cutStarted  && (millis() - lastDebounceTime) > debounceDelay) {
+    else if (cutStarted  && (millis() - timeLastDebounce) > debounceDelay) {
       // USER IS NOT IN CONTROL OF DEVICE -> cancel everything
       // TO-DO: this is where we would initiate a reset after someone is done demoing
 
@@ -410,9 +416,10 @@ void loop() {
 
       // Reset
       cutStarted = 0;
+      readyOrNot = 1;         // retains z workpiece homing, but not xy
 
       Serial.println("User is no longer in control");
-      debugMode = 0;
+      timeLastDebug = nanl;            // stop debug printing
     }
 
     if (x0_count == 2 && digitalRead(LIMIT_MACH_X0) == LOW) {
@@ -420,24 +427,32 @@ void loop() {
       stopStepperX();
       raiseZ();
       limitHitX = 1;
+
+      // Reset
       cutStarted = 0;
+      readyOrNot = 1;         // retains z workpiece homing, but not xy
+      x0_count = 0;           // removes x machine homing
       
       Serial.println("X limit reached");
-      debugMode = 0;
+      timeLastDebug = nanl;            // stop debug printing
     }
 
     if (z0_count == 2 && digitalRead(LIMIT_MACH_Z0) == LOW) {
       // If Z carriage runs into Z limit switch
       stopStepperZ();
       limitHitZ = 1;
+
+      // Reset
       cutStarted = 0;
+      readyOrNot = 1;         // retains z workpiece homing, but not xy
+      z0_count = 0;           // removes z workpiece/machine homing
       
       Serial.println("Z limit reached");
-      debugMode = 0;
+      timeLastDebug = nanl;            // stop debug printing
     }
     
     // Debugging -----------------------------------------------------------------------------------
-    if(millis() - timeLastPoll >= dtDebug) {
+    if(millis() - timeLastDebug >= dtDebug) {
       timeLastDebug = millis();
       if (debugMode) {
         debugging();
