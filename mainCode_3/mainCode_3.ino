@@ -152,9 +152,8 @@ const int num_queries = 2;        // number of points to query for min distance 
 
 // Control Variables ----------------------------------------------------------------
 // Path following
-int closest_point_index = 0;      // index of closest point
 int prev_pnt_ind = 0;
-int goal_pnt_ind = 0;
+int goal_pnt_ind = 0;             // index of current goal point
 float goalX = 0.0f;               // goal point x coordinate (mm)
 float goalY = 0.0f;               // goal point y coordinate (mm)
 float lastX = 0.0f;               // (unsure if needed) last goal point
@@ -754,6 +753,8 @@ void workZeroXY() {
     estPosToolX = 0;
     estPosToolY = 0;
     goal_pnt_ind = 0;           // reset path to initial point
+    goalX = pathArrayX[0];
+    goalY = pathArrayY[0];
   }
 }
 
