@@ -1,6 +1,7 @@
 // Libraries to include
 #include <PMW3360.h>
 #include <AccelStepper.h>
+#include <TMCStepper.h>
 
 // Files to include
 /*
@@ -23,10 +24,10 @@ Angle signage: +CCW
 #define LIMIT_MACH_Z0   2
 #define BUTT_MACH_X0    4
 #define BUTT_MACH_Z0    3
-#define BUTT_WORK_X0Y0   6
-#define BUTT_WORK_Z0   5
+#define BUTT_WORK_X0Y0  6
+#define BUTT_WORK_Z0    5
 #define BUTT_HANDLE     7
-#define POT_THICK   31
+#define POT_THICK       31
 
 // Motor Pins
 #define MS1_X       17
@@ -40,18 +41,16 @@ Angle signage: +CCW
 #define MOT_DIR_Z   36
 #define MOT_STEP_Z  33
 
-//int dirPin = 36;
-//int stepPin = 33;
-//#define RX2 0
-//#define TX2 1
-//#define DIAG_PIN 12
+// Driver pins
+#define SERIAL_PORT_X         Serial7     // HardwareSerial port
+#define SERIAL_PORT_Z         Serial6
 
 // Constants ------------------------------------------------------------------------
 // Modes
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
 int generalMode = 1;          // use general mode (general_path = 1; line_drawing = 0)
-int designMode = 1;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2)
+int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2)
 int cheatMode = 0;            // disregard orientation for sine drawing (1 = yes; 0 = no)
 
 // Path properties
@@ -83,16 +82,22 @@ const float yOff[3] = {ly/2,ly/2,-ly/2};
 // Note: Constants are in units (steps/*) whereas variables are (mm/*). Kind of
 // confusing, but whenedver the variables are used within an accelStepper function,
 // multiply by Conv. This can be made simpler by using SpeedyStepper library.
-int uSteps = 8;                       // microstep configuration
+int uSteps = 4;                       // microstep configuration
 int Conv = 25*uSteps;                 // conversion factor (mm -> steps)
 float stepPulseWidth = 20.0;          // min pulse width (from Mark Rober's code)
-float maxVel = 40.0 * Conv;           // max velocity motor can move at (step/s)
-float maxAccel = 800.0 * Conv;        // max acceleration (step/s^2)
+float maxCurrent_RMS = 640.0;         // motor RMS current rating (mOhm)
+// float maxVel = 6400.0;                // max velocity motor can move at (step/s)
+float maxVel = 80.0*Conv;                // max velocity motor can move at (step/s)
+float maxAccel = 1600.0*Conv;             // max acceleration (step/s^2)
 float retract = 5;                    // distance to retract (mm)
 float speed_x0 = 20.0 * Conv;             // x zeroing speed (step/s)
 float speed_x1 = 4.0 * Conv;              // x secondary zeroing speed (step/s)
 float accel_x0 = 200.0 * Conv;            // x zeroing acceleration (step/s^2)
 #define motorInterfaceType 1
+
+// Driver properties
+#define DRIVER_ADDRESS      0b00    // TMC2209 Driver address according to MS1 and MS2
+#define R_SENSE             0.11f   // Match to your driver
 
 // Gantry geometry
 float gantryLength = 106.0;         // usable length of x-gantry (mm)
@@ -174,6 +179,10 @@ PMW3360 sensor2;
 AccelStepper stepperX(motorInterfaceType, MOT_STEP_X, MOT_DIR_X);
 AccelStepper stepperZ(motorInterfaceType, MOT_STEP_Z, MOT_DIR_Z);
 
+// Driver objecet creation
+TMC2209Stepper driverX(&SERIAL_PORT_X, R_SENSE, DRIVER_ADDRESS);
+TMC2209Stepper driverZ(&SERIAL_PORT_Z, R_SENSE, DRIVER_ADDRESS);
+
 // -------------------------------------------------------------------------------------------------
 // Setup and Main Loop -----------------------------------------------------------------------------
 void setup() {
@@ -194,6 +203,8 @@ void setup() {
   sensorSetup();
 
   motorSetup();
+
+  driverSetup();
 
   // Make path
   switch (designMode) {
@@ -486,16 +497,16 @@ void sensorSetup() {
 void motorSetup() {
   // Set up motors
   // Initialize pins
-  pinMode(MS1_X, OUTPUT);
-  pinMode(MS2_X, OUTPUT);
+  // pinMode(MS1_X, OUTPUT);
+  // pinMode(MS2_X, OUTPUT);
   pinMode(MS1_Z, OUTPUT);
   pinMode(MS2_Z, OUTPUT);
   pinMode(MOT_EN_X, OUTPUT);
   pinMode(MOT_EN_Z, OUTPUT);
 
   // Initialize microstep
-  digitalWrite(MS1_X, LOW);
-  digitalWrite(MS2_X, LOW);
+  // digitalWrite(MS1_X, LOW);
+  // digitalWrite(MS2_X, LOW);
   digitalWrite(MS1_Z, LOW);
   digitalWrite(MS2_Z, LOW);
 
@@ -518,6 +529,33 @@ void motorSetup() {
   stepperZ.setMaxSpeed(speed_x0);
   stepperZ.setAcceleration(maxAccel);
   stepperZ.setCurrentPosition(0);
+}
+
+void driverSetup() {
+  // Set up TMC2209 drivers
+  SERIAL_PORT_X.begin(115200);      // INITIALIZE UART TMC2209
+  SERIAL_PORT_Z.begin(115200);
+  delay(100);
+
+  driverX.begin();                // Initialize driver                   
+  driverX.toff(5);                // Enables driver in software
+  driverZ.begin();
+  driverZ.toff(5);
+
+  driverX.rms_current(maxCurrent_RMS);       // Set motor RMS current
+  driverZ.rms_current(maxCurrent_RMS);       // Set motor RMS current
+  if (uSteps > 1) {
+    driverX.microsteps(uSteps);               // Set microsteps
+    driverZ.microsteps(uSteps);               // Set microsteps
+  } else {
+    driverX.microsteps(0);
+    driverZ.microsteps(0);
+  }
+
+  driverX.pwm_autoscale(true);    // Needed for stealthChop
+  driverX.en_spreadCycle(true);   // false = StealthChop / true = SpreadCycle
+  driverZ.pwm_autoscale(true);    // Needed for stealthChop
+  driverZ.en_spreadCycle(false);   // false = StealthChop / true = SpreadCycle
 }
 
 void lineGenerator() {
