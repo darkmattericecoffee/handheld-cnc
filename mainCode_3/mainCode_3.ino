@@ -98,6 +98,7 @@ float accel_x0 = 200.0 * Conv;            // x zeroing acceleration (step/s^2)
 // Driver properties
 #define DRIVER_ADDRESS      0b00    // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE             0.11f   // Match to your driver
+int TPWMTHRS = 0x753;                  // threshold velocity for spreadCycle (at 1 mm/s right now)
 
 // Gantry geometry
 float gantryLength = 106.0;         // usable length of x-gantry (mm)
@@ -553,7 +554,8 @@ void driverSetup() {
   }
 
   driverX.pwm_autoscale(true);    // Needed for stealthChop
-  driverX.en_spreadCycle(true);   // false = StealthChop / true = SpreadCycle
+  driverX.en_spreadCycle(false);   // false = StealthChop / true = SpreadCycle
+  driverX.TPWMTHRS(TPWMTHRS);     // enable hybrid mode with velocity threshold
   driverZ.pwm_autoscale(true);    // Needed for stealthChop
   driverZ.en_spreadCycle(false);   // false = StealthChop / true = SpreadCycle
 }
