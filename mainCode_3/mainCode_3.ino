@@ -209,7 +209,7 @@ void setup() {
   // Setup systems
   sensorSetup();
 
-  motorSetup();
+  motorSetup(); 
 
   driverSetup();
   
@@ -248,6 +248,10 @@ void setup() {
 }
 
 void loop() {
+  if (Serial.available()) {
+    ch = Serial.read();
+    if (ch == 'd')  DesignModeToggle();
+  }
   // System Initialization ------------------------------------------------------------------------
   // If zeroing operations are needed, they are excecuted here.
   // Machine X zeroing
@@ -485,6 +489,13 @@ void loop() {
     }
     //delay(10);
   }
+}
+
+
+// ------ Design mode toggle
+
+void DesignModeToggle() {
+  
 }
 
 // ------------------------------------------------------------------------------------------------
