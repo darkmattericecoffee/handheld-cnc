@@ -233,7 +233,7 @@ void setup() {
 }
 
 void loop() {
-  
+  // Serial Interface -----------------------------------------------------------------------------
   if (Serial.available()) {
     char ch = Serial.read();
     if (ch == 'd') {
@@ -479,23 +479,6 @@ void loop() {
     }
     //delay(10);
   }
-}
-
-
-// ------ Design mode toggle
-
-void DesignModeToggle() {
-  while (!Serial.available()) {
-    
-  }
-
-  int receivedNum = Serial.parseInt();
-  designMode = receivedNum;
-
-  makePath();
-
-  Serial.println("End of Design Mode Toggle!");
-
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -988,4 +971,21 @@ void makePath() {
       parseNC("generic_test02.nc", pathArrayX, pathArrayY);
       break;
   }
+}
+
+void DesignModeToggle() {
+  // Serial interface for toggling design mode
+
+  while (!Serial.available()) {
+    // stay in loop
+    delay(10);
+  }
+
+  int receivedNum = Serial.parseInt();
+  designMode = receivedNum;
+
+  makePath();
+
+  Serial.println("End of Design Mode Toggle!");
+
 }
