@@ -250,7 +250,8 @@ void setup() {
 void loop() {
   
   if (Serial.available()) {
-    ch = Serial.read();
+    char ch = Serial.read();
+    Serial.println("Initialized Design Mode Toggle!");
     if (ch == 'd')  DesignModeToggle();
   }
   
@@ -498,7 +499,7 @@ void loop() {
 
 void DesignModeToggle() {
   while (!Serial.available()) {
-    continue;
+    
   }
 
   int receivedNum = Serial.parseInt();
@@ -522,6 +523,8 @@ void DesignModeToggle() {
       parseNC("generic_test02.nc", pathArrayX, pathArrayY);
       break;
   }
+  Serial.println("End of Design Mode Toggle!");
+
 }
 
 // ------------------------------------------------------------------------------------------------
