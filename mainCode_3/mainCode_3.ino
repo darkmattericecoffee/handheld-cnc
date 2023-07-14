@@ -972,29 +972,6 @@ void makePath() {
   }
 }
 
-//void DesignModeToggle() {
-//  // Serial interface for toggling design mode
-//  Serial.print("Start Design Mode Toggle");
-//  
-////  while (Serial.available()) {
-////    Serial.read();  // Read and discard each available byte
-////  }
-//  
-//  int receivedNum;
-//  
-//  if (Serial.available() > 0) {
-//    receivedNum = Serial.parseInt();
-//  }
-//
-//  Serial.print("received num: ");
-//  Serial.println(receivedNum);
-//  designMode = receivedNum;
-//
-//  makePath();
-//
-//  Serial.println("End of Design Mode Toggle!");
-//
-//}
 
 void DesignModeToggle() {
   Serial.println("Start Design Mode Toggle");
