@@ -236,8 +236,10 @@ void loop() {
   
   if (Serial.available()) {
     char ch = Serial.read();
-    Serial.println("Initialized Design Mode Toggle!");
-    if (ch == 'd')  DesignModeToggle();
+    if (ch == 'd') {
+      Serial.println("Initialized Design Mode Toggle!");
+      DesignModeToggle();
+    }
   }
   
   // System Initialization ------------------------------------------------------------------------
