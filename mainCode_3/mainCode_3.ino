@@ -237,7 +237,6 @@ void loop() {
   if (Serial.available()) {
     char ch = Serial.read();
     if (ch == 'd') {
-      Serial.println("Initialized Design Mode Toggle!");
       DesignModeToggle();
     }
   }
@@ -973,19 +972,50 @@ void makePath() {
   }
 }
 
+//void DesignModeToggle() {
+//  // Serial interface for toggling design mode
+//  Serial.print("Start Design Mode Toggle");
+//  
+////  while (Serial.available()) {
+////    Serial.read();  // Read and discard each available byte
+////  }
+//  
+//  int receivedNum;
+//  
+//  if (Serial.available() > 0) {
+//    receivedNum = Serial.parseInt();
+//  }
+//
+//  Serial.print("received num: ");
+//  Serial.println(receivedNum);
+//  designMode = receivedNum;
+//
+//  makePath();
+//
+//  Serial.println("End of Design Mode Toggle!");
+//
+//}
+
 void DesignModeToggle() {
-  // Serial interface for toggling design mode
-
-  while (!Serial.available()) {
-    // stay in loop
-    delay(10);
+  Serial.println("Start Design Mode Toggle");
+  
+  // Clear the serial buffer
+  while (Serial.available()) {
+    Serial.read();
   }
-
+  
+  while (!Serial.available()) {
+    // Wait until there is data available in the serial buffer
+  }
+  
   int receivedNum = Serial.parseInt();
+  
+  Serial.print("Received num: ");
+  Serial.println(receivedNum);
+  
   designMode = receivedNum;
-
+  
   makePath();
-
+  
   Serial.println("End of Design Mode Toggle!");
-
 }
