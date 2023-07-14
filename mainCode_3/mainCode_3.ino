@@ -70,7 +70,7 @@ const float pathMax_y = 300.0;            // x-length of entire path (mm) (used 
 const float circleDiameter = 200.0;       // Diameter of the circle
 
 // Button properties
-long debounceDelay = 50;      // the debounce time; increase if the output flickers
+long unsigned debounceDelay = 50;      // the debounce time; increase if the output flickers
 
 // Sensor properties
 const int ns = 3;                   // number of sensors
