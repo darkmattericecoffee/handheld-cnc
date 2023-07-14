@@ -495,7 +495,13 @@ void loop() {
 // ------ Design mode toggle
 
 void DesignModeToggle() {
-  
+  while (!Serial.available()) {
+    continue;
+  }
+
+  int receivedNum = Serial.parseInt();
+  designMode = receivedNum;
+
 }
 
 // ------------------------------------------------------------------------------------------------
