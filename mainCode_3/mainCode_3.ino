@@ -2,6 +2,8 @@
 #include <PMW3360.h>
 #include <AccelStepper.h>
 #include <TMCStepper.h>
+#include <SPI.h>
+#include <SD.h>
 
 // Files to include
 /*
@@ -45,12 +47,15 @@ Angle signage: +CCW
 #define SERIAL_PORT_X         Serial7     // HardwareSerial port
 #define SERIAL_PORT_Z         Serial6
 
+// SD pins
+const int chipSelect = BUILTIN_SDCARD;
+
 // Constants ------------------------------------------------------------------------
 // Modes
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
 int generalMode = 1;          // use general mode (general_path = 1; line_drawing = 0)
-int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2)
+int designMode = 3;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
 int cheatMode = 0;            // disregard orientation for sine drawing (1 = yes; 0 = no)
 
 // Path properties
@@ -201,11 +206,19 @@ void setup() {
   pinMode(BUTT_HANDLE, INPUT);
   //handleButton.setDebounceTime(50);
 
+  // Setup systems
   sensorSetup();
 
   motorSetup();
 
   driverSetup();
+  
+  Serial.print("Initializing SD card...");
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Initialization failed!");
+    return;
+  }
+  Serial.println("Initialization done.");
 
   // Make path
   switch (designMode) {
@@ -220,6 +233,9 @@ void setup() {
     case 2:
       circleGenerator();
       Serial.println("Circle path generated!");
+      break;
+    case 3:
+      parseNC("generic_test02.nc", pathArrayX, pathArrayY);
       break;
   }
 //  for (int i = 1; i < num_points; i++) {
@@ -907,4 +923,37 @@ void debugging() {
   // Serial.print(motorPosX);
 
   Serial.println();
+}
+
+void parseNC(const char* filename, float* pathArrayX, float* pathArrayY) {
+  // NC gCode parsing function
+  File myFile = SD.open(filename);
+  if (!myFile) {
+    Serial.println("Failed to open file for reading");
+    return;
+  }
+
+  int idx = 0;
+  while (myFile.available()) {
+    String line = myFile.readStringUntil('\n');
+    int xPos = line.indexOf('X');
+    int yPos = line.indexOf('Y');
+    if (xPos != -1 && yPos != -1) {
+      int spacePos = line.indexOf(' ', xPos);
+      // if (spacePos == -1) {
+      //   spacePos = line.length();
+      // }
+      pathArrayX[idx] = line.substring(xPos+1, spacePos).toFloat();
+
+      spacePos = line.indexOf(' ', yPos);
+      if (spacePos == -1) {
+        spacePos = line.length();
+      }
+      pathArrayY[idx] = line.substring(yPos+1, spacePos).toFloat();
+
+      idx++;        // only go to update index if there is a valid XY coordinate
+    }
+  }
+
+  myFile.close();
 }
