@@ -33,3 +33,5 @@
 
 # VsCode Property Files
 .vscode/
+
+.DS_Store
