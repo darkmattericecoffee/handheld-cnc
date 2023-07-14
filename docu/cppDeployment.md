@@ -1,6 +1,6 @@
 # CPP Deployment Guide
 
-This will be a relatively loose guide of how to run your shit properly with c++ using VS Code.
+This will be a relatively loose guide of how to run stuff with c++ using VS Code. The main benefit here is your working with real cpp in VSCode/PlatformIO, so it is more scalable/dialed and offers pretty powerful debugging
 
 ## Big Idea
 
