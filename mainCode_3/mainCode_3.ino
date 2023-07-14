@@ -248,10 +248,12 @@ void setup() {
 }
 
 void loop() {
+  
   if (Serial.available()) {
     ch = Serial.read();
     if (ch == 'd')  DesignModeToggle();
   }
+  
   // System Initialization ------------------------------------------------------------------------
   // If zeroing operations are needed, they are excecuted here.
   // Machine X zeroing
@@ -502,6 +504,24 @@ void DesignModeToggle() {
   int receivedNum = Serial.parseInt();
   designMode = receivedNum;
 
+    // Make path
+  switch (designMode) {
+    case 0:
+      lineGenerator();
+      Serial.println("Line path generated!");
+      break;
+    case 1:
+      sinGenerator();
+      Serial.println("Sine wave path generated!");
+      break;
+    case 2:
+      circleGenerator();
+      Serial.println("Circle path generated!");
+      break;
+    case 3:
+      parseNC("generic_test02.nc", pathArrayX, pathArrayY);
+      break;
+  }
 }
 
 // ------------------------------------------------------------------------------------------------
