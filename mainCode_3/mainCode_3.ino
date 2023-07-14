@@ -130,7 +130,7 @@ int z0_count = 2;           // z zeroing count variable (start as "false")
 
 // Timing variables
 int firstPoint = 1;
-long dtDebug = 500;                   // (ms)
+long unsigned dtDebug = 500;                   // (ms)
 long unsigned timeLastPoll = 0;
 long unsigned timeLastDebug = 0;
 long unsigned timeLastDebounce = 0;   // (ms)
