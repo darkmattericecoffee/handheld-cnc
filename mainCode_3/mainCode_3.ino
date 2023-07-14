@@ -221,23 +221,8 @@ void setup() {
   Serial.println("Initialization done.");
 
   // Make path
-  switch (designMode) {
-    case 0:
-      lineGenerator();
-      Serial.println("Line path generated!");
-      break;
-    case 1:
-      sinGenerator();
-      Serial.println("Sine wave path generated!");
-      break;
-    case 2:
-      circleGenerator();
-      Serial.println("Circle path generated!");
-      break;
-    case 3:
-      parseNC("generic_test02.nc", pathArrayX, pathArrayY);
-      break;
-  }
+  makePath();
+
 //  for (int i = 1; i < num_points; i++) {
 //    Serial.printf("x(%i) = 
 //  }
@@ -505,24 +490,8 @@ void DesignModeToggle() {
   int receivedNum = Serial.parseInt();
   designMode = receivedNum;
 
-    // Make path
-  switch (designMode) {
-    case 0:
-      lineGenerator();
-      Serial.println("Line path generated!");
-      break;
-    case 1:
-      sinGenerator();
-      Serial.println("Sine wave path generated!");
-      break;
-    case 2:
-      circleGenerator();
-      Serial.println("Circle path generated!");
-      break;
-    case 3:
-      parseNC("generic_test02.nc", pathArrayX, pathArrayY);
-      break;
-  }
+  makePath();
+
   Serial.println("End of Design Mode Toggle!");
 
 }
@@ -996,4 +965,25 @@ void parseNC(const char* filename, float* pathArrayX, float* pathArrayY) {
   }
 
   myFile.close();
+}
+
+void makePath() {
+  // Make path
+  switch (designMode) {
+    case 0:
+      lineGenerator();
+      Serial.println("Line path generated!");
+      break;
+    case 1:
+      sinGenerator();
+      Serial.println("Sine wave path generated!");
+      break;
+    case 2:
+      circleGenerator();
+      Serial.println("Circle path generated!");
+      break;
+    case 3:
+      parseNC("generic_test02.nc", pathArrayX, pathArrayY);
+      break;
+  }
 }
