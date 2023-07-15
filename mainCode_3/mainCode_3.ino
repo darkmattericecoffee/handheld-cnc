@@ -165,10 +165,10 @@ const int num_queries = 2;        // number of points to query for min distance 
 // Path following
 int prev_pnt_ind = 0;
 int goal_pnt_ind = 0;             // index of current goal point
+float prevX = 0.0f;               // previous point x coordinate (mm)
+float prevY = 0.0f;               // previous point y coordinate (mm)
 float goalX = 0.0f;               // goal point x coordinate (mm)
 float goalY = 0.0f;               // goal point y coordinate (mm)
-float lastX = 0.0f;               // (unsure if needed) last goal point
-float lastY = 0.0f;               // (unsure if needed) last goal point
 
 // Motor control variables
 float desPos = 0.0f;              // desired position of tool (mm - 0 is center of gantry)
@@ -373,6 +373,8 @@ void loop() {
       if (signedDist(estPosX,estPosY,goalX,goalY,estYaw) > 0) {
         // If the goal point has been passed
         goal_pnt_ind++;
+        prevX = goalX;
+        prevY = goalY;
         goalX = pathArrayX[goal_pnt_ind];      // x coordinate of closest point
         goalY = pathArrayY[goal_pnt_ind];      // y coordinate of closest point
       }
@@ -382,14 +384,12 @@ void loop() {
       
       // Determine desired actuation
       if (generalMode) {
-        if (!cheatMode) {
-          // General path drawing
+        // General path drawing (try first with intersect interpolation)
+        desPos = desPosIntersect(estPosX, estPosY, estYaw, prevX, prevY, goalX, goalY);
+        if (isnan(desPos)) {
           desPos = desiredPosition(deltaX,deltaY,estYaw);
-          // desPos = (deltaX - tanf(estYaw)*deltaY)*cosf(estYaw);
-        } else {
-          // Cheat mode sine drawing
-          desPos = sinAmp * sinf((TWO_PI/sinPeriod)*estPosY);     // cheat mode
         }
+
         // Velocity control
         if (!isnan(estTraj)) {
           desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;    // unused right now
@@ -413,12 +413,6 @@ void loop() {
         //delay(100);
         stepperX.run();
       }
-
-      // // Save last point (not being used)
-      // if (start_point != closest_point_index) {
-      //   lastX = goalX;
-      //   lastY = goalY;
-      // }
     }
     // React to non-operational state ---------------------------------------------------------------
     else if (cutStarted  && (millis() - timeLastDebounce) > debounceDelay) {
@@ -616,14 +610,14 @@ float myDist(float x1, float y1, float x2, float y2) {
   return sqrt(pow(x1 - x2,2) + pow(y1 - y2,2));
 }
 
-float signedDist(float xr, float yr, float xg, float yg, float th) {
+float signedDist(float xc, float yc, float xg, float yg, float th) {
   // Calculate the signed distance between goal point and line of gantry
   // Note: if the distance is:
   //    < 0 - the point is in front of the gantry (it is yet to be passed)
   //    > 0 - the point is behind the gantry (it has been passed)
 
   float m = tan(th);
-  float b = yr - m*xr;
+  float b = yc - m*xc;
   float A = m;
   float B = -1;
   float C = b;
@@ -642,16 +636,16 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
 
   // Check for parallel lines (denominator is zero)
   if (den == 0) {
-      Serial.println("Lines are parallel, no intersection point.");
-      return NAN;
+    Serial.println("Lines are parallel, no intersection point.");
+    return NAN;
   }
 
   float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
   float u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
   // Check if the intersection point is on the line segments
   if (t < 0 || t > 1 || u < 0 || u > 1) {
-      Serial.println("Intersection point is not on the line segments.");
-      return NAN;     // TO-DO: do other stuff like stopping motor
+    Serial.println("Intersection point is not on the line segments.");
+    return NAN;     // TO-DO: do other stuff like stopping motor
   }
   
   float x = x1 + t * (x2 - x1);
@@ -660,7 +654,8 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
 //  pointDes[0] = (((x1*y2 - y1*x2)*(x3 - x4)) - ((x1 - x2)*(x3*y4 - y3*x4)))/den;
 //  pointDes[1] = (((x1*y2 - y1*x2)*(y3 - y4)) - ((y1 - y2)*(x3*y4 - y3*x4)))/den;
 
-  return -myDist(xc,yc,x,y)*cosf(th);
+  // return -myDist(xc,yc,x,y)*cosf(th);
+  return signedDist(xc,yc,x,y,th+(PI/2));             // test whether should be adding or subtracting PI/2
 }
 
 void enableStepperZ() {
