@@ -969,6 +969,9 @@ void makePath() {
     case 3:
       parseNC("generic_test02.nc", pathArrayX, pathArrayY);
       break;
+    case 4:
+      parseNC("stupid_wave02.nc", pathArrayX, pathArrayY);
+      break;
   }
 }
 
