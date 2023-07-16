@@ -55,7 +55,7 @@ const int chipSelect = BUILTIN_SDCARD;
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
 int generalMode = 1;          // use general mode (general_path = 1; line_drawing = 0)
-int designMode = 3;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
+int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
 int cheatMode = 0;            // disregard orientation for sine drawing (1 = yes; 0 = no)
 
 // Path properties
@@ -67,7 +67,7 @@ const float sinAmp = 5.0;
 const float sinPeriod = 50.0;
 const float pathMax_y = 300.0;            // x-length of entire path (mm) (used for line too)
 // Path properties (circle)
-const float circleDiameter = 200.0;       // Diameter of the circle
+const float circleDiameter = 800.0;       // Diameter of the circle
 
 // Button properties
 long unsigned debounceDelay = 50;      // the debounce time; increase if the output flickers
