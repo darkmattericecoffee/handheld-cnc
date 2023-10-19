@@ -37,7 +37,7 @@ Module   Arduino
                                raw data values within normal operating ranges.
  */
 
-#define SS  40   // Slave Select pin. Connect this to SS on the module.
+#define SS  10   // Slave Select pin. Connect this to SS on the module.
 
 // Sensor properties
 int CPI = 2500;               // This value changes calibration coefficients
@@ -65,17 +65,18 @@ void setup() {
   Serial.begin(9600);  
   while(!Serial);
   
+  delay(100);
   //sensor.begin(10, 1600); // to set CPI (Count per Inch), pass it as the second parameter
   if(sensor.begin(SS, CPI)) {  // 10 is the pin connected to SS of the module.
-    Serial.print("Sensor initialization successed, with CPI = ");
+    Serial.printf("Sensor on pin %i initialization succeeded, with CPI = ", SS);
     Serial.println(sensor.getCPI());
   }else{
-    Serial.println("Sensor initialization failed");
+    Serial.printf("Sensor on pin %i initialization failed\n", SS);
   }
 
   //sensor.setCPI(12000);
   //Serial.println(sensor.getCPI());
-  
+  delay(1000);
   
   //sensor.setCPI(1600);    // or, you can set CPI later by calling setCPI();
 }
