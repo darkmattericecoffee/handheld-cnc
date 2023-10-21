@@ -599,6 +599,26 @@ void circleGenerator() {
   }
 }
 
+void zigZagGenerator() {
+  // Generate a zig zaxg to cut
+  int numPLine = 50;
+  int pCount = 0;
+  int leftRight = 1;
+  float zigSize = 40;
+
+  for (int i = 0; i < num_points; ++i) {
+    if (pCount < numPLine) {
+      float y = (pathMax_y) * (float)i / (num_points - 1);
+      float x = y % zigSize;
+      if (x > (zigSize / 2)) {
+        x = (zigSize / 2) - (x - (zigSize / 2));
+      }
+      pathArrayX[i] = x;
+      pathArrayY[i] = y;
+    }
+  }
+}
+
 // Loop subfunctions -----------------------------------------------------------------------------
 int convTwosComp(int b){
   // Convert from 2's complement
@@ -959,7 +979,8 @@ void makePath() {
       Serial.println("Line path generated!");
       break;
     case 1:
-      sinGenerator();
+      sinGenerator()d
+      ;
       Serial.println("Sine wave path generated!");
       break;
     case 2:
