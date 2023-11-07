@@ -1,6 +1,6 @@
 Manufacturing BOM and Readme
 
-Main Assembly - 
+Main Assembly (/latest) - 
 Aluminum Sheet Metal (6061)
 (1x) boardFrame.dxf - 1/4"
 (1x) crossPanel.dxf - 1/8"

@@ -609,9 +609,9 @@ void zigZagGenerator() {
   for (int i = 0; i < num_points; ++i) {
     if (pCount < numPLine) {
       float y = (pathMax_y) * (float)i / (num_points - 1);
-      float x = y % zigSize;
+      float x = std::fmod(y, zigSize);
       if (x > (zigSize / 2)) {
-        x = (zigSize / 2) - (x - (zigSize / 2));
+        x = zigSize - x;
       }
       pathArrayX[i] = x;
       pathArrayY[i] = y;
@@ -979,8 +979,7 @@ void makePath() {
       Serial.println("Line path generated!");
       break;
     case 1:
-      sinGenerator()d
-      ;
+      sinGenerator();
       Serial.println("Sine wave path generated!");
       break;
     case 2:
@@ -992,6 +991,9 @@ void makePath() {
       break;
     case 4:
       parseNC("stupid_wave02.nc", pathArrayX, pathArrayY);
+      break;
+    case 5:
+      zigZagGenerator();
       break;
   }
 }
