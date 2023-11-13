@@ -119,7 +119,7 @@ float maxHeight = zLength;          // max height that z can actuate without col
 int limitHitX = 0;
 int limitHitZ = 0;
 int cutStarted = 0;
-int raised = 0;
+int toolRaised = 0;
 
 // Button states
 int readyOrNot = 0;                 // (0 = workpiece is unzeroed; 1 = z is zeroed; 2 = xy is zeroed)
@@ -877,6 +877,8 @@ void workZeroZ_man() {
         stepperZ.run();
       }
 
+      toolRaised = 0;     // tool has now gone down to surface
+
       stepperZ.setMaxSpeed(speed_x0);
       //disableStepperZ();
       z0_count += 1;      // Stop limit switch function (should go back to 0 for main code)
@@ -891,7 +893,7 @@ void raiseZ() {
   while (stepperZ.distanceToGo() != 0) {
     stepperZ.run();
   }
-  raised = 1;
+  toolRaised = 1;
 }
 
 float desiredPosition(float dX,float dY,float theta) {
