@@ -96,6 +96,10 @@ const float pathMax_y = 300.0;            // x-length of entire path (mm) (used 
 // Path properties (circle)
 const float circleDiameter = 800.0;       // Diameter of the circle
 
+// Material properties
+float matThickness = 0;                   // thickness of material
+float restHeight = 4.0;                   // rest height of tool before cutting
+
 // Button properties
 long unsigned debounceDelay = 50;      // the debounce time; increase if the output flickers
 
@@ -146,7 +150,7 @@ float maxHeight = zLength;          // max height that z can actuate without col
 int limitHitX = 0;
 int limitHitZ = 0;
 int cutStarted = 0;
-int toolRaised = 0;
+int toolRaised = 1;
 
 // Button states
 int readyOrNot = 0;                 // (0 = workpiece is unzeroed; 1 = z is zeroed; 2 = xy is zeroed)
@@ -390,8 +394,8 @@ void loop() {
       //    - the tool hasn't hit a limit switch (limitHitX)
 
       // Lower tool
-      if (!toolRaised) {
-        
+      if (toolRaised) {
+        lowerZ();
       }
 
       // Update states
@@ -734,6 +738,12 @@ float desiredPosition(float dX,float dY,float theta) {
   return desPos;
 }
 
+float mapF(long x, float in_min, float in_max, float out_min, float out_max) {
+  // Maps a float value
+
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
 // Motor control functions
 void enableStepperZ() {
   digitalWrite(MOT_EN_Z, LOW);
@@ -857,7 +867,7 @@ void workZeroXY() {
     }
 
     // Make sure tool is down
-    stepperZ.moveTo(0);           // brings tool down to top of surface (0)
+    stepperZ.moveTo(Conv*restHeight);           // brings tool down to rest height
     while (abs(stepperZ.distanceToGo()) > (Conv*2)) {
       stepperZ.run();
     }
@@ -920,7 +930,7 @@ void workZeroZ_man() {
       Serial.println(maxHeight);
 
       // Go back down to manually set height
-      stepperZ.moveTo(0);
+      stepperZ.moveTo(Conv*restHeight);                              // go to restheight
       while (abs(stepperZ.distanceToGo()) > (Conv*2)) {
         stepperZ.run();
       }
@@ -929,7 +939,7 @@ void workZeroZ_man() {
         stepperZ.run();
       }
 
-      toolRaised = 0;     // tool has now gone down to surface
+      // toolRaised = 0;     // [still 1 because it is at restHeight, not -matThickness]
 
       stepperZ.setMaxSpeed(speed_x0);
       //disableStepperZ();
@@ -951,7 +961,20 @@ void raiseZ() {
 void lowerZ() {
   // Lower tool
 
-  stepperZ.moveTo(-Conv*)
+  int sensorVal = analogRead(POT_THICK);
+  matThickness = mapF(sensorVal, 0, 1024, 0, 10);
+
+  stepperZ.moveTo(-Conv*matThickness);
+  while (abs(stepperZ.distanceToGo()) > (Conv*2)) {
+    stepperZ.run();
+  }
+  stepperZ.setMaxSpeed(round(speed_x1/2));
+  while (stepperZ.distanceToGo() !=0) {
+    stepperZ.run();
+  }
+  stepperZ.setMaxSpeed(speed_x0);
+  
+  toolRaised = 0;
 }
 
 void sensorPlotting() {
