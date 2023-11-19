@@ -146,7 +146,7 @@ float maxHeight = zLength;          // max height that z can actuate without col
 int limitHitX = 0;
 int limitHitZ = 0;
 int cutStarted = 0;
-int raised = 0;
+int toolRaised = 0;
 
 // Button states
 int readyOrNot = 0;                 // (0 = workpiece is unzeroed; 1 = z is zeroed; 2 = xy is zeroed)
@@ -388,6 +388,11 @@ void loop() {
       //    - the path hasn't finished (num_points)
       //    - the tool is not colliding with the wall
       //    - the tool hasn't hit a limit switch (limitHitX)
+
+      // Lower tool
+      if (!toolRaised) {
+        
+      }
 
       // Update states
       cutStarted = 1;
@@ -647,6 +652,7 @@ void zigZagGenerator() {
 }
 
 // Loop subfunctions -----------------------------------------------------------------------------
+// Math functions
 int convTwosComp(int b){
   // Convert from 2's complement
   // This is needed to convert the binary values from the sensor library to decimal
@@ -710,6 +716,25 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
   return -myDist(xc,yc,x,y)*cosf(th);
 }
 
+float desiredPosition(float dX,float dY,float theta) {
+  // Calculate the desired position for the tool
+
+  desPos = (dX - tanf(theta)*dY)*cosf(theta);       // Sanzhar equation
+
+  // Alternative methods (preivous attempts):
+//desPos = myDist(estPosX,estPosY,goalX,goalY)*sinf(nextTrajC);
+//        if (closest_point_index == 0 && goalX == 0 && goalY == 0) {
+//          desPos = 0;
+//        } else {
+//          desPos = desPosIntersect(estPosX,estPosY,estYaw,lastX,lastY,goalX,goalY);
+//        }
+// desPos = -distance(estPosX,estPosY,goalX,goalY);
+// desPos = -(goalX - estPosX);
+// desPos = sinAmp * sinf((TWO_PI/sinPeriod)*estPosY);     // cheat mode
+  return desPos;
+}
+
+// Motor control functions
 void enableStepperZ() {
   digitalWrite(MOT_EN_Z, LOW);
 }
@@ -918,25 +943,13 @@ void raiseZ() {
   while (stepperZ.distanceToGo() != 0) {
     stepperZ.run();
   }
-  raised = 1;
+  toolRaised = 1;
 }
 
-float desiredPosition(float dX,float dY,float theta) {
-  // Calculate the desired position for the tool
+void lowerZ() {
+  // Lower tool
 
-  desPos = (dX - tanf(theta)*dY)*cosf(theta);       // Sanzhar equation
-
-  // Alternative methods (preivous attempts):
-//desPos = myDist(estPosX,estPosY,goalX,goalY)*sinf(nextTrajC);
-//        if (closest_point_index == 0 && goalX == 0 && goalY == 0) {
-//          desPos = 0;
-//        } else {
-//          desPos = desPosIntersect(estPosX,estPosY,estYaw,lastX,lastY,goalX,goalY);
-//        }
-// desPos = -distance(estPosX,estPosY,goalX,goalY);
-// desPos = -(goalX - estPosX);
-// desPos = sinAmp * sinf((TWO_PI/sinPeriod)*estPosY);     // cheat mode
-  return desPos;
+  stepperZ.moveTo(-Conv*)
 }
 
 void sensorPlotting() {
@@ -1024,7 +1037,6 @@ void makePath() {
       break;
   }
 }
-
 
 void DesignModeToggle() {
   Serial.println("Start Design Mode Toggle");
