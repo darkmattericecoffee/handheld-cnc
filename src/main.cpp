@@ -5,6 +5,16 @@
 #include <SPI.h>
 #include <SD.h>
 
+/*
+Sensor configuration (USING 3 SENSORS NOW!!):
+0 --- 1              ^ y
+|  x  |   (old x <-) |-> x
+2 --- (3 gone)
+    NOTE: old config didn't obey the right hand rule. We are now flipping x.
+
+Angle signage: +CCW
+*/
+
 // Function definitions
 void sensorSetup();
 void motorSetup();
@@ -32,17 +42,6 @@ void debugging();
 void parseNC(const char* filename, float* pathArrayX, float* pathArrayY);
 void makePath();
 void DesignModeToggle();
-
-
-/*
-Sensor configuration (USING 3 SENSORS NOW!!):
-0 --- 1              ^ y
-|  x  |   (old x <-) |-> x
-2 --- (3 gone)
-    NOTE: old config didn't obey the right hand rule. We are now flipping x.
-
-Angle signage: +CCW
-*/
 
 // Pin definitions -------------------------------------------------------------------------------
 // Sensor pins
@@ -83,7 +82,7 @@ const int chipSelect = BUILTIN_SDCARD;
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
 int generalMode = 1;          // use general mode (general_path = 1; line_drawing = 0)
-int designMode = 3;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
+int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
 int cheatMode = 0;            // disregard orientation for sine drawing (1 = yes; 0 = no)
 
 // Path properties
@@ -95,7 +94,7 @@ const float sinAmp = 5.0;
 const float sinPeriod = 50.0;
 const float pathMax_y = 300.0;            // x-length of entire path (mm) (used for line too)
 // Path properties (circle)
-const float circleDiameter = 200.0;       // Diameter of the circle
+const float circleDiameter = 800.0;       // Diameter of the circle
 
 // Button properties
 long unsigned debounceDelay = 50;      // the debounce time; increase if the output flickers
@@ -508,6 +507,7 @@ void loop() {
   }
 }
 
+// ------------------------------------------------------------------------------------------------
 // Setup subfunctions -----------------------------------------------------------------------------
 void sensorSetup() {
   // Sensor initialization
@@ -623,6 +623,26 @@ void circleGenerator() {
     float angle = i * angle_step;
     pathArrayX[i] = -radius + (radius * cosf(angle));
     pathArrayY[i] = radius * sinf(angle);
+  }
+}
+
+void zigZagGenerator() {
+  // Generate a zig zaxg to cut
+  int numPLine = 50;
+  int pCount = 0;
+  int leftRight = 1;
+  float zigSize = 40;
+
+  for (int i = 0; i < num_points; ++i) {
+    if (pCount < numPLine) {
+      float y = (pathMax_y) * (float)i / (num_points - 1);
+      float x = std::fmod(y, zigSize);
+      if (x > (zigSize / 2)) {
+        x = zigSize - x;
+      }
+      pathArrayX[i] = x;
+      pathArrayY[i] = y;
+    }
   }
 }
 
@@ -995,6 +1015,12 @@ void makePath() {
       break;
     case 3:
       parseNC("generic_test02.nc", pathArrayX, pathArrayY);
+      break;
+    case 4:
+      parseNC("stupid_wave02.nc", pathArrayX, pathArrayY);
+      break;
+    case 5:
+      zigZagGenerator();
       break;
   }
 }
