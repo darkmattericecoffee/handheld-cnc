@@ -16,16 +16,23 @@ Angle signage: +CCW
 */
 
 // Function definitions
+// Setup functions
 void sensorSetup();
 void motorSetup();
 void driverSetup();
 void lineGenerator();
 void sinGenerator();
 void circleGenerator();
+// Math functions
 int convTwosComp(int b);
 float myDist(float x1, float y1, float x2, float y2);
 float signedDist(float xr, float yr, float xg, float yg, float th);
 float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4);
+float desiredPosition(float dX,float dY,float theta);
+float mapF(long x, float in_min, float in_max, float out_min, float out_max);
+// Sensing functions
+void doSensing();
+// Motor control functions
 void enableStepperZ();
 void disableStepperZ();
 void stopStepperX();
@@ -36,7 +43,7 @@ void machineZeroZ();
 void workZeroXY();
 void workZeroZ_man();
 void raiseZ();
-float desiredPosition(float dX,float dY,float theta);
+void lowerZ();
 void sensorPlotting();
 void debugging();
 void parseNC(const char* filename, float* pathArrayX, float* pathArrayY);
@@ -97,7 +104,8 @@ const float pathMax_y = 300.0;            // x-length of entire path (mm) (used 
 const float circleDiameter = 800.0;       // Diameter of the circle
 
 // Material properties
-float matThickness = 0;                   // thickness of material
+float matThickness = 0.0;                   // thickness of material
+float maxThickness = 10.0;                // upper bound of thickness knob (mm)
 float restHeight = 4.0;                   // rest height of tool before cutting
 
 // Button properties
@@ -308,74 +316,7 @@ void loop() {
   // Sensing and Control ---------------------------------------------------------------------------
   if (readyOrNot > 1) {       // keep in mind this may occur premptively b/c of X0Y0 reading
     if(micros() - timeLastPoll >= dt) {
-      //Serial.println(micros() - timeLastPoll);
-      timeLastPoll = micros();
-  
-      // Sensing ---------------------------------------------------------------------
-      // Collect sensor data (raw)
-      PMW3360_DATA data0 = sensor0.readBurst_simple();
-      PMW3360_DATA data1 = sensor1.readBurst_simple();
-      PMW3360_DATA data2 = sensor2.readBurst_simple();
-      //PMW3360_DATA data3 = sensor3.readBurst_simple();
-  
-      int yup = 1;        // filling in for good motion detection boolean
-      if(yup) {
-      //if(data1.isOnSurface && data1.isMotion) {   // If movement...
-        // **Only checking sensor 1 rn (TODO: check all of them and account for misreads)**
-  
-        // Sensor velocity sensing
-        measVelX[0] = -convTwosComp(data0.dx)*Cx[0] / dt;
-        measVelX[1] = -convTwosComp(data1.dx)*Cx[1] / dt;
-        measVelX[2] = -convTwosComp(data2.dx)*Cx[2] / dt;
-        //measVelX[3] = -convTwosComp(data3.dx)*Cx[3] / dt;
-        measVelY[0] = convTwosComp(data0.dy)*Cx[0] / dt;
-        measVelY[1] = convTwosComp(data1.dy)*Cx[1] / dt;
-        measVelY[2] = convTwosComp(data2.dy)*Cx[2] / dt;
-        //measVelY[3] = convTwosComp(data3.dy)*Cx[3] / dt;
-  
-        // Body angle estimation
-        estAngVel[0] = (measVelX[2] - measVelX[0])/ly;
-        estAngVel[1] = (measVelX[2] - measVelX[1])/ly;
-        estAngVel[2] = (measVelY[1] - measVelY[0])/lx;
-        estAngVel[3] = (measVelY[1] - measVelY[2])/lx;
-        // Simple average of angular velocities
-        float sumAngVel = 0.0f;
-        for (int i = 0; i<4; i++) {
-          sumAngVel = sumAngVel + estAngVel[i];
-        }
-        estAngVel1 = sumAngVel / 4.0f;
-        // Integrate angular velocity to get angle
-        estYaw = estYaw + estAngVel1*dt;
-  
-        // Body position estimation
-        estVelX[0] = measVelX[0]*cosf(estYaw)-measVelY[0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-ly*sinf(estYaw));
-        estVelX[1] = measVelX[1]*cosf(estYaw)-measVelY[1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+ly*sinf(estYaw));
-        estVelX[2] = measVelX[2]*cosf(estYaw)-measVelY[2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-ly*sinf(estYaw));
-        estVelY[0] = measVelX[0]*sinf(estYaw)+measVelY[0]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)+lx*sinf(estYaw));
-        estVelY[1] = measVelX[1]*sinf(estYaw)+measVelY[1]*cosf(estYaw) + 0.5*estAngVel1*(-ly*cosf(estYaw)+lx*sinf(estYaw));
-        estVelY[2] = measVelX[2]*sinf(estYaw)+measVelY[2]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)-lx*sinf(estYaw));
-        // Simple average of linear velocities
-        float sumVelX = 0.0f;
-        float sumVelY = 0.0f;
-        for (int i = 0; i<ns; i++) {
-          sumVelX = sumVelX + estVelX[i];
-          sumVelY = sumVelY + estVelY[i];
-        }
-        estVelX1 = sumVelX / ns;
-        estVelY1 = sumVelY / ns;
-        // Integrate linear velocities to get position
-        estPosX = estPosX + estVelX1*dt;
-        estPosY = estPosY + estVelY1*dt;
-
-        // Additional values
-        estTraj = atanf(estVelY1/estVelX1);    // trajectory angle w.r.t inertial frame
-        estVelAbs = sqrt(pow(estVelX1,2) + pow(estVelY1,2));
-
-        // Sensor plotting
-        if (plotting) {
-          sensorPlotting();
-        }
-      }
+      doSensing();
     }
 
     // Motor position
@@ -639,7 +580,7 @@ void zigZagGenerator() {
   // Generate a zig zaxg to cut
   int numPLine = 50;
   int pCount = 0;
-  int leftRight = 1;
+  // int leftRight = 1;
   float zigSize = 40;
 
   for (int i = 0; i < num_points; ++i) {
@@ -742,6 +683,78 @@ float mapF(long x, float in_min, float in_max, float out_min, float out_max) {
   // Maps a float value
 
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+// Sensing functions
+void doSensing() {
+  //Serial.println(micros() - timeLastPoll);
+  timeLastPoll = micros();
+
+  // Sensing ---------------------------------------------------------------------
+  // Collect sensor data (raw)
+  PMW3360_DATA data0 = sensor0.readBurst_simple();
+  PMW3360_DATA data1 = sensor1.readBurst_simple();
+  PMW3360_DATA data2 = sensor2.readBurst_simple();
+  //PMW3360_DATA data3 = sensor3.readBurst_simple();
+
+  int yup = 1;        // filling in for good motion detection boolean
+  if(yup) {
+  //if(data1.isOnSurface && data1.isMotion) {   // If movement...
+    // **Only checking sensor 1 rn (TODO: check all of them and account for misreads)**
+
+    // Sensor velocity sensing
+    measVelX[0] = -convTwosComp(data0.dx)*Cx[0] / dt;
+    measVelX[1] = -convTwosComp(data1.dx)*Cx[1] / dt;
+    measVelX[2] = -convTwosComp(data2.dx)*Cx[2] / dt;
+    //measVelX[3] = -convTwosComp(data3.dx)*Cx[3] / dt;
+    measVelY[0] = convTwosComp(data0.dy)*Cx[0] / dt;
+    measVelY[1] = convTwosComp(data1.dy)*Cx[1] / dt;
+    measVelY[2] = convTwosComp(data2.dy)*Cx[2] / dt;
+    //measVelY[3] = convTwosComp(data3.dy)*Cx[3] / dt;
+
+    // Body angle estimation
+    estAngVel[0] = (measVelX[2] - measVelX[0])/ly;
+    estAngVel[1] = (measVelX[2] - measVelX[1])/ly;
+    estAngVel[2] = (measVelY[1] - measVelY[0])/lx;
+    estAngVel[3] = (measVelY[1] - measVelY[2])/lx;
+    // Simple average of angular velocities
+    float sumAngVel = 0.0f;
+    for (int i = 0; i<4; i++) {
+      sumAngVel = sumAngVel + estAngVel[i];
+    }
+    estAngVel1 = sumAngVel / 4.0f;
+    // Integrate angular velocity to get angle
+    estYaw = estYaw + estAngVel1*dt;
+
+    // Body position estimation
+    estVelX[0] = measVelX[0]*cosf(estYaw)-measVelY[0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-ly*sinf(estYaw));
+    estVelX[1] = measVelX[1]*cosf(estYaw)-measVelY[1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+ly*sinf(estYaw));
+    estVelX[2] = measVelX[2]*cosf(estYaw)-measVelY[2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-ly*sinf(estYaw));
+    estVelY[0] = measVelX[0]*sinf(estYaw)+measVelY[0]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)+lx*sinf(estYaw));
+    estVelY[1] = measVelX[1]*sinf(estYaw)+measVelY[1]*cosf(estYaw) + 0.5*estAngVel1*(-ly*cosf(estYaw)+lx*sinf(estYaw));
+    estVelY[2] = measVelX[2]*sinf(estYaw)+measVelY[2]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)-lx*sinf(estYaw));
+    // Simple average of linear velocities
+    float sumVelX = 0.0f;
+    float sumVelY = 0.0f;
+    for (int i = 0; i<ns; i++) {
+      sumVelX = sumVelX + estVelX[i];
+      sumVelY = sumVelY + estVelY[i];
+    }
+    estVelX1 = sumVelX / ns;
+    estVelY1 = sumVelY / ns;
+    // Integrate linear velocities to get position
+    estPosX = estPosX + estVelX1*dt;
+    estPosY = estPosY + estVelY1*dt;
+
+    // Additional values
+    estTraj = atanf(estVelY1/estVelX1);    // trajectory angle w.r.t inertial frame
+    estVelAbs = sqrt(pow(estVelX1,2) + pow(estVelY1,2));
+
+    // Sensor plotting
+    if (plotting) {
+      sensorPlotting();
+    }
+  }
 }
 
 // Motor control functions
@@ -962,13 +975,13 @@ void lowerZ() {
   // Lower tool
 
   int sensorVal = analogRead(POT_THICK);
-  matThickness = mapF(sensorVal, 0, 1024, 0, 10);
+  matThickness = mapF(sensorVal, 0, 1024, 0, maxThickness);
 
   stepperZ.moveTo(-Conv*matThickness);
-  while (abs(stepperZ.distanceToGo()) > (Conv*2)) {
+  while (abs(stepperZ.distanceToGo()) > (Conv*1)) {
     stepperZ.run();
   }
-  stepperZ.setMaxSpeed(round(speed_x1/2));
+  stepperZ.setMaxSpeed(speed_x1);             // initial speed faster now
   while (stepperZ.distanceToGo() !=0) {
     stepperZ.run();
   }
