@@ -63,7 +63,7 @@ void DesignModeToggle();
 #define BUTT_WORK_X0Y0  6
 #define BUTT_WORK_Z0    5
 #define BUTT_HANDLE     7
-#define POT_THICK       31
+#define POT_THICK       26
 
 // Motor Pins
 #define MS1_X       17
@@ -1014,6 +1014,8 @@ void debugging() {
   // Serial.print(motorPosX);
 
   Serial.println();
+
+  Serial.println(analogRead(POT_THICK));
 }
 
 void parseNC(const char* filename, float* pathArrayX, float* pathArrayY) {
