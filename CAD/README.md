@@ -22,6 +22,7 @@ Laser Cut Clear Acrylic
 	- Note: I think everything should be able to be printed with no (or minimal) support. Orient intentfully! (They might already be oriented correctly)
 (1x) dremelMount.stl
 (1x) dremelSinch.stl
+(1x) frameLeft.stl
 (1x) frameRight.stl
 (1x) handleLeft.stl
 (1x) handleRight.stl
