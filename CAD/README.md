@@ -2,8 +2,8 @@ Manufacturing BOM and Readme
 
 Main Assembly (/latest) - 
 Aluminum Sheet Metal (6061)
-(1x) boardFrame.dxf - 1/4"
-(1x) zCarriagePlate - 1/4"
+(1x) basePlate.dxf - 1/4"
+(1x) zCarriagePlate.dxf - 1/4"
 (1x) crossPanel.dxf - 1/8"
 (1x) UIPanel2.dxf - 1/16" (with engravings)
 	- Note: the UIPanel2.ai file might be easier to use. It already has paths color coded
@@ -11,9 +11,11 @@ Aluminum Sheet Metal (6061)
 	- Note: also, this UI scheme will also likely soon be deprecated, so this file will also likely be too.
 
 Laser Cut Clear Acrylic
-	- Note: these are for the UI which still hasn't been used yet. Pretty optional.
+(1x) boardFrame.dxf - 1/8"
+	- Note: this can be cut out of wood too
 (1x) xStrip.dxf - 1/8"
 (1x) yStrip.dxf - 1/8"
+	- Note: these are for the UI which still hasn't been used yet. Pretty optional.
 
 3D Printed Parts
 	- Note: everything was printed in PLA but PET or Nylon or something stronger would probably be better.
