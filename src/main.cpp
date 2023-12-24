@@ -37,8 +37,7 @@ void enableStepperZ();
 void disableStepperZ();
 void stopStepperX();
 void stopStepperZ();
-void machineZeroX_1();
-void machineZeroX_2();
+void machineZeroX();
 void machineZeroZ();
 void workZeroXY();
 void workZeroZ_man();
@@ -286,12 +285,7 @@ void loop() {
   if (digitalRead(BUTT_MACH_X0) == LOW) {
     x0_count = 0;
   }
-  if (x0_count == 0) {
-    //Serial.println("Init limit switch");
-    machineZeroX_1();
-  } else if (x0_count == 1) {
-    machineZeroX_2();
-  }
+  machineZeroX();
 
   // Machine Z zeroing
   if (digitalRead(BUTT_MACH_Z0) == LOW) {
@@ -779,54 +773,54 @@ void stopStepperZ() {
   stepperZ.runSpeed();
 }
 
-void machineZeroX_1() {
-  // First x calibration run
+void machineZeroX() {
+  if (x0_count == 0) { 
+    // First x calibration run
+    stepperX.setMaxSpeed(speed_x0);
+    stepperX.setAcceleration(accel_x0);
+    stepperX.move(Conv*gantryLength);
+    stepperX.run();
+    if (digitalRead(LIMIT_MACH_X0) == LOW) {
+      // myStepper.setSpeed(0);              // stop motor
+      stopStepperX();
+      stepperX.setCurrentPosition(0);
+      x0_count += 1;
+      Serial.println("X limit reached");
+    }
+  } else if (x0_count == 1) {
+    // Second x calibration run
+    //myStepper.setMaxSpeed(speed_x0);
+    // Retract
+    stepperX.move(-Conv*retract);
+    while (stepperX.distanceToGo() != 0) {
+      stepperX.run();
+    }
+    stopStepperX();
+    delay(100);
 
-  stepperX.setMaxSpeed(speed_x0);
-  stepperX.setAcceleration(accel_x0);
-  stepperX.move(Conv*gantryLength);
-  stepperX.run();
-  if (digitalRead(LIMIT_MACH_X0) == LOW) {
-    // myStepper.setSpeed(0);              // stop motor
+    // Move in for second calibration
+    stepperX.setSpeed(speed_x1);
+    while (digitalRead(LIMIT_MACH_X0) == HIGH) {
+      // Run until you hit the limit switch
+      stepperX.runSpeed();
+    }
     stopStepperX();
     stepperX.setCurrentPosition(0);
-    x0_count += 1;
-    Serial.println("X Limit reached");
+    Serial.println(stepperZ.currentPosition());
+
+    // Move to middle
+    stepperX.move(-Conv*((gantryLength/2) - xLimitOffset));
+    while (stepperX.distanceToGo() != 0) {
+      stepperX.run();
+    }
+    stepperX.setCurrentPosition(0);
+
+    // Go back to standard settings
+    stepperX.setMaxSpeed(maxVel);
+    stepperX.setAcceleration(maxAccel);
+    x0_count += 1;      // Stop limit switch function (should go back to 0 for main code)
   }
-}
 
-void machineZeroX_2() {
-  // Second x calibration run
-
-  //myStepper.setMaxSpeed(speed_x0);
-  // Retract
-  stepperX.move(-Conv*retract);
-  while (stepperX.distanceToGo() != 0) {
-    stepperX.run();
-  }
-  stopStepperX();
-  delay(100);
-
-  // Move in for second calibration
-  stepperX.setSpeed(speed_x1);
-  while (digitalRead(LIMIT_MACH_X0) == HIGH) {
-    // Run until you hit the limit switch
-    stepperX.runSpeed();
-  }
-  stopStepperX();
-  stepperX.setCurrentPosition(0);
-  Serial.println(stepperZ.currentPosition());
-
-  stepperX.move(-Conv*((gantryLength/2) - xLimitOffset));
-  while (stepperX.distanceToGo() != 0) {
-    stepperX.run();
-  }
-  stepperX.setCurrentPosition(0);
-
-  // Go back to standard settings
-  stepperX.setMaxSpeed(maxVel);
-  stepperX.setAcceleration(maxAccel);
-  x0_count += 1;      // Stop limit switch function (should go back to 0 for main code)
 }
 
 void machineZeroZ() {
@@ -841,10 +835,9 @@ void machineZeroZ() {
       stopStepperZ();
       stepperZ.setCurrentPosition(0);
       z0_count += 1;
-      Serial.println("Limit reached");
+      Serial.println("Z limit reached");
     }
-  }
-  if (z0_count == 1) {
+  } else if (z0_count == 1) {
     //stepperZ.setMaxSpeed(speed_x0);
     // Retract
     stepperZ.move(-Conv*retract);
