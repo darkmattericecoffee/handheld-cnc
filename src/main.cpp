@@ -806,7 +806,7 @@ void machineZeroX() {
     }
     stopStepperX();
     stepperX.setCurrentPosition(0);
-    Serial.println(stepperZ.currentPosition());
+    // Serial.println(stepperZ.currentPosition());
 
     // Move to middle
     stepperX.move(-Conv*((gantryLength/2) - xLimitOffset));
@@ -855,7 +855,7 @@ void machineZeroZ() {
     }
     stopStepperZ();
     stepperZ.setCurrentPosition(0);
-    Serial.println(stepperZ.currentPosition());
+    // Serial.println(stepperZ.currentPosition());
     
     z0_count += 1;      // Stop limit switch function (should go back to 0 for main code)
     disableStepperZ();  // disable so it can be zeroed to workpiece
@@ -933,7 +933,8 @@ void workZeroZ_man() {
       }
       stopStepperZ();
       maxHeight = stepperZ.currentPosition() / Conv;
-      Serial.println(maxHeight);
+      Serial.printf("Max height = %f", maxHeight);
+      Serial.println();
 
       // Go back down to manually set height
       stepperZ.moveTo(Conv*restHeight);                              // go to restheight
@@ -1001,14 +1002,12 @@ void debugging() {
   
   // Serial.printf("x:%f,y:%f,theta:%f,dist:%f",estPosX,estPosY,estYaw,signedDist(estPosX,estPosY,0,10,estYaw));
   Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
-  // Serial.println();
-  // Serial.printf("error:%f",motorPosX-desPos);
+  Serial.println();
+  Serial.printf("thickness:%f, analog: %i",Conv*analogRead(POT_THICK), analogRead(POT_THICK));
   // Serial.printf("x:%f,y:%f,goalX:%f,goalY:%f,desPos:%i",estPosToolX,estPosToolY,goalX,goalY,desPos);
   // Serial.print(motorPosX);
 
   Serial.println();
-
-  Serial.println(analogRead(POT_THICK));
 }
 
 void parseNC(const char* filename, float* pathArrayX, float* pathArrayY) {
