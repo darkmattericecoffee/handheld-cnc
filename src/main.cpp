@@ -43,6 +43,7 @@ void workZeroXY();
 void workZeroZ_man();
 void raiseZ();
 void lowerZ();
+// Other loop functions
 void sensorPlotting();
 void debugging();
 void parseNC(const char* filename, float* pathArrayX, float* pathArrayY);
@@ -231,7 +232,8 @@ TMC2209Stepper driverZ(&SERIAL_PORT_Z, R_SENSE, DRIVER_ADDRESS);
 // Setup and Main Loop -----------------------------------------------------------------------------
 void setup() {
   Serial.begin(9600);  
-  while(!Serial);
+  // while(!Serial);
+  delay(100);         // as opposed to the while(!Serial);
 
   // Limit switch initialization
   pinMode(LIMIT_MACH_X0, INPUT);
