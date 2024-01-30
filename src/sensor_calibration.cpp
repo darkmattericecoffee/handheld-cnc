@@ -28,6 +28,8 @@ float mapF(long x, float in_min, float in_max, float out_min, float out_max);
 // Sensing functions
 void sensorPlotting();
 void doSensing();
+// Other loop functions
+void writeToEEPROM();
 
 // Pin definitions -------------------------------------------------------------------------------
 // Sensor pins
@@ -65,18 +67,17 @@ long unsigned timeLastDebounce = 0;   // (ms)
 long unsigned timeSinceGo = 0;
 
 // Measured quantities
-float measVelX[4] = {0.0f,0.0f,0.0f,0.0f};     // BFF x velocity of each sensor (mm/us)
-float measVelY[4] = {0.0f,0.0f,0.0f,0.0f};     // BFF y velocity of each sensor (mm/us)
-float estPosX[4] = {0.0f,0.0f,0.0f,0.0f};
-float estPosY[4] = {0.0f,0.0f,0.0f,0.0f};
+float measVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
+                      {0.0f,0.0f,0.0f,0.0f}};     // BFF (x,y) velocity of each sensor (mm/us)
+float estPos[2][4] = {{0.0f,0.0f,0.0f,0.0f},
+                      {0.0f,0.0f,0.0f,0.0f}}; 
 
 // Calibration variables
 int sensorSelect = -1;
-float Cx[4];            // calibration coefficient to be calculated
-float Cy[4];
+float cVal[2][4];            // calibration coefficient to be calculated
 int runCount = 0;
 bool atOrigin = 1;
-bool xMode = 1;
+int axis = 0;                 // axis to calibrate (0 = x; 1 = y)
 float calValHolder[numRuns];
 bool runInitiated = 0;
 
@@ -113,8 +114,15 @@ void loop() {
       case '1':
         sensorSelect = 1;
         break;
-
-      // To-Do: add more cases
+      case '2':
+        sensorSelect = 2;
+        break;
+      case '3':
+        sensorSelect = 3;
+        break;
+      case 'w':
+        writeToEEPROM();
+        break;
     }
   }
 
@@ -122,90 +130,59 @@ void loop() {
     if(micros() - timeLastPoll >= dt) {
       doSensing();
 
-      if (xMode) {
-        // Check whether the chip has left origin
-        if (estPosX[sensorSelect] > zeroThresh) { 
-          atOrigin = 0;
+      // Check whether the chip has left origin
+      if (estPos[axis][sensorSelect] > zeroThresh) { 
+        atOrigin = 0;
 
-          // See if stopped
-          if (millis() - timeSinceGo >= dtStop) {
-            calValHolder[runCount] = estPosX[sensorSelect];
-            runInitiated = 0;
-          }
-        } else {
-          atOrigin = 1;
-
-          if (millis() - timeSinceGo >= dtStop && !runInitiated) {
-            estPosX[sensorSelect] = 0;      // reset sensor position
-            runInitiated = 1;
-            runCount += 1;
-
-            Serial.printf("Ready for run %i\n", runCount + 1);
-
-          }
-        }
-
-        if (runCount == numRuns){
-          // Calculate calibration value
-          // TO-DO ^^
-
-          Serial.printf("X calibration for sensor %i done. Value = ", sensorSelect);
-          Serial.println("Move sensor to Y rail and press any key when ready");
-
-          while (!Serial.available());
-          char ch = Serial.read();
-
-          // Switch to Y calibration
-          xMode = 0;
-          atOrigin = 1;
-          runCount = 0;
-          runInitiated = 1;
+        // See if stopped
+        if (millis() - timeSinceGo >= dtStop) {
+          calValHolder[runCount] = estPos[axis][sensorSelect];
+          runInitiated = 0;
         }
       } else {
-        // Y mode now
-        // Check whether the chip has left origin
-        if (estPosY[sensorSelect] > zeroThresh) { 
-          atOrigin = 0;
+        atOrigin = 1;
 
-          // See if stopped
-          if (millis() - timeSinceGo >= dtStop) {
-            calValHolder[runCount] = estPosY[sensorSelect];
-            runInitiated = 0;
-          }
-        } else {
-          atOrigin = 1;
-
-          if (millis() - timeSinceGo >= dtStop && !runInitiated) {
-            estPosY[sensorSelect] = 0;      // reset sensor position
-            runInitiated = 1;
-            runCount += 1;
-
-            Serial.printf("Ready for run %i\n", runCount + 1);
-
-          }
-        }
-
-        if (runCount == numRuns){
-          // Calculate calibration value
-          // TO-DO ^^
-
-          Serial.printf("X calibration for sensor %i done. Value = ", sensorSelect);
-          Serial.println("Move sensor to Y rail and press any key when ready");
-
-          while (!Serial.available());
-          char ch = Serial.read();
-
-          // Reset calibration
-          xMode = 1;
-          atOrigin = 1;
-          runCount = 0;
+        // See if stopped 
+        if (millis() - timeSinceGo >= dtStop && !runInitiated) {
+          estPos[axis][sensorSelect] = 0;      // reset sensor position
           runInitiated = 1;
+          runCount += 1;
+
+          Serial.printf("Ready for run %i\n", runCount + 1);
+
         }
       }
 
+      // Once runs have completed...
+      if (runCount == numRuns && !axis){
+        // Calculate calibration value
+        // TO-DO ^^
+
+        Serial.printf("X calibration for sensor %i done. Value = ", sensorSelect);
+        Serial.println("Move sensor to Y rail and press any key when ready");
+
+        while (!Serial.available());
+        char ch = Serial.read();
+
+        // Switch to Y calibration
+        axis = 1;
+        atOrigin = 1;
+        runCount = 0;
+        runInitiated = 1;
+      } else if (runCount == numRuns && axis) {
+        // Calculate calibration value
+        // TO-DO ^^
+
+        Serial.printf("Y calibration for sensor %i done. Value = ", sensorSelect);
+
+        // Reset calibration
+        axis = 0;
+        atOrigin = 1;
+        runCount = 0;
+        runInitiated = 1;
+        sensorSelect = -1;        // reset sensor select to go to new sensor
+      }
     }
-
-
   }
 }
 
@@ -262,31 +239,25 @@ void doSensing() {
     // **Only checking sensor 1 rn (TODO: check all of them and account for misreads)**
 
     // Sensor velocity sensing
-    measVelX[0] = -convTwosComp(data0.dx) / dt;     // is '-' necessary?
-    measVelX[1] = -convTwosComp(data1.dx) / dt;
-    measVelX[2] = -convTwosComp(data2.dx) / dt;
-    measVelX[3] = -convTwosComp(data3.dx) / dt;
-    measVelY[0] = convTwosComp(data0.dy) / dt;
-    measVelY[1] = convTwosComp(data1.dy) / dt;
-    measVelY[2] = convTwosComp(data2.dy) / dt;
-    measVelY[3] = convTwosComp(data3.dy) / dt;
+    measVel[0][0] = -convTwosComp(data0.dx) / dt;     // is '-' necessary?
+    measVel[0][1] = -convTwosComp(data1.dx) / dt;
+    measVel[0][2] = -convTwosComp(data2.dx) / dt;
+    measVel[0][3] = -convTwosComp(data3.dx) / dt;
+    measVel[1][0] = convTwosComp(data0.dy) / dt;
+    measVel[1][1] = convTwosComp(data1.dy) / dt;
+    measVel[1][2] = convTwosComp(data2.dy) / dt;
+    measVel[1][3] = convTwosComp(data3.dy) / dt;
 
     // Record time stamp of movement
     // To-Do: make sure a reading is actually sent when the sensor is stopped
-    if (xMode){
-      if (measVelX[sensorSelect] > 0) {
-        timeSinceGo = millis();
-      }
-    } else {
-      if (measVelY[sensorSelect] > 0) {
-        timeSinceGo = millis();
-      }
+    if (measVel[axis][sensorSelect] > 0) {
+      timeSinceGo = millis();
     }
 
     // Integrate linear velocities to get position
     for (int i = 0; i < 4; i++) {
-      estPosX[i] = estPosX[i] + measVelX[i]*dt;
-      estPosY[i] = estPosY[i] + measVelY[i]*dt;
+      estPos[0][i] = estPos[0][i] + measVel[0][i]*dt;
+      estPos[1][i] = estPos[1][i] + measVel[1][i]*dt;
     }
 
     // Sensor plotting
@@ -301,7 +272,7 @@ void sensorPlotting() {
 
   //Serial.printf("dx:%f,dy:%f",measVelX,measVelY);
   //Serial.printf("dx:%i,dy:%i",data.dx,data.dy);
-  Serial.printf("x:%f,y:%f",estPosX,estPosY);
+  Serial.printf("x:%f,y:%f",estPos[0][sensorSelect],estPos[1][sensorSelect]);
 //      Serial.printf("w1:%f,w2:%f,w3:%f,w4:%f,w5:%f,w6:%f,w7:%f,w8:%f",estAngVel[0],estAngVel[1],
 //        estAngVel[2],estAngVel[3],estAngVel[4],estAngVel[5],estAngVel[6],estAngVel[7]);
   //Serial.printf("x:%f,y:%f",xmm[1],ymm[1]);
@@ -315,4 +286,30 @@ void debugging() {
   // if you need to debug...
 
   Serial.println();
+}
+
+void writeToEEPROM() {
+  // Write calibration values to EEPROM
+  Serial.println("Write all values ('a') or just one sensor value (type sensor number)?");
+
+  while (!Serial.available());
+  char ch = Serial.read();
+
+  switch(ch) {
+    case 'a':
+      // To-Do: Write all values
+      break;
+    case '0':
+      sensorSelect = 0;
+      break;
+    case '1':
+      sensorSelect = 1;
+      break;
+    case '2':
+      sensorSelect = 2;
+      break;
+    case '3':
+      sensorSelect = 3;
+      break;
+  }
 }
