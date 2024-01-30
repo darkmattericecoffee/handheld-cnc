@@ -41,21 +41,28 @@ void doSensing();
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
 
-// Button properties
+// Timing properties
 long unsigned debounceDelay = 50;      // the debounce time; increase if the output flickers
+long unsigned dtDebug = 500;            // [ms]
+long unsigned dtStop = 1000;            // time to indicate a stop [ms]
 
 // Sensor properties
 const int ns = 4;                   // number of sensors
 const int CPI = 2500;               // This value changes calibration coefficients
 long unsigned dt = 500;       // microseconds (freq = 1,000,000/timestepPoll [Hz])
 
+// Calibration properties
+float l = 100.0f;             // length of track [mm]
+float zeroThresh = 500.0f;    // threshold to detmerine zero [unitless]
+const int numRuns = 5;            // number of calibration runs
+
 // Variables ------------------------------------------------------------------------
 // Timing variables
 int firstPoint = 1;
-long unsigned dtDebug = 500;                   // (ms)
 long unsigned timeLastPoll = 0;
 long unsigned timeLastDebug = 0;
 long unsigned timeLastDebounce = 0;   // (ms)
+long unsigned timeSinceGo = 0;
 
 // Measured quantities
 float measVelX[4] = {0.0f,0.0f,0.0f,0.0f};     // BFF x velocity of each sensor (mm/us)
@@ -67,6 +74,11 @@ float estPosY[4] = {0.0f,0.0f,0.0f,0.0f};
 int sensorSelect = -1;
 float Cx[4];            // calibration coefficient to be calculated
 float Cy[4];
+int runCount = 0;
+bool atOrigin = 1;
+bool xMode = 1;
+float calValHolder[numRuns];
+bool runInitiated = 0;
 
 // Object Initialization ------------------------------------------------------------
 // Sensor object creation
@@ -106,8 +118,94 @@ void loop() {
     }
   }
 
-  if (sensorSelect != -1) {
-    doSensing();
+  if (sensorSelect != -1 && runCount < numRuns) {
+    if(micros() - timeLastPoll >= dt) {
+      doSensing();
+
+      if (xMode) {
+        // Check whether the chip has left origin
+        if (estPosX[sensorSelect] > zeroThresh) { 
+          atOrigin = 0;
+
+          // See if stopped
+          if (millis() - timeSinceGo >= dtStop) {
+            calValHolder[runCount] = estPosX[sensorSelect];
+            runInitiated = 0;
+          }
+        } else {
+          atOrigin = 1;
+
+          if (millis() - timeSinceGo >= dtStop && !runInitiated) {
+            estPosX[sensorSelect] = 0;      // reset sensor position
+            runInitiated = 1;
+            runCount += 1;
+
+            Serial.printf("Ready for run %i\n", runCount + 1);
+
+          }
+        }
+
+        if (runCount == numRuns){
+          // Calculate calibration value
+          // TO-DO ^^
+
+          Serial.printf("X calibration for sensor %i done. Value = ", sensorSelect);
+          Serial.println("Move sensor to Y rail and press any key when ready");
+
+          while (!Serial.available());
+          char ch = Serial.read();
+
+          // Switch to Y calibration
+          xMode = 0;
+          atOrigin = 1;
+          runCount = 0;
+          runInitiated = 1;
+        }
+      } else {
+        // Y mode now
+        // Check whether the chip has left origin
+        if (estPosY[sensorSelect] > zeroThresh) { 
+          atOrigin = 0;
+
+          // See if stopped
+          if (millis() - timeSinceGo >= dtStop) {
+            calValHolder[runCount] = estPosY[sensorSelect];
+            runInitiated = 0;
+          }
+        } else {
+          atOrigin = 1;
+
+          if (millis() - timeSinceGo >= dtStop && !runInitiated) {
+            estPosY[sensorSelect] = 0;      // reset sensor position
+            runInitiated = 1;
+            runCount += 1;
+
+            Serial.printf("Ready for run %i\n", runCount + 1);
+
+          }
+        }
+
+        if (runCount == numRuns){
+          // Calculate calibration value
+          // TO-DO ^^
+
+          Serial.printf("X calibration for sensor %i done. Value = ", sensorSelect);
+          Serial.println("Move sensor to Y rail and press any key when ready");
+
+          while (!Serial.available());
+          char ch = Serial.read();
+
+          // Reset calibration
+          xMode = 1;
+          atOrigin = 1;
+          runCount = 0;
+          runInitiated = 1;
+        }
+      }
+
+    }
+
+
   }
 }
 
@@ -173,6 +271,18 @@ void doSensing() {
     measVelY[2] = convTwosComp(data2.dy) / dt;
     measVelY[3] = convTwosComp(data3.dy) / dt;
 
+    // Record time stamp of movement
+    // To-Do: make sure a reading is actually sent when the sensor is stopped
+    if (xMode){
+      if (measVelX[sensorSelect] > 0) {
+        timeSinceGo = millis();
+      }
+    } else {
+      if (measVelY[sensorSelect] > 0) {
+        timeSinceGo = millis();
+      }
+    }
+
     // Integrate linear velocities to get position
     for (int i = 0; i < 4; i++) {
       estPosX[i] = estPosX[i] + measVelX[i]*dt;
@@ -191,7 +301,7 @@ void sensorPlotting() {
 
   //Serial.printf("dx:%f,dy:%f",measVelX,measVelY);
   //Serial.printf("dx:%i,dy:%i",data.dx,data.dy);
-  Serial.printf("x:%f,y:%f,theta:%f",estPosX,estPosY,estYaw);
+  Serial.printf("x:%f,y:%f",estPosX,estPosY);
 //      Serial.printf("w1:%f,w2:%f,w3:%f,w4:%f,w5:%f,w6:%f,w7:%f,w8:%f",estAngVel[0],estAngVel[1],
 //        estAngVel[2],estAngVel[3],estAngVel[4],estAngVel[5],estAngVel[6],estAngVel[7]);
   //Serial.printf("x:%f,y:%f",xmm[1],ymm[1]);
@@ -202,12 +312,7 @@ void debugging() {
   // Print debug data
   // Put all Serial print lines here to view
   
-  // Serial.printf("x:%f,y:%f,theta:%f,dist:%f",estPosX,estPosY,estYaw,signedDist(estPosX,estPosY,0,10,estYaw));
-  Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
-  Serial.println();
-  Serial.printf("thickness:%f, analog: %i",Conv*analogRead(POT_THICK), analogRead(POT_THICK));
-  // Serial.printf("x:%f,y:%f,goalX:%f,goalY:%f,desPos:%i",estPosToolX,estPosToolY,goalX,goalY,desPos);
-  // Serial.print(motorPosX);
+  // if you need to debug...
 
   Serial.println();
 }
