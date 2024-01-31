@@ -2,6 +2,7 @@
 #include <PMW3360.h>
 #include <SPI.h>
 #include <SD.h>
+#include <EEPROM.h>
 
 // Calibration process:
 //      1. get out x and y calibration rails
@@ -312,4 +313,35 @@ void writeToEEPROM() {
       sensorSelect = 3;
       break;
   }
+}
+
+void eepromWrite(int address, float value) {
+  // Write given calibration value to EEPROM in (0,1,2,3) format
+  // Note: Each float value (32 bit) takes up 4 bytes, so the addresses
+  //    for each sensor will be ((0,1,2,3),(4,5,6,7),(8,9,10,11),(12,13,14,15))
+  int eeAddress = address * 4;
+
+  // Convert the float to a byte array
+  byte* floatAsBytes = (byte*)(void*)&value;
+
+  // EEPROM.put(eeAddress, deviceID);
+  // Write each byte of the float to EEPROM
+  for (int i = 0; i < 4; i++) {
+      EEPROM.write(eeAddress + i, floatAsBytes[i]);
+  }
+}
+
+float eepromRead(int address) {
+  // Read calibration value from given address (0,1,2,3)
+  int eeAddress = address * 4;
+
+  float value;
+  byte* floatAsBytes = (byte*)(void*)&value;
+
+  // Read each byte of the float from EEPROM
+  for (int i = 0; i < 4; i++) {
+      floatAsBytes[i] = EEPROM.read(eeAddress + i);
+  }
+
+  return value;
 }
