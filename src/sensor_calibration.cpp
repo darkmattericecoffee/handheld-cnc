@@ -26,6 +26,7 @@ void sensorSetup();
 // Math functions
 int convTwosComp(int b);
 float mapF(long x, float in_min, float in_max, float out_min, float out_max);
+float meanArray(float* arr, int size);
 // Sensing functions
 void sensorPlotting();
 void doSensing();
@@ -58,7 +59,7 @@ long unsigned dt = 500;       // microseconds (freq = 1,000,000/timestepPoll [Hz
 
 // Calibration properties
 float l = 100.0f;             // length of track [mm]
-float zeroThresh = 500.0f;    // threshold to detmerine zero [unitless]
+float zeroThresh = 500.0f;    // threshold to detmerine zero [unitless](100units ~= 1mm)
 const int numRuns = 5;            // number of calibration runs
 
 // Variables ------------------------------------------------------------------------
@@ -110,22 +111,11 @@ void loop() {
   // Serial Interface -----------------------------------------------------------------------------
   if (Serial.available()) {
     char ch = Serial.read();
-    switch(ch) {
-      case '0':
-        sensorSelect = 0;
-        break;
-      case '1':
-        sensorSelect = 1;
-        break;
-      case '2':
-        sensorSelect = 2;
-        break;
-      case '3':
-        sensorSelect = 3;
-        break;
-      case 'w':
-        writeToEEPROM();
-        break;
+    if (ch >= '0' && ch <= '3') {
+      int index = ch - '0';         // convert char to int by subtracting ASCII value of '0'
+      sensorSelect = index;
+    } else if (ch == 'w') {         // TO-DO: change to switch case if more inputs are needed
+      writeToEEPROM();
     }
   }
 
@@ -159,7 +149,7 @@ void loop() {
       // Once runs have completed...
       if (runCount == numRuns && !axis){
         // Calculate calibration value
-        cVal[axis][sensorSelect] = meanArray(calValHolder, numRuns);
+        cVal[axis][sensorSelect] = l / meanArray(calValHolder, numRuns);
 
         Serial.printf("X calibration for sensor %i done. Value = ", sensorSelect);
         Serial.println("Move sensor to Y rail and press any key when ready");
@@ -174,7 +164,7 @@ void loop() {
         runInitiated = 1;
       } else if (runCount == numRuns && axis) {
         // Calculate calibration value
-        cVal[axis][sensorSelect] = meanArray(calValHolder, numRuns);
+        cVal[axis][sensorSelect] = l / meanArray(calValHolder, numRuns);
 
         Serial.printf("Y calibration for sensor %i done. Value = ", sensorSelect);
 
@@ -298,34 +288,18 @@ void writeToEEPROM() {
   while (!Serial.available());
   char ch = Serial.read();
 
-  switch(ch) {
-    case 'a':
-      for (int i = 0; i < 4; i++){
-        for (int j = 0; j < 2; j++){
-          eepromWrite(i, cVal[j][i]);
-        }
+  // Handle serial input
+  if (ch >= '0' && ch <= '3') {
+    int index = ch - '0';         // convert char to int by subtracting ASCII value of '0'
+    for (int j = 0; j < 2; j++) {
+      eepromWrite(index, cVal[j][index]);
+    }
+  } else if (ch == 'a') {         // TO-DO: change to switch case if more inputs are needed
+    for (int i = 0; i < 4; i++) {
+      for (int j = 0; j < 2; j++) {
+        eepromWrite(i, cVal[j][i]);
       }
-      break;
-    case '0':
-      for (int j = 0; j < 2; j++){
-        eepromWrite(0, cVal[j][0]);
-      }
-      break;
-    case '1':
-      for (int j = 0; j < 2; j++){
-        eepromWrite(1, cVal[j][1]);
-      }
-      break;
-    case '2':
-      for (int j = 0; j < 2; j++){
-        eepromWrite(2, cVal[j][2]);
-      }
-      break;
-    case '3':
-      for (int j = 0; j < 2; j++){
-        eepromWrite(3, cVal[j][3]);
-      }
-      break;
+    }
   }
 }
 
