@@ -226,37 +226,31 @@ void doSensing() {
   PMW3360_DATA data2 = sensor2.readBurst_simple();
   PMW3360_DATA data3 = sensor3.readBurst_simple();
 
-  int yup = 1;        // filling in for good motion detection boolean
-  if(yup) {
-  //if(data1.isOnSurface && data1.isMotion) {   // If movement...
-    // **Only checking sensor 1 rn (TODO: check all of them and account for misreads)**
+  // Sensor velocity sensing
+  measVel[0][0] = -convTwosComp(data0.dx) / dt;     // is '-' necessary?
+  measVel[0][1] = -convTwosComp(data1.dx) / dt;
+  measVel[0][2] = -convTwosComp(data2.dx) / dt;
+  measVel[0][3] = -convTwosComp(data3.dx) / dt;
+  measVel[1][0] = convTwosComp(data0.dy) / dt;
+  measVel[1][1] = convTwosComp(data1.dy) / dt;
+  measVel[1][2] = convTwosComp(data2.dy) / dt;
+  measVel[1][3] = convTwosComp(data3.dy) / dt;
 
-    // Sensor velocity sensing
-    measVel[0][0] = -convTwosComp(data0.dx) / dt;     // is '-' necessary?
-    measVel[0][1] = -convTwosComp(data1.dx) / dt;
-    measVel[0][2] = -convTwosComp(data2.dx) / dt;
-    measVel[0][3] = -convTwosComp(data3.dx) / dt;
-    measVel[1][0] = convTwosComp(data0.dy) / dt;
-    measVel[1][1] = convTwosComp(data1.dy) / dt;
-    measVel[1][2] = convTwosComp(data2.dy) / dt;
-    measVel[1][3] = convTwosComp(data3.dy) / dt;
+  // Record time stamp of movement
+  // To-Do: make sure a reading is actually sent when the sensor is stopped
+  if (measVel[axis][sensorSelect] > 0) {
+    timeSinceGo = millis();
+  }
 
-    // Record time stamp of movement
-    // To-Do: make sure a reading is actually sent when the sensor is stopped
-    if (measVel[axis][sensorSelect] > 0) {
-      timeSinceGo = millis();
-    }
+  // Integrate linear velocities to get position
+  for (int i = 0; i < 4; i++) {
+    estPos[0][i] = estPos[0][i] + measVel[0][i]*dt;
+    estPos[1][i] = estPos[1][i] + measVel[1][i]*dt;
+  }
 
-    // Integrate linear velocities to get position
-    for (int i = 0; i < 4; i++) {
-      estPos[0][i] = estPos[0][i] + measVel[0][i]*dt;
-      estPos[1][i] = estPos[1][i] + measVel[1][i]*dt;
-    }
-
-    // Sensor plotting
-    if (plotting) {
-      sensorPlotting();
-    }
+  // Sensor plotting
+  if (plotting) {
+    sensorPlotting();
   }
 }
 
