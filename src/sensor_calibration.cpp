@@ -31,6 +31,8 @@ void sensorPlotting();
 void doSensing();
 // Other loop functions
 void writeToEEPROM();
+void eepromWrite(int address, float value);
+float eepromRead(int address);
 
 // Pin definitions -------------------------------------------------------------------------------
 // Sensor pins
@@ -157,7 +159,7 @@ void loop() {
       // Once runs have completed...
       if (runCount == numRuns && !axis){
         // Calculate calibration value
-        // TO-DO ^^
+        cVal[axis][sensorSelect] = meanArray(calValHolder, numRuns);
 
         Serial.printf("X calibration for sensor %i done. Value = ", sensorSelect);
         Serial.println("Move sensor to Y rail and press any key when ready");
@@ -172,7 +174,7 @@ void loop() {
         runInitiated = 1;
       } else if (runCount == numRuns && axis) {
         // Calculate calibration value
-        // TO-DO ^^
+        cVal[axis][sensorSelect] = meanArray(calValHolder, numRuns);
 
         Serial.printf("Y calibration for sensor %i done. Value = ", sensorSelect);
 
@@ -298,19 +300,31 @@ void writeToEEPROM() {
 
   switch(ch) {
     case 'a':
-      // To-Do: Write all values
+      for (int i = 0; i < 4; i++){
+        for (int j = 0; j < 2; j++){
+          eepromWrite(i, cVal[j][i]);
+        }
+      }
       break;
     case '0':
-      sensorSelect = 0;
+      for (int j = 0; j < 2; j++){
+        eepromWrite(0, cVal[j][0]);
+      }
       break;
     case '1':
-      sensorSelect = 1;
+      for (int j = 0; j < 2; j++){
+        eepromWrite(1, cVal[j][1]);
+      }
       break;
     case '2':
-      sensorSelect = 2;
+      for (int j = 0; j < 2; j++){
+        eepromWrite(2, cVal[j][2]);
+      }
       break;
     case '3':
-      sensorSelect = 3;
+      for (int j = 0; j < 2; j++){
+        eepromWrite(3, cVal[j][3]);
+      }
       break;
   }
 }
@@ -327,7 +341,7 @@ void eepromWrite(int address, float value) {
   // EEPROM.put(eeAddress, deviceID);
   // Write each byte of the float to EEPROM
   for (int i = 0; i < 4; i++) {
-      EEPROM.write(eeAddress + i, floatAsBytes[i]);
+    EEPROM.write(eeAddress + i, floatAsBytes[i]);
   }
 }
 
@@ -340,8 +354,19 @@ float eepromRead(int address) {
 
   // Read each byte of the float from EEPROM
   for (int i = 0; i < 4; i++) {
-      floatAsBytes[i] = EEPROM.read(eeAddress + i);
+    floatAsBytes[i] = EEPROM.read(eeAddress + i);
   }
 
   return value;
+}
+
+float meanArray(float* arr, int size) {
+  // Calculate the mean of all values in an array
+  if (size == 0) return 0; // Return 0 if the array is empty
+
+  float sum = 0;
+  for (int i = 0; i < size; i++) {
+    sum += arr[i]; // Summing up all elements of the array
+  }
+  return sum / size; // Calculating the mean
 }
