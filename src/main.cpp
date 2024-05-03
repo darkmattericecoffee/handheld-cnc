@@ -89,7 +89,6 @@ int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
 int generalMode = 1;          // use general mode (general_path = 1; line_drawing = 0)
 int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
-int cheatMode = 0;            // disregard orientation for sine drawing (1 = yes; 0 = no)
 
 // Path properties
 const int num_points = 1000;             // length of path array
@@ -160,7 +159,8 @@ int cutStarted = 0;
 int toolRaised = 1;
 
 // Button states
-int readyOrNot = 0;                 // (0 = workpiece is unzeroed; 1 = z is zeroed; 2 = xy is zeroed)
+int readyOrNot = 0;                 // determines whether system is zeroed 
+                                    // (0 = workpiece is unzeroed; 1 = z is zeroed; 2 = xy is zeroed)
 
 // Zeroing variables
 int x0_count = 2;           // x zeroing count variable (start as "false")
@@ -189,7 +189,7 @@ float estPosToolY = 0.0f;                     // tool center position - y
 float estAngVel[4] = {0.0f,0.0f,0.0f,0.0f};   // angular velocity of router (rad/s)
 float estAngVel1 = 0.0f;                      // averaged velocity calculation (rad/s)
 float estYaw = 0.0f;                          // orientation of router (rad)
-float estTraj = 0.0f;                     // (..?) trajectory angle wrt. world frame
+float estTraj = 0.0f;                     // (..?) trajectory angle wrt. world frame (n. direction of velocity. Best way to track this?)
 float estVelAbs = 0.0f;                   // (unsure why used..?) absolute velocity
 
 // Motor quantities
@@ -205,8 +205,6 @@ int prev_pnt_ind = 0;
 int goal_pnt_ind = 0;             // index of current goal point
 float goalX = 0.0f;               // goal point x coordinate (mm)
 float goalY = 0.0f;               // goal point y coordinate (mm)
-float lastX = 0.0f;               // (unsure if needed) last goal point
-float lastY = 0.0f;               // (unsure if needed) last goal point
 
 // Motor control variables
 float desPos = 0.0f;              // desired position of tool (mm - 0 is center of gantry)
@@ -353,14 +351,10 @@ void loop() {
       
       // Determine desired actuation
       if (generalMode) {
-        if (!cheatMode) {
-          // General path drawing
-          desPos = desiredPosition(deltaX,deltaY,estYaw);
-          // desPos = (deltaX - tanf(estYaw)*deltaY)*cosf(estYaw);
-        } else {
-          // Cheat mode sine drawing
-          desPos = sinAmp * sinf((TWO_PI/sinPeriod)*estPosY);     // cheat mode
-        }
+        // General path drawing
+        desPos = desiredPosition(deltaX,deltaY,estYaw);
+        // desPos = (deltaX - tanf(estYaw)*deltaY)*cosf(estYaw);
+
         // Velocity control
         if (!isnan(estTraj)) {
           desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;    // unused right now
