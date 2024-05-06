@@ -43,6 +43,7 @@ void workZeroXY();
 void workZeroZ_man();
 void raiseZ();
 void lowerZ();
+// Other loop functions
 void sensorPlotting();
 void debugging();
 void parseNC(const char* filename, float* pathArrayX, float* pathArrayY);
@@ -229,7 +230,8 @@ TMC2209Stepper driverZ(&SERIAL_PORT_Z, R_SENSE, DRIVER_ADDRESS);
 // Setup and Main Loop -----------------------------------------------------------------------------
 void setup() {
   Serial.begin(9600);  
-  while(!Serial);
+  // while(!Serial);
+  delay(100);         // as opposed to the while(!Serial);
 
   // Limit switch initialization
   pinMode(LIMIT_MACH_X0, INPUT);
@@ -995,9 +997,10 @@ void debugging() {
   // Put all Serial print lines here to view
   
   // Serial.printf("x:%f,y:%f,theta:%f,dist:%f",estPosX,estPosY,estYaw,signedDist(estPosX,estPosY,0,10,estYaw));
-  Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
+  // Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
+  Serial.printf("x_raw:%f,y_raw:%f",measVelX[0],measVelY[0]);
   Serial.println();
-  Serial.printf("thickness:%f, analog: %i",Conv*analogRead(POT_THICK), analogRead(POT_THICK));
+  // Serial.printf("thickness:%f, analog: %i",Conv*analogRead(POT_THICK), analogRead(POT_THICK));
   // Serial.printf("x:%f,y:%f,goalX:%f,goalY:%f,desPos:%i",estPosToolX,estPosToolY,goalX,goalY,desPos);
   // Serial.print(motorPosX);
 
