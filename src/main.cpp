@@ -206,6 +206,8 @@ int prev_pnt_ind = 0;
 int goal_pnt_ind = 0;             // index of current goal point
 float goalX = 0.0f;               // goal point x coordinate (mm)
 float goalY = 0.0f;               // goal point y coordinate (mm)
+float prevX = 0.0f;               // previous point x coordinate (mm)
+float prevY = 0.0f;               // previous point y coordinate (mm)
 
 // Motor control variables
 float desPos = 0.0f;              // desired position of tool (mm - 0 is center of gantry)
@@ -344,6 +346,8 @@ void loop() {
       if (signedDist(estPosX,estPosY,goalX,goalY,estYaw) > 0) {
         // If the goal point has been passed
         goal_pnt_ind++;
+        prevX = goalX;
+        prevY = goalY;
         goalX = pathArrayX[goal_pnt_ind];      // x coordinate of closest point
         goalY = pathArrayY[goal_pnt_ind];      // y coordinate of closest point
       }
@@ -353,9 +357,13 @@ void loop() {
       
       // Determine desired actuation
       if (generalMode) {
-        // General path drawing
-        desPos = desiredPosition(deltaX,deltaY,estYaw);
-        // desPos = (deltaX - tanf(estYaw)*deltaY)*cosf(estYaw);
+        // General path drawing (try first with intersect interpolation)
+        desPos = desPosIntersect(estPosX, estPosY, estYaw, prevX, prevY, goalX, goalY);
+        if (isnan(desPos)) {
+          // if intersect algorithm gives bad value, go back to OG
+          desPos = desiredPosition(deltaX,deltaY,estYaw);
+        }
+        // desPos = desiredPosition(deltaX,deltaY,estYaw);
 
         // Velocity control
         if (!isnan(estTraj)) {
@@ -380,12 +388,7 @@ void loop() {
         //delay(100);
         stepperX.run();
       }
-
-      // // Save last point (not being used)
-      // if (start_point != closest_point_index) {
-      //   lastX = goalX;
-      //   lastY = goalY;
-      // }
+      
     }
     // React to non-operational state ---------------------------------------------------------------
     else if (cutStarted  && (millis() - timeLastDebounce) > debounceDelay) {
@@ -620,6 +623,7 @@ float signedDist(float xr, float yr, float xg, float yg, float th) {
 }
 
 float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4) {
+  // *Currently unused*
   // Determine where two lines intersect (one line will always be the gantry, made by xc, yc, and th)
 
   float x1 = xc - (cosf(th)*gantryLength/2);
@@ -656,16 +660,6 @@ float desiredPosition(float dX,float dY,float theta) {
 
   desPos = (dX - tanf(theta)*dY)*cosf(theta);       // Sanzhar equation
 
-  // Alternative methods (preivous attempts):
-//desPos = myDist(estPosX,estPosY,goalX,goalY)*sinf(nextTrajC);
-//        if (closest_point_index == 0 && goalX == 0 && goalY == 0) {
-//          desPos = 0;
-//        } else {
-//          desPos = desPosIntersect(estPosX,estPosY,estYaw,lastX,lastY,goalX,goalY);
-//        }
-// desPos = -distance(estPosX,estPosY,goalX,goalY);
-// desPos = -(goalX - estPosX);
-// desPos = sinAmp * sinf((TWO_PI/sinPeriod)*estPosY);     // cheat mode
   return desPos;
 }
 
