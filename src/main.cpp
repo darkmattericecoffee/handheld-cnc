@@ -355,10 +355,11 @@ void loop() {
       // Determine desired actuation
       if (generalMode) {
         // General path drawing (try first with intersect interpolation)
-        desPos = desPosIntersect(estPosX, estPosY, estYaw, prevX, prevY, goalX, goalY);
+        desPos = desPosIntersect(estPos[0], estPos[1], estYaw, prevX, prevY, goalX, goalY);
         if (isnan(desPos)) {
           // if intersect algorithm gives bad value, go back to OG
           desPos = desiredPosition(deltaX,deltaY,estYaw);
+          Serial.println("NaN value from interpolation function.");
         }
         // desPos = desiredPosition(deltaX,deltaY,estYaw);
 
@@ -616,6 +617,7 @@ float signedDist(float xr, float yr, float xg, float yg, float th) {
 float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4) {
   // *Currently unused*
   // Determine where two lines intersect (one line will always be the gantry, made by xc, yc, and th)
+  // TODO: if this doesn't work, compare distance between router and goal point and interpolate based off of that
 
   float x1 = xc - (cosf(th)*gantryLength/2);
   float y1 = yc - (sinf(th)*gantryLength/2);
@@ -625,16 +627,16 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
 
   // Check for parallel lines (denominator is zero)
   if (den == 0) {
-      Serial.println("Lines are parallel, no intersection point.");
-      return NAN;
+    Serial.println("Lines are parallel, no intersection point.");
+    return NAN;
   }
 
   float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
   float u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
   // Check if the intersection point is on the line segments
   if (t < 0 || t > 1 || u < 0 || u > 1) {
-      Serial.println("Intersection point is not on the line segments.");
-      return NAN;     // TO-DO: do other stuff like stopping motor
+    Serial.println("Intersection point is not on the line segments.");
+    return NAN;     // TO-DO: do other stuff like stopping motor
   }
   
   float x = x1 + t * (x2 - x1);
