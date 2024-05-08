@@ -90,7 +90,6 @@ const int chipSelect = BUILTIN_SDCARD;
 // Modes
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
-int generalMode = 1;          // use general mode (general_path = 1; line_drawing = 0)
 int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
 
 // Path properties
@@ -353,27 +352,17 @@ void loop() {
       float deltaY = goalY - estPos[0];               // y distance of goal from current router position
       
       // Determine desired actuation
-      if (generalMode) {
-        // General path drawing (try first with intersect interpolation)
-        desPos = desPosIntersect(estPos[0], estPos[1], estYaw, prevX, prevY, goalX, goalY);
-        if (isnan(desPos)) {
-          // if intersect algorithm gives bad value, go back to OG
-          desPos = desiredPosition(deltaX,deltaY,estYaw);
-          Serial.println("NaN value from interpolation function.");
-        }
-        // desPos = desiredPosition(deltaX,deltaY,estYaw);
+      desPos = desPosIntersect(estPos[0], estPos[1], estYaw, prevX, prevY, goalX, goalY);
+      if (isnan(desPos)) {
+        // if intersect algorithm gives bad value, go back to OG
+        desPos = desiredPosition(deltaX,deltaY,estYaw);
+        Serial.println("NaN value from interpolation function.");
+      }
+      // desPos = desiredPosition(deltaX,deltaY,estYaw);
 
-        // Velocity control
-        if (!isnan(estTraj)) {
-          desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;    // unused right now
-        }
-      } else {
-        // Simple line drawing
-        desPos = -estPos[0]*cosf(estYaw);
-        // Velocity control
-        if (!isnan(estTraj)) {
-          desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;    // unused right now
-        }
+      // Velocity control
+      if (!isnan(estTraj)) {
+        desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;    // unused right now
       }
 
       // Motor actuation ---------------------------------------------------------------------------
