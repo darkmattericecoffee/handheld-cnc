@@ -1,7 +1,8 @@
 // Libraries to include
-#include <PMW3360.h>
 #include <AccelStepper.h>
 #include <TMCStepper.h>
+#include <PMW3360.h>
+#include <EEPROM.h>
 #include <SPI.h>
 #include <SD.h>
 
@@ -30,6 +31,8 @@ float signedDist(float xr, float yr, float xg, float yg, float th);
 float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4);
 float desiredPosition(float dX,float dY,float theta);
 float mapF(long x, float in_min, float in_max, float out_min, float out_max);
+void readEepromCalibration(float (&Cx)[3], float (&Cy)[3]);
+void writeEepromCalibration();
 // Sensing functions
 void doSensing();
 // Motor control functions
@@ -87,6 +90,10 @@ int sensorPins[3] = {SS0, SS1, SS2};
 const int chipSelect = BUILTIN_SDCARD;
 
 // Constants ------------------------------------------------------------------------
+// EEPROM addresses
+const int eepromAddrCx = 0;  
+const int eepromAddrCy = 12;  
+
 // Modes
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
@@ -116,8 +123,6 @@ long unsigned debounceDelay = 50;      // the debounce time; increase if the out
 const int ns = 3;                   // number of sensors
 const int CPI = 2500;               // This value changes calibration coefficients
 long unsigned dt = 500;       // microseconds (freq = 1,000,000/timestepPoll [Hz])
-const float Cx[3] = {0.00997506234f,0.01003310926f,0.00996611521f};
-const float Cy[3] = {0.01011531459f,0.01026588646f,0.01019056354f};
 const float lx = 120.0f;                // x length of rectangular sensor configuration
 const float ly = 140.0f;                // y length of rectangular sensor configuration
 const float xOff[3] = {-lx/2,lx/2,-lx/2};
@@ -155,6 +160,12 @@ float maxHeight = zLength;          // max height that z can actuate without col
                                     // (really depends on zeroed position)
 
 // Variables ------------------------------------------------------------------------
+// Calibration coeffs, these are variables since we set them by accessing eeprom in setup
+// float Cx[3] = {0.00997506234f,0.01003310926f,0.00996611521f};
+// float Cy[3] = {0.01011531459f,0.01026588646f,0.01019056354f};
+float Cx[3] = {0.0f,0.0f,0.0f};
+float Cy[3] = {0.0f,0.0f,0.0f};
+
 // Run states
 int limitHitX = 0;
 int limitHitZ = 0;
@@ -230,6 +241,28 @@ void setup() {
   // while(!Serial);
   delay(100);         // as opposed to the while(!Serial);
 
+  // Load calibration coeffs
+  readEepromCalibration(Cx, Cy);
+  // DEBUG
+  Serial.print("Cx values: ");
+    for (int i = 0; i < 3; i++) {
+        Serial.print(Cx[i], 4);
+        if (i < 2) {
+            Serial.print(", ");
+        }
+    }
+    Serial.println();
+
+    // Print Cy values
+  Serial.print("Cy values: ");
+    for (int i = 0; i < 3; i++) {
+        Serial.print(Cy[i], 4);
+        if (i < 2) {
+            Serial.print(", ");
+        }
+    }
+    Serial.println();
+    
   // Limit switch initialization
   pinMode(LIMIT_MACH_X0, INPUT);
   pinMode(LIMIT_MACH_Z0, INPUT);
@@ -271,6 +304,9 @@ void loop() {
   // Serial Interface -----------------------------------------------------------------------------
   if (Serial.available()) {
     char ch = Serial.read();
+    if (ch== 'c') {
+      writeEepromCalibration();
+    }
     if (ch == 'd') {
       DesignModeToggle();
     }
@@ -1078,4 +1114,61 @@ void DesignModeToggle() {
   makePath();
   
   Serial.println("End of Design Mode Toggle!");
+}
+
+void writeEepromCalibration() {
+  // TODO: serial input
+  // Even better python input    
+  // MATT VALUES
+  //0.009558401835 0.009638554217 0.009674922601 0.009652509653 
+  // -0.009903931861 -0.009958175662 -0.01004520342 -0.009993004897
+  Serial.println("writing calibration values to EEPROM...");
+  float x_vals[3] = {0.009558401835f, 0.009638554217f, 0.009674922601f,};
+  float y_vals[3] = {-0.009903931861f, -0.009958175662f, -0.01004520342f};
+
+  int addr = eepromAddrCx;
+  for (int i = 0; i < 3; i++) {
+      EEPROM.put(addr, x_vals[i]);
+      addr += sizeof(float);
+  }
+
+  addr = eepromAddrCy;
+  for (int i = 0; i < 3; i++) {
+      EEPROM.put(addr, y_vals[i]);
+      addr += sizeof(float);
+  }
+
+  Serial.println("Calibration values written to EEPROM.");
+
+  Serial.print("Cx values: ");
+  for (int i = 0; i < 3; i++) {
+      Serial.print(x_vals[i]);
+      if (i < 2) {
+          Serial.print(", ");
+      }
+  }
+  Serial.println();
+
+  Serial.print("Cy values: ");
+  for (int i = 0; i < 3; i++) {
+      Serial.print(y_vals[i]);
+      if (i < 2) {
+          Serial.print(", ");
+      }
+  }
+  Serial.println();
+}
+
+void readEepromCalibration(float (&Cx)[3], float (&Cy)[3]) {
+    int addr = eepromAddrCx;
+    for (int i = 0; i < 3; i++) {
+        Cx[i] = EEPROM.get(addr, Cx[i]);
+        addr += sizeof(float);
+    }
+
+    addr = eepromAddrCy;
+    for (int i = 0; i < 3; i++) {
+        Cy[i] = EEPROM.get(addr, Cy[i]);
+        addr += sizeof(float);
+    }
 }
