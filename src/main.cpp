@@ -243,7 +243,7 @@ void setup() {
 
   // Load calibration coeffs
   readEepromCalibration(Cx, Cy);
-  // DEBUG
+  // DEBUG prints
   Serial.print("Cx values: ");
     for (int i = 0; i < 3; i++) {
         Serial.print(Cx[i], 4);
@@ -253,7 +253,6 @@ void setup() {
     }
     Serial.println();
 
-    // Print Cy values
   Serial.print("Cy values: ");
     for (int i = 0; i < 3; i++) {
         Serial.print(Cy[i], 4);
@@ -262,7 +261,7 @@ void setup() {
         }
     }
     Serial.println();
-    
+
   // Limit switch initialization
   pinMode(LIMIT_MACH_X0, INPUT);
   pinMode(LIMIT_MACH_Z0, INPUT);
@@ -1117,7 +1116,7 @@ void DesignModeToggle() {
 }
 
 void writeEepromCalibration() {
-  // TODO: serial input
+  // TODO: serial input or python serial input
   // Even better python input    
   // MATT VALUES
   //0.009558401835 0.009638554217 0.009674922601 0.009652509653 
