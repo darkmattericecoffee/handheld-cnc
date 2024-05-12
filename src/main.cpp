@@ -31,7 +31,7 @@ float signedDist(float xr, float yr, float xg, float yg, float th);
 float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4);
 float desiredPosition(float dX,float dY,float theta);
 float mapF(long x, float in_min, float in_max, float out_min, float out_max);
-void readEepromCalibration(float (&Cx)[3], float (&Cy)[3]);
+void readEepromCalibration(float (&cVal)[2][4]);
 // Sensing functions
 void doSensing();
 // Motor control functions
@@ -162,8 +162,10 @@ float maxHeight = zLength;          // max height that z can actuate without col
 // Calibration coeffs, these are variables since we set them by accessing eeprom in setup
 // float Cx[3] = {0.00997506234f,0.01003310926f,0.00996611521f};
 // float Cy[3] = {0.01011531459f,0.01026588646f,0.01019056354f};
-float Cx[3] = {0.0f,0.0f,0.0f};
+// float Cx[3] = {0.0f,0.0f,0.0f};
 float Cy[3] = {0.0f,0.0f,0.0f};
+float cVal[2][4] = {{0.0f,0.0f,0.0f,0.0f},
+                  {0.0f,0.0f,0.0f,0.0f}};
 
 // Run states
 int limitHitX = 0;
@@ -241,25 +243,22 @@ void setup() {
   delay(100);         // as opposed to the while(!Serial);
 
   // Load calibration coeffs
-  readEepromCalibration(Cx, Cy);
-  // DEBUG prints
-  Serial.print("Cx values: ");
-  for (int i = 0; i < ns; i++) {
-      Serial.print(Cx[i], 4);
-      if (i < 2) {
-          Serial.print(", ");
-      }
-  }
-  Serial.println();
+  Serial.println("Loading calibration coefficients:");
+  readEepromCalibration(cVal);
 
-  Serial.print("Cy values: ");
-    for (int i = 0; i < 3; i++) {
-        Serial.print(Cy[i], 4);
-        if (i < 2) {
-            Serial.print(", ");
-        }
+  Serial.print("Cx values: ");
+  for (int j = 0; j < 2; j++) {
+    for (int i = 0; i < ns; i++) {
+      Serial.print(cVal[j][i], 4);
+      if (i < ns - 1) {
+        Serial.print(", ");
+      }
     }
     Serial.println();
+    if (j == 0){
+      Serial.print("Cy values: ");
+    }
+  }
 
   // Limit switch initialization
   pinMode(LIMIT_MACH_X0, INPUT);
@@ -717,8 +716,8 @@ void doSensing() {
     // Sensor velocity sensing
     for (int i = 0; i < ns; i++) {
       // Sensor velocity sensing
-      measVel[0][i] = -convTwosComp(data[i].dx);     // '-' convention is used to flip sensor's z axis
-      measVel[1][i] = convTwosComp(data[i].dy);
+      measVel[0][i] = -convTwosComp(data[i].dx)*cVal[0][i]/dt;     // '-' convention is used to flip sensor's z axis
+      measVel[1][i] = convTwosComp(data[i].dy)*cVal[1][i]/dt;
     }
 
     // Body angle estimation
@@ -1111,16 +1110,24 @@ void DesignModeToggle() {
   Serial.println("End of Design Mode Toggle!");
 }
 
-void readEepromCalibration(float (&Cx)[3], float (&Cy)[3]) {
-    int addr = eepromAddrCx;
-    for (int i = 0; i < ns; i++) {
-        Cx[i] = EEPROM.get(addr, Cx[i]);
-        addr += sizeof(float);
-    }
+void readEepromCalibration(float (&cVal)[2][4]) {
+  // int addr = eepromAddrCx;
+  // for (int i = 0; i < ns; i++) {
+  //   Cx[i] = EEPROM.get(addr, Cx[i]);
+  //   addr += sizeof(float);
+  // }
 
-    addr = eepromAddrCy;
-    for (int i = 0; i < ns; i++) {
-        Cy[i] = EEPROM.get(addr, Cy[i]);
-        addr += sizeof(float);
+  // addr = eepromAddrCy;
+  // for (int i = 0; i < ns; i++) {
+  //   Cy[i] = EEPROM.get(addr, Cy[i]);
+  //   addr += sizeof(float);
+  // }
+
+  int addr = 0;
+  for (int i = 0; i < ns; i++) {
+    for (int j = 0; j < 2; j++) {
+      EEPROM.get(addr, cVal[j][i]);
+      addr += sizeof(float);
     }
+  }
 }
