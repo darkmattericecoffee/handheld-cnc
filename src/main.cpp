@@ -32,7 +32,6 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
 float desiredPosition(float dX,float dY,float theta);
 float mapF(long x, float in_min, float in_max, float out_min, float out_max);
 void readEepromCalibration(float (&Cx)[3], float (&Cy)[3]);
-void writeEepromCalibration();
 // Sensing functions
 void doSensing();
 // Motor control functions
@@ -245,13 +244,13 @@ void setup() {
   readEepromCalibration(Cx, Cy);
   // DEBUG prints
   Serial.print("Cx values: ");
-    for (int i = 0; i < 3; i++) {
-        Serial.print(Cx[i], 4);
-        if (i < 2) {
-            Serial.print(", ");
-        }
-    }
-    Serial.println();
+  for (int i = 0; i < ns; i++) {
+      Serial.print(Cx[i], 4);
+      if (i < 2) {
+          Serial.print(", ");
+      }
+  }
+  Serial.println();
 
   Serial.print("Cy values: ");
     for (int i = 0; i < 3; i++) {
@@ -303,9 +302,6 @@ void loop() {
   // Serial Interface -----------------------------------------------------------------------------
   if (Serial.available()) {
     char ch = Serial.read();
-    if (ch== 'c') {
-      writeEepromCalibration();
-    }
     if (ch == 'd') {
       DesignModeToggle();
     }
@@ -1115,58 +1111,15 @@ void DesignModeToggle() {
   Serial.println("End of Design Mode Toggle!");
 }
 
-void writeEepromCalibration() {
-  // TODO: serial input or python serial input
-  // Even better python input    
-  // MATT VALUES
-  //0.009558401835 0.009638554217 0.009674922601 0.009652509653 
-  // -0.009903931861 -0.009958175662 -0.01004520342 -0.009993004897
-  Serial.println("writing calibration values to EEPROM...");
-  float x_vals[3] = {0.009558401835f, 0.009638554217f, 0.009674922601f,};
-  float y_vals[3] = {-0.009903931861f, -0.009958175662f, -0.01004520342f};
-
-  int addr = eepromAddrCx;
-  for (int i = 0; i < 3; i++) {
-      EEPROM.put(addr, x_vals[i]);
-      addr += sizeof(float);
-  }
-
-  addr = eepromAddrCy;
-  for (int i = 0; i < 3; i++) {
-      EEPROM.put(addr, y_vals[i]);
-      addr += sizeof(float);
-  }
-
-  Serial.println("Calibration values written to EEPROM.");
-
-  Serial.print("Cx values: ");
-  for (int i = 0; i < 3; i++) {
-      Serial.print(x_vals[i]);
-      if (i < 2) {
-          Serial.print(", ");
-      }
-  }
-  Serial.println();
-
-  Serial.print("Cy values: ");
-  for (int i = 0; i < 3; i++) {
-      Serial.print(y_vals[i]);
-      if (i < 2) {
-          Serial.print(", ");
-      }
-  }
-  Serial.println();
-}
-
 void readEepromCalibration(float (&Cx)[3], float (&Cy)[3]) {
     int addr = eepromAddrCx;
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < ns; i++) {
         Cx[i] = EEPROM.get(addr, Cx[i]);
         addr += sizeof(float);
     }
 
     addr = eepromAddrCy;
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < ns; i++) {
         Cy[i] = EEPROM.get(addr, Cy[i]);
         addr += sizeof(float);
     }
