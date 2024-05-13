@@ -162,8 +162,6 @@ float maxHeight = zLength;          // max height that z can actuate without col
 // Calibration coeffs, these are variables since we set them by accessing eeprom in setup
 // float Cx[3] = {0.00997506234f,0.01003310926f,0.00996611521f};
 // float Cy[3] = {0.01011531459f,0.01026588646f,0.01019056354f};
-// float Cx[3] = {0.0f,0.0f,0.0f};
-float Cy[3] = {0.0f,0.0f,0.0f};
 float cVal[2][4] = {{0.0f,0.0f,0.0f,0.0f},
                   {0.0f,0.0f,0.0f,0.0f}};
 
