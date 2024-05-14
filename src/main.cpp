@@ -702,61 +702,57 @@ void doSensing() {
     data[i] = sensors[i].readBurst();
   }
 
-  int yup = 1;        // filling in for good motion detection boolean
-  if(yup) {
-  //if(data1.isOnSurface && data1.isMotion) {   // If movement...
-    // **Only checking sensor 1 rn (TODO: check all of them and account for misreads)**
+  // TODO: check all of the sensors and account for misreads
 
+  // Sensor velocity sensing
+  for (int i = 0; i < ns; i++) {
     // Sensor velocity sensing
-    for (int i = 0; i < ns; i++) {
-      // Sensor velocity sensing
-      measVel[0][i] = -convTwosComp(data[i].dx)*cVal[0][i]/dt;     // '-' convention is used to flip sensor's z axis
-      measVel[1][i] = convTwosComp(data[i].dy)*cVal[1][i]/dt;
-    }
+    measVel[0][i] = -convTwosComp(data[i].dx)*cVal[0][i]/dt;     // '-' convention is used to flip sensor's z axis
+    measVel[1][i] = convTwosComp(data[i].dy)*cVal[1][i]/dt;
+  }
 
-    // Body angle estimation
-    estAngVel[0] = (measVel[0][2] - measVel[0][0])/ly;
-    estAngVel[1] = (measVel[0][2] - measVel[0][1])/ly;
-    estAngVel[2] = (measVel[1][1] - measVel[1][0])/lx;
-    estAngVel[3] = (measVel[1][1] - measVel[1][2])/lx;
-    // Simple average of angular velocities
-    float sumAngVel = 0.0f;
-    for (int i = 0; i<4; i++) {
-      sumAngVel = sumAngVel + estAngVel[i];
-    }
-    estAngVel1 = sumAngVel / 4.0f;
-    // Integrate angular velocity to get angle
-    estYaw = estYaw + estAngVel1*dt;
+  // Body angle estimation
+  estAngVel[0] = (measVel[0][2] - measVel[0][0])/ly;
+  estAngVel[1] = (measVel[0][2] - measVel[0][1])/ly;
+  estAngVel[2] = (measVel[1][1] - measVel[1][0])/lx;
+  estAngVel[3] = (measVel[1][1] - measVel[1][2])/lx;
+  // Simple average of angular velocities
+  float sumAngVel = 0.0f;
+  for (int i = 0; i<4; i++) {
+    sumAngVel = sumAngVel + estAngVel[i];
+  }
+  estAngVel1 = sumAngVel / 4.0f;
+  // Integrate angular velocity to get angle
+  estYaw = estYaw + estAngVel1*dt;
 
-    // Body position estimation
-    // TODO: simplify with matrix operation for rotation (using for loops)
-    estVel[0][0] = measVel[0][0]*cosf(estYaw)-measVel[1][0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-ly*sinf(estYaw));
-    estVel[0][1] = measVel[0][1]*cosf(estYaw)-measVel[1][1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+ly*sinf(estYaw));
-    estVel[0][2] = measVel[0][2]*cosf(estYaw)-measVel[1][2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-ly*sinf(estYaw));
-    estVel[1][0] = measVel[0][0]*sinf(estYaw)+measVel[1][0]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)+lx*sinf(estYaw));
-    estVel[1][1] = measVel[0][1]*sinf(estYaw)+measVel[1][1]*cosf(estYaw) + 0.5*estAngVel1*(-ly*cosf(estYaw)+lx*sinf(estYaw));
-    estVel[1][2] = measVel[0][2]*sinf(estYaw)+measVel[1][2]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)-lx*sinf(estYaw));
-    // Simple average of linear velocities
-    float sumVelX = 0.0f;
-    float sumVelY = 0.0f;
-    for (int i = 0; i<ns; i++) {
-      sumVelX = sumVelX + estVel[0][i];
-      sumVelY = sumVelY + estVel[1][i];
-    }
-    estVel1[0] = sumVelX / ns;
-    estVel1[1] = sumVelY / ns;
-    // Integrate linear velocities to get position
-    estPos[0] = estPos[0] + estVel1[0]*dt;
-    estPos[1] = estPos[1] + estVel1[1]*dt;
+  // Body position estimation
+  // TODO: simplify with matrix operation for rotation (using for loops)
+  estVel[0][0] = measVel[0][0]*cosf(estYaw)-measVel[1][0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-ly*sinf(estYaw));
+  estVel[0][1] = measVel[0][1]*cosf(estYaw)-measVel[1][1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+ly*sinf(estYaw));
+  estVel[0][2] = measVel[0][2]*cosf(estYaw)-measVel[1][2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-ly*sinf(estYaw));
+  estVel[1][0] = measVel[0][0]*sinf(estYaw)+measVel[1][0]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)+lx*sinf(estYaw));
+  estVel[1][1] = measVel[0][1]*sinf(estYaw)+measVel[1][1]*cosf(estYaw) + 0.5*estAngVel1*(-ly*cosf(estYaw)+lx*sinf(estYaw));
+  estVel[1][2] = measVel[0][2]*sinf(estYaw)+measVel[1][2]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)-lx*sinf(estYaw));
+  // Simple average of linear velocities
+  float sumVelX = 0.0f;
+  float sumVelY = 0.0f;
+  for (int i = 0; i<ns; i++) {
+    sumVelX = sumVelX + estVel[0][i];
+    sumVelY = sumVelY + estVel[1][i];
+  }
+  estVel1[0] = sumVelX / ns;
+  estVel1[1] = sumVelY / ns;
+  // Integrate linear velocities to get position
+  estPos[0] = estPos[0] + estVel1[0]*dt;
+  estPos[1] = estPos[1] + estVel1[1]*dt;
 
-    // Additional values
-    estTraj = atanf(estVel1[1]/estVel1[0]);    // trajectory angle w.r.t inertial frame
-    estVelAbs = sqrt(pow(estVel1[0],2) + pow(estVel1[1],2));
+  // Additional values
+  estTraj = atanf(estVel1[1]/estVel1[0]);    // trajectory angle w.r.t inertial frame
+  estVelAbs = sqrt(pow(estVel1[0],2) + pow(estVel1[1],2));
 
-    // Sensor plotting
-    if (plotting) {
-      sensorPlotting();
-    }
+  // Sensor plotting
+  if (plotting) {
+    sensorPlotting();
   }
 }
 
