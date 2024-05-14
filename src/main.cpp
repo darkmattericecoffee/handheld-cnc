@@ -25,7 +25,7 @@ void lineGenerator();
 void sinGenerator();
 void circleGenerator();
 // Math functions
-int convTwosComp(int b);
+int16_t convTwosComp(int16_t value);
 float myDist(float x1, float y1, float x2, float y2);
 float signedDist(float xr, float yr, float xg, float yg, float th);
 float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4);
@@ -374,7 +374,7 @@ void loop() {
       }
 
       float deltaX = goalX - estPos[0];               // x distance of goal from current router position
-      float deltaY = goalY - estPos[0];               // y distance of goal from current router position
+      float deltaY = goalY - estPos[1];               // y distance of goal from current router position
       
       // Determine desired actuation
       if (generalMode) {
@@ -462,12 +462,7 @@ void loop() {
     }
     
     // Debugging -----------------------------------------------------------------------------------
-    if(millis() - timeLastDebug >= dtDebug) {
-      timeLastDebug = millis();
-      if (debugMode) {
-        debugging();
-      }
-    }
+    debugging();
     //delay(10);
   }
 }
@@ -607,14 +602,15 @@ void zigZagGenerator() {
 
 // Loop subfunctions -----------------------------------------------------------------------------
 // Math functions
-int convTwosComp(int b){
-  // Convert from 2's complement
+int16_t convTwosComp(int16_t value){
+  // Convert from 2's complement (16 bit now)
   // This is needed to convert the binary values from the sensor library to decimal
 
-  if(b & 0x80){                     // 0x80 (hex) = 10000000 (bin) = 128 (dec)
-    b = -1 * ((b ^ 0xff) + 1);      // 0xff (hex) = 11111111 (bin) = 255 (dec)
+  if (value & 0x8000) {                     // Check if the sign bit is set (negative value)
+    return -((~value & 0xFFFF) + 1);      // Invert bits, add one, make negative
+  } else {
+    return value;
   }
-  return b;
 }
 
 float myDist(float x1, float y1, float x2, float y2) {
@@ -904,7 +900,7 @@ void workZeroXY() {
     estPosTool[1] = 0;
     goal_pnt_ind = 0;           // reset path to initial point
     goalX = pathArrayX[0];
-    goalY = pathArrayY[0];
+    goalY = pathArrayY[1];
   }
 }
 
@@ -1010,18 +1006,23 @@ void sensorPlotting() {
 }
 
 void debugging() {
-  // Print debug data
-  // Put all Serial print lines here to view
-  
-  // Serial.printf("x:%f,y:%f,theta:%f,dist:%f",estPosX,estPosY,estYaw,signedDist(estPosX,estPosY,0,10,estYaw));
-  // Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
-  Serial.printf("x_raw:%f,y_raw:%f",measVel[0][0],measVel[1][0]);
-  Serial.println();
-  // Serial.printf("thickness:%f, analog: %i",Conv*analogRead(POT_THICK), analogRead(POT_THICK));
-  // Serial.printf("x:%f,y:%f,goalX:%f,goalY:%f,desPos:%i",estPosToolX,estPosToolY,goalX,goalY,desPos);
-  // Serial.print(motorPosX);
+  if(millis() - timeLastDebug >= dtDebug) {
+    timeLastDebug = millis();
+    if (debugMode) {
+      // Print debug data
+      // Put all Serial print lines here to view
+      
+      Serial.printf("x:%f,y:%f,theta:%f",estPos[0],estPos[1],estYaw);
+      Serial.println();
+      // Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
+      Serial.printf("x_raw:%f,y_raw:%f",measVel[0][0],measVel[1][0]);
+      // Serial.printf("thickness:%f, analog: %i",Conv*analogRead(POT_THICK), analogRead(POT_THICK));
+      // Serial.printf("x:%f,y:%f,goalX:%f,goalY:%f,desPos:%i",estPosToolX,estPosToolY,goalX,goalY,desPos);
+      // Serial.print(motorPosX);
 
-  Serial.println();
+      Serial.println();
+    }
+  }
 }
 
 void parseNC(const char* filename, float* pathArrayX, float* pathArrayY) {
