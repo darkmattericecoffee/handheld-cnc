@@ -1,7 +1,8 @@
 // Libraries to include
-#include <PMW3360.h>
 #include <AccelStepper.h>
 #include <TMCStepper.h>
+#include <PMW3360.h>
+#include <EEPROM.h>
 #include <SPI.h>
 #include <SD.h>
 
@@ -24,12 +25,13 @@ void lineGenerator();
 void sinGenerator();
 void circleGenerator();
 // Math functions
-int convTwosComp(int b);
+int16_t convTwosComp(int16_t value);
 float myDist(float x1, float y1, float x2, float y2);
 float signedDist(float xr, float yr, float xg, float yg, float th);
 float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4);
 float desiredPosition(float dX,float dY,float theta);
 float mapF(long x, float in_min, float in_max, float out_min, float out_max);
+void readEepromCalibration(float (&cVal)[2][4]);
 // Sensing functions
 void doSensing();
 // Motor control functions
@@ -87,6 +89,10 @@ int sensorPins[3] = {SS0, SS1, SS2};
 const int chipSelect = BUILTIN_SDCARD;
 
 // Constants ------------------------------------------------------------------------
+// EEPROM addresses
+const int eepromAddrCx = 0;  
+const int eepromAddrCy = 12;  
+
 // Modes
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
@@ -115,8 +121,6 @@ long unsigned debounceDelay = 50;      // the debounce time; increase if the out
 const int ns = 3;                   // number of sensors
 const int CPI = 2500;               // This value changes calibration coefficients
 long unsigned dt = 500;       // microseconds (freq = 1,000,000/timestepPoll [Hz])
-const float Cx[3] = {0.00997506234f,0.01003310926f,0.00996611521f};
-const float Cy[3] = {0.01011531459f,0.01026588646f,0.01019056354f};
 const float lx = 120.0f;                // x length of rectangular sensor configuration
 const float ly = 140.0f;                // y length of rectangular sensor configuration
 const float xOff[3] = {-lx/2,lx/2,-lx/2};
@@ -154,6 +158,12 @@ float maxHeight = zLength;          // max height that z can actuate without col
                                     // (really depends on zeroed position)
 
 // Variables ------------------------------------------------------------------------
+// Calibration coeffs, these are variables since we set them by accessing eeprom in setup
+// float Cx[3] = {0.00997506234f,0.01003310926f,0.00996611521f};
+// float Cy[3] = {0.01011531459f,0.01026588646f,0.01019056354f};
+float cVal[2][4] = {{0.0f,0.0f,0.0f,0.0f},
+                  {0.0f,0.0f,0.0f,0.0f}};
+
 // Run states
 int limitHitX = 0;
 int limitHitZ = 0;
@@ -230,6 +240,24 @@ void setup() {
   Serial.begin(9600);  
   // while(!Serial);
   delay(100);         // as opposed to the while(!Serial);
+
+  // Load calibration coeffs
+  Serial.println("Loading calibration coefficients:");
+  readEepromCalibration(cVal);
+
+  Serial.print("Cx values: ");
+  for (int j = 0; j < 2; j++) {
+    for (int i = 0; i < ns; i++) {
+      Serial.print(cVal[j][i], 4);
+      if (i < ns - 1) {
+        Serial.print(", ");
+      }
+    }
+    Serial.println();
+    if (j == 0){
+      Serial.print("Cy values: ");
+    }
+  }
 
   // Limit switch initialization
   pinMode(LIMIT_MACH_X0, INPUT);
@@ -349,7 +377,7 @@ void loop() {
       }
 
       float deltaX = goalX - estPos[0];               // x distance of goal from current router position
-      float deltaY = goalY - estPos[0];               // y distance of goal from current router position
+      float deltaY = goalY - estPos[1];               // y distance of goal from current router position
       
       // Determine desired actuation
       desPos = desPosIntersect(estPos[0], estPos[1], estYaw, prevX, prevY, goalX, goalY);
@@ -427,12 +455,7 @@ void loop() {
     }
     
     // Debugging -----------------------------------------------------------------------------------
-    if(millis() - timeLastDebug >= dtDebug) {
-      timeLastDebug = millis();
-      if (debugMode) {
-        debugging();
-      }
-    }
+    debugging();
     //delay(10);
   }
 }
@@ -572,14 +595,15 @@ void zigZagGenerator() {
 
 // Loop subfunctions -----------------------------------------------------------------------------
 // Math functions
-int convTwosComp(int b){
-  // Convert from 2's complement
+int16_t convTwosComp(int16_t value){
+  // Convert from 2's complement (16 bit now)
   // This is needed to convert the binary values from the sensor library to decimal
 
-  if(b & 0x80){                     // 0x80 (hex) = 10000000 (bin) = 128 (dec)
-    b = -1 * ((b ^ 0xff) + 1);      // 0xff (hex) = 11111111 (bin) = 255 (dec)
+  if (value & 0x8000) {                     // Check if the sign bit is set (negative value)
+    return -((~value & 0xFFFF) + 1);      // Invert bits, add one, make negative
+  } else {
+    return value;
   }
-  return b;
 }
 
 float myDist(float x1, float y1, float x2, float y2) {
@@ -671,8 +695,8 @@ void doSensing() {
     // Sensor velocity sensing
     for (int i = 0; i < ns; i++) {
       // Sensor velocity sensing
-      measVel[0][i] = -convTwosComp(data[i].dx);     // '-' convention is used to flip sensor's z axis
-      measVel[1][i] = convTwosComp(data[i].dy);
+      measVel[0][i] = -convTwosComp(data[i].dx)*cVal[0][i]/dt;     // '-' convention is used to flip sensor's z axis
+      measVel[1][i] = convTwosComp(data[i].dy)*cVal[1][i]/dt;
     }
 
     // Body angle estimation
@@ -861,7 +885,7 @@ void workZeroXY() {
     estPosTool[1] = 0;
     goal_pnt_ind = 0;           // reset path to initial point
     goalX = pathArrayX[0];
-    goalY = pathArrayY[0];
+    goalY = pathArrayY[1];
   }
 }
 
@@ -967,18 +991,23 @@ void sensorPlotting() {
 }
 
 void debugging() {
-  // Print debug data
-  // Put all Serial print lines here to view
-  
-  // Serial.printf("x:%f,y:%f,theta:%f,dist:%f",estPosX,estPosY,estYaw,signedDist(estPosX,estPosY,0,10,estYaw));
-  // Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
-  Serial.printf("x_raw:%f,y_raw:%f",measVel[0][0],measVel[1][0]);
-  Serial.println();
-  // Serial.printf("thickness:%f, analog: %i",Conv*analogRead(POT_THICK), analogRead(POT_THICK));
-  // Serial.printf("x:%f,y:%f,goalX:%f,goalY:%f,desPos:%i",estPosToolX,estPosToolY,goalX,goalY,desPos);
-  // Serial.print(motorPosX);
+  if(millis() - timeLastDebug >= dtDebug) {
+    timeLastDebug = millis();
+    if (debugMode) {
+      // Print debug data
+      // Put all Serial print lines here to view
+      
+      Serial.printf("x:%f,y:%f,theta:%f",estPos[0],estPos[1],estYaw);
+      Serial.println();
+      // Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
+      Serial.printf("x_raw:%f,y_raw:%f",measVel[0][0],measVel[1][0]);
+      // Serial.printf("thickness:%f, analog: %i",Conv*analogRead(POT_THICK), analogRead(POT_THICK));
+      // Serial.printf("x:%f,y:%f,goalX:%f,goalY:%f,desPos:%i",estPosToolX,estPosToolY,goalX,goalY,desPos);
+      // Serial.print(motorPosX);
 
-  Serial.println();
+      Serial.println();
+    }
+  }
 }
 
 void parseNC(const char* filename, float* pathArrayX, float* pathArrayY) {
@@ -1063,4 +1092,26 @@ void DesignModeToggle() {
   makePath();
   
   Serial.println("End of Design Mode Toggle!");
+}
+
+void readEepromCalibration(float (&cVal)[2][4]) {
+  // int addr = eepromAddrCx;
+  // for (int i = 0; i < ns; i++) {
+  //   Cx[i] = EEPROM.get(addr, Cx[i]);
+  //   addr += sizeof(float);
+  // }
+
+  // addr = eepromAddrCy;
+  // for (int i = 0; i < ns; i++) {
+  //   Cy[i] = EEPROM.get(addr, Cy[i]);
+  //   addr += sizeof(float);
+  // }
+
+  int addr = 0;
+  for (int i = 0; i < ns; i++) {
+    for (int j = 0; j < 2; j++) {
+      EEPROM.get(addr, cVal[j][i]);
+      addr += sizeof(float);
+    }
+  }
 }
