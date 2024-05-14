@@ -48,6 +48,7 @@ void lowerZ();
 // Other loop functions
 void sensorPlotting();
 void debugging();
+void outputSerial();
 void parseNC(const char* filename, float* pathArrayX, float* pathArrayY);
 void makePath();
 void DesignModeToggle();
@@ -96,6 +97,7 @@ const int eepromAddrCy = 12;
 // Modes
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
+int outputMode = 1;           // output data to serial
 int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
 
 // Path properties
@@ -237,8 +239,11 @@ TMC2209Stepper driverZ(&SERIAL_PORT_Z, R_SENSE, DRIVER_ADDRESS);
 // -------------------------------------------------------------------------------------------------
 // Setup and Main Loop -----------------------------------------------------------------------------
 void setup() {
-  Serial.begin(9600);  
-  // while(!Serial);
+  Serial.begin(115200);  
+
+  if (outputMode) {
+    while(!Serial);
+  }
   delay(100);         // as opposed to the while(!Serial);
 
   // Load calibration coeffs
@@ -368,6 +373,8 @@ void loop() {
 
       // Determine goal point
       if (signedDist(estPos[0],estPos[1],goalX,goalY,estYaw) > 0) {
+        // TODO: modify this so that it works for multi-pass when needing to move backwards
+        //  - introduce velocity as an input?
         // If the goal point has been passed
         goal_pnt_ind++;
         prevX = goalX;
@@ -455,8 +462,13 @@ void loop() {
     }
     
     // Debugging -----------------------------------------------------------------------------------
-    debugging();
-    //delay(10);
+    if (debugMode) {
+      debugging();
+    }
+
+    if (outputMode) {
+      outputSerial();
+    }
   }
 }
 
@@ -647,10 +659,10 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
   float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
   float u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
   // Check if the intersection point is on the line segments
-  if (t < 0 || t > 1 || u < 0 || u > 1) {
-    Serial.println("Intersection point is not on the line segments.");
-    return NAN;     // TO-DO: do other stuff like stopping motor
-  }
+  // if (t < 0 || t > 1 || u < 0 || u > 1) {
+  //   Serial.println("Intersection point is not on the line segments.");
+  //   return NAN;     // TO-DO: do other stuff like stopping motor
+  // }
   
   float x = x1 + t * (x2 - x1);
   float y = y1 + t * (y2 - y1);
@@ -993,21 +1005,30 @@ void sensorPlotting() {
 void debugging() {
   if(millis() - timeLastDebug >= dtDebug) {
     timeLastDebug = millis();
-    if (debugMode) {
-      // Print debug data
-      // Put all Serial print lines here to view
-      
-      Serial.printf("x:%f,y:%f,theta:%f",estPos[0],estPos[1],estYaw);
-      Serial.println();
-      // Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
-      Serial.printf("x_raw:%f,y_raw:%f",measVel[0][0],measVel[1][0]);
-      // Serial.printf("thickness:%f, analog: %i",Conv*analogRead(POT_THICK), analogRead(POT_THICK));
-      // Serial.printf("x:%f,y:%f,goalX:%f,goalY:%f,desPos:%i",estPosToolX,estPosToolY,goalX,goalY,desPos);
-      // Serial.print(motorPosX);
+    // Print debug data
+    // Put all Serial print lines here to view
+    
+    Serial.printf("x:%f,y:%f,theta:%f",estPos[0],estPos[1],estYaw);
+    Serial.println();
+    // Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
+    Serial.printf("x_raw:%f,y_raw:%f",measVel[0][0],measVel[1][0]);
+    // Serial.printf("thickness:%f, analog: %i",Conv*analogRead(POT_THICK), analogRead(POT_THICK));
+    // Serial.printf("x:%f,y:%f,goalX:%f,goalY:%f,desPos:%i",estPosToolX,estPosToolY,goalX,goalY,desPos);
+    // Serial.print(motorPosX);
 
-      Serial.println();
-    }
+    Serial.println();
   }
+}
+
+void outputSerial() {
+  // Starting label
+  Serial.print("POS:");
+
+  // Data to output
+  Serial.printf("%f,%f,%f,%f,%f",estPos[0],estPos[1],estYaw,estPosTool[0],estPosTool[1]);
+  Serial.printf(",%f,%f,%f",goalX,goalY,cutStarted);
+
+  Serial.println();
 }
 
 void parseNC(const char* filename, float* pathArrayX, float* pathArrayY) {
@@ -1068,6 +1089,14 @@ void makePath() {
       zigZagGenerator();
       break;
   }
+
+  for (int i = 0; i < num_points; i++) {
+    // TODO: do for any size pathArray
+    Serial.print("PATH:");
+    Serial.printf("%f,%f",pathArrayX[i],pathArrayY[i]);
+    Serial.println();
+  }
+
 }
 
 void DesignModeToggle() {
