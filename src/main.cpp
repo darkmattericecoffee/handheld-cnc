@@ -116,8 +116,10 @@ float matThickness = 0.0;                   // thickness of material
 float maxThickness = 10.0;                // upper bound of thickness knob (mm)
 float restHeight = 4.0;                   // rest height of tool before cutting
 
-// Button properties
+// Timing constants
 long unsigned debounceDelay = 50;      // the debounce time; increase if the output flickers
+long unsigned dtDebug = 500;                   // (ms)
+long unsigned dtOutput = 50;            // (ms)
 
 // Sensor properties
 const int ns = 3;                   // number of sensors
@@ -182,8 +184,8 @@ int z0_count = 2;           // z zeroing count variable (start as "false")
 
 // Timing variables
 int firstPoint = 1;
-long unsigned dtDebug = 500;                   // (ms)
 long unsigned timeLastPoll = 0;
+long unsigned timeLastOutput = 0;
 long unsigned timeLastDebug = 0;
 long unsigned timeLastDebounce = 0;   // (ms)
 
@@ -348,7 +350,7 @@ void loop() {
     motorPosX = stepperX.currentPosition() / (float)Conv;
     // Tool position
     estPosTool[0] = estPos[0] + motorPosX*cosf(estYaw);
-    estPosTool[1] = estPos[1] + motorPosX*cosf(estYaw);
+    estPosTool[1] = estPos[1] + motorPosX*sinf(estYaw);
   
     // Control ---------------------------------------------------------------------------------
     if (digitalRead(BUTT_HANDLE) == LOW  && goal_pnt_ind + 1 < num_points &&
@@ -640,7 +642,6 @@ float signedDist(float xr, float yr, float xg, float yg, float th) {
 }
 
 float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4) {
-  // *Currently unused*
   // Determine where two lines intersect (one line will always be the gantry, made by xc, yc, and th)
   // TODO: if this doesn't work, compare distance between router and goal point and interpolate based off of that
 
@@ -656,6 +657,7 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
     return NAN;
   }
 
+  // TODO: look at approach where if lines don't intersect
   float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
   float u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
   // Check if the intersection point is on the line segments
@@ -666,11 +668,15 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
   
   float x = x1 + t * (x2 - x1);
   float y = y1 + t * (y2 - y1);
+
+  float dx = x - xc;
+  float dy = y - yc;
+
 //  float pointDes[2];
 //  pointDes[0] = (((x1*y2 - y1*x2)*(x3 - x4)) - ((x1 - x2)*(x3*y4 - y3*x4)))/den;
 //  pointDes[1] = (((x1*y2 - y1*x2)*(y3 - y4)) - ((y1 - y2)*(x3*y4 - y3*x4)))/den;
 
-  return -myDist(xc,yc,x,y)*cosf(th);
+  return desiredPosition(dx, dy, th);
 }
 
 float desiredPosition(float dX,float dY,float theta) {
@@ -1017,14 +1023,18 @@ void debugging() {
 }
 
 void outputSerial() {
-  // Starting label
-  Serial.print("POS:");
+  if(millis() - timeLastOutput >= dtOutput) {
+    timeLastOutput = millis();
 
-  // Data to output
-  Serial.printf("%f,%f,%f,%f,%f",estPos[0],estPos[1],estYaw,estPosTool[0],estPosTool[1]);
-  Serial.printf(",%f,%f,%f",goalX,goalY,cutStarted);
+    // Starting label
+    Serial.print("POS:");
 
-  Serial.println();
+    // Data to output
+    Serial.printf("%f,%f,%f,%f,%f",estPos[0],estPos[1],estYaw,estPosTool[0],estPosTool[1]);
+    Serial.printf(",%f,%f,%f",goalX,goalY,cutStarted);
+
+    Serial.println();
+  }
 }
 
 void parseNC(const char* filename, float* pathArrayX, float* pathArrayY) {
