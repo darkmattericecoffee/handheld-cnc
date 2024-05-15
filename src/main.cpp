@@ -348,7 +348,7 @@ void loop() {
     motorPosX = stepperX.currentPosition() / (float)Conv;
     // Tool position
     estPosTool[0] = estPos[0] + motorPosX*cosf(estYaw);
-    estPosTool[1] = estPos[1] + motorPosX*cosf(estYaw);
+    estPosTool[1] = estPos[1] + motorPosX*sinf(estYaw);
   
     // Control ---------------------------------------------------------------------------------
     if (digitalRead(BUTT_HANDLE) == LOW  && goal_pnt_ind + 1 < num_points &&
