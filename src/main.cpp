@@ -119,7 +119,7 @@ float restHeight = 4.0;                   // rest height of tool before cutting
 // Timing constants
 long unsigned debounceDelay = 50;      // the debounce time; increase if the output flickers
 long unsigned dtDebug = 500;                   // (ms)
-long unsigned dtOutput = 50;            // (ms)
+long unsigned dtOutput = 20;            // (ms)
 
 // Sensor properties
 const int ns = 3;                   // number of sensors
@@ -683,7 +683,9 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
 float desiredPosition(float dX,float dY,float theta) {
   // Calculate the desired position for the tool
 
-  float desPosition = (dX - tanf(theta)*dY)*cosf(theta);       // Sanzhar equation
+  float desPosition = (dX + tanf(theta)*dY)*cosf(theta);       // Sanzhar equation
+  // this can also just be written:
+  // float desPosition = dX*cosf(th) + dY*sinf(th);
   
   return desPosition;
 }
