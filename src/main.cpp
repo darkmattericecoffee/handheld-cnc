@@ -40,16 +40,15 @@ void disableStepperZ();
 void stopStepperX();
 void stopStepperZ();
 void machineZeroX();
-void machineZeroZ();
-void workZeroXY();
-void workZeroZ_man();
+void workspaceZeroZ();
+void workspaceZeroXY();
 void raiseZ();
 void lowerZ();
 // Other loop functions
 void sensorPlotting();
 void debugging();
 void outputSerial();
-void parseNC(const char* filename, float* pathArrayX, float* pathArrayY);
+void parseNC(const char* filename);
 void makePath();
 void DesignModeToggle();
 
@@ -86,6 +85,25 @@ int sensorPins[3] = {SS0, SS1, SS2};
 #define SERIAL_PORT_X         Serial7     // HardwareSerial port
 #define SERIAL_PORT_Z         Serial6
 
+// Max path values
+#define MAX_PATHS  4
+#define MAX_POINTS 1000
+
+// State values
+typedef enum State {
+  POWER_ON,
+  MACHINE_X_ZERO,
+  WORKSPACE_Z_ZERO,
+  DESIGN_SELECTED,
+  READY
+} State;
+
+// Coordinate
+typedef struct Point {
+  float x;
+  float y;
+} Point;
+
 // SD pins
 const int chipSelect = BUILTIN_SDCARD;
 
@@ -101,9 +119,10 @@ int outputMode = 1;           // output data to serial
 int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
 
 // Path properties
-const int num_points = 1000;             // length of path array
-float pathArrayX[num_points];
-float pathArrayY[num_points];
+int num_paths = 0;  // The actual number of paths
+int num_points = 0; // The actual number of points
+Point paths[MAX_PATHS][MAX_POINTS];
+
 // Path properties (sine wave)
 const float sinAmp = 5.0;
 const float sinPeriod = 50.0;
@@ -238,6 +257,9 @@ AccelStepper stepperZ(motorInterfaceType, MOT_STEP_Z, MOT_DIR_Z);
 TMC2209Stepper driverX(&SERIAL_PORT_X, R_SENSE, DRIVER_ADDRESS);
 TMC2209Stepper driverZ(&SERIAL_PORT_Z, R_SENSE, DRIVER_ADDRESS);
 
+// Router state
+State state = POWER_ON;
+
 // -------------------------------------------------------------------------------------------------
 // Setup and Main Loop -----------------------------------------------------------------------------
 void setup() {
@@ -291,16 +313,28 @@ void setup() {
   }
   Serial.println("Initialization done.");
 
-  // Make path
-  makePath();
+  // Zero the machine X once on startup
+  Serial.println("Waiting for machine X to be zeroed...");
+  while (state != MACHINE_X_ZERO) {
+    if(digitalRead(BUTT_MACH_X0) == LOW) {
+      machineZeroX();
+      state = MACHINE_X_ZERO;
+    }
+  }
+  Serial.println("Machine x zeroed!");
 
-//  for (int i = 1; i < num_points; i++) {
-//    Serial.printf("x(%i) = 
-//  }
+  // Zero the workspace Z once on startup
+  Serial.println("Waiting for workspace Z to be zeroed...");
+  while (state != WORKSPACE_Z_ZERO) {
+    if(digitalRead(BUTT_WORK_Z0) == LOW) {
+      workspaceZeroZ();
+      state = WORKSPACE_Z_ZERO;
+    }
+  }
+  Serial.println("Workspace Z zeroed!");
 
-  Serial.println("Handheld CNC Router set up!");
-  
-  delay(500);
+  // Pick a design
+  DesignModeToggle();
 }
 
 void loop() {
@@ -312,33 +346,21 @@ void loop() {
     }
   }
   
-  // System Initialization ------------------------------------------------------------------------
-  // If zeroing operations are needed, they are excecuted here.
-  // Machine X zeroing
-  if (digitalRead(BUTT_MACH_X0) == LOW) {
-    x0_count = 0;
+  // Workspace X and Y zeroing
+  if (state == DESIGN_SELECTED && digitalRead(BUTT_WORK_X0Y0) == LOW) {
+    workspaceZeroXY();
+    state = READY;
   }
-  machineZeroX();
 
-  // Machine Z zeroing
-  if (digitalRead(BUTT_MACH_Z0) == LOW) {
-    z0_count = 0;
-    enableStepperZ();
-    //Serial.println("z homing");
+  // Break here until we are ready to cut
+  if (state != READY) {
+    return;
   }
-  machineZeroZ();
 
-  // Workpiece zeroing
-  // X and Y
-  if (digitalRead(BUTT_WORK_X0Y0) == LOW) {
-    workZeroXY();
-  }
-  // Z
-  if (digitalRead(BUTT_WORK_Z0) == LOW) {
-    z0_count = 0;
-    workZeroZ_man();
-    readyOrNot = 1;
-  }
+  // Cutting logic
+  Serial.println("OK IMMA START CUTTING NOW");
+  delay(2000);
+  return;
 
   // Sensing and Control ---------------------------------------------------------------------------
   if (readyOrNot > 1) {       // keep in mind this may occur premptively b/c of X0Y0 reading
@@ -381,8 +403,8 @@ void loop() {
         goal_pnt_ind++;
         prevX = goalX;
         prevY = goalY;
-        goalX = pathArrayX[goal_pnt_ind];      // x coordinate of closest point
-        goalY = pathArrayY[goal_pnt_ind];      // y coordinate of closest point
+        // goalX = pathArrayX[goal_pnt_ind];      // x coordinate of closest point
+        // goalY = pathArrayY[goal_pnt_ind];      // y coordinate of closest point
       }
 
       float deltaX = goalX - estPos[0];               // x distance of goal from current router position
@@ -557,34 +579,54 @@ void driverSetup() {
   driverZ.en_spreadCycle(false);   // false = StealthChop / true = SpreadCycle
 }
 
+void doubleLineGenerator() {
+  // One line going up at x = -5 and one line going down at x = 5
+  for (int i=0; i<MAX_POINTS; i++) {
+    float scale = (float)i / num_points - 1;
+    paths[0][i] = Point{x: -20.0, y: pathMax_y * scale};
+    paths[1][i] = Point{x: 20.0, y: pathMax_y * (1- scale)};
+  }
+
+  num_paths = 2;
+  num_points = MAX_POINTS;
+}
+
 void lineGenerator() {
   // Generate line path to cut
-  for (int i = 0; i < num_points; i++) {
-    pathArrayX[i] = 0;
-    pathArrayY[i] = (pathMax_y) * (float)i / (num_points - 1);
+  for (int i = 0; i < MAX_POINTS; i++) {
+    paths[0][i] = Point{x: 0, y: (pathMax_y) * (float)i / (MAX_POINTS - 1)};
   }
+
+  num_paths = 1;
+  num_points = MAX_POINTS;
 }
 
 void sinGenerator() {
   // Generate sine path to cut
-  for (int i = 0; i < num_points; ++i) {
-    float y = (pathMax_y) * (float)i / (num_points - 1);
+  for (int i = 0; i < MAX_POINTS; ++i) {
+    float y = (pathMax_y) * (float)i / (MAX_POINTS - 1);
     float x = sinAmp * sinf((TWO_PI/sinPeriod)*y);
-    pathArrayX[i] = x;
-    pathArrayY[i] = y;
+    paths[0][i] = Point{x, y};
   }
+
+  num_paths = 1;
+  num_points = MAX_POINTS;
 }
 
 void circleGenerator() {
   // Generate a circle path to cut
   float radius = circleDiameter / 2.0;
-  float angle_step = 2.0 * PI / num_points;
+  float angle_step = 2.0 * PI / MAX_POINTS;
 
-  for (int i = 0; i < num_points; i++) {
+  for (int i = 0; i < MAX_POINTS; i++) {
     float angle = i * angle_step;
-    pathArrayX[i] = -radius + (radius * cosf(angle));
-    pathArrayY[i] = radius * sinf(angle);
+    float x = -radius + (radius * cosf(angle));
+    float y = radius * sinf(angle);
+    paths[0][i] = Point{x, y};
   }
+
+  num_paths = 1;
+  num_points = MAX_POINTS;
 }
 
 void zigZagGenerator() {
@@ -594,17 +636,20 @@ void zigZagGenerator() {
   // int leftRight = 1;
   float zigSize = 40;
 
-  for (int i = 0; i < num_points; ++i) {
+  for (int i = 0; i < MAX_POINTS; ++i) {
     if (pCount < numPLine) {
-      float y = (pathMax_y) * (float)i / (num_points - 1);
+      float y = (pathMax_y) * (float)i / (MAX_POINTS - 1);
       float x = std::fmod(y, zigSize);
       if (x > (zigSize / 2)) {
         x = zigSize - x;
       }
-      pathArrayX[i] = x;
-      pathArrayY[i] = y;
+      
+      paths[0][i] = Point{x, y};
     }
   }
+
+  num_paths = 1;
+  num_points = MAX_POINTS;
 }
 
 // Loop subfunctions -----------------------------------------------------------------------------
@@ -785,185 +830,96 @@ void stopStepperZ() {
 }
 
 void machineZeroX() {
-  if (x0_count == 0) { 
-    // First x calibration run
-    stepperX.setMaxSpeed(speed_x0);
-    stepperX.setAcceleration(accel_x0);
-    stepperX.move(Conv*gantryLength);
+  // Run until we hit the xlimit
+  stepperX.setSpeed(speed_x0);
+  while (digitalRead(LIMIT_MACH_X0) == HIGH) {
+    stepperX.runSpeed();
+  }
+
+  // Back off
+  stepperX.move(-Conv*retract);
+  while (stepperX.distanceToGo() != 0) {
     stepperX.run();
-    if (digitalRead(LIMIT_MACH_X0) == LOW) {
-      // myStepper.setSpeed(0);              // stop motor
-      stopStepperX();
-      stepperX.setCurrentPosition(0);
-      x0_count += 1;
-      Serial.println("X limit reached");
-    }
-  } else if (x0_count == 1) {
-    // Second x calibration run
-    //myStepper.setMaxSpeed(speed_x0);
-    // Retract
-    stepperX.move(-Conv*retract);
-    while (stepperX.distanceToGo() != 0) {
-      stepperX.run();
-    }
-    stopStepperX();
-    delay(100);
-
-    // Move in for second calibration
-    stepperX.setSpeed(speed_x1);
-    while (digitalRead(LIMIT_MACH_X0) == HIGH) {
-      // Run until you hit the limit switch
-      stepperX.runSpeed();
-    }
-    stopStepperX();
-    stepperX.setCurrentPosition(0);
-    // Serial.println(stepperZ.currentPosition());
-
-    // Move to middle
-    stepperX.move(-Conv*((gantryLength/2) - xLimitOffset));
-    while (stepperX.distanceToGo() != 0) {
-      stepperX.run();
-    }
-    stepperX.setCurrentPosition(0);
-
-    // Go back to standard settings
-    stepperX.setMaxSpeed(maxVel);
-    stepperX.setAcceleration(maxAccel);
-    x0_count += 1;      // Stop limit switch function (should go back to 0 for main code)
   }
 
-}
-
-void machineZeroZ() {
-  // Z machine zeroing operation (not really necessary when using manual workpiece zeroing)
-
-  if (z0_count == 0) { 
-    // First calibration
-    //stepperZ.moveTo(Conv*retract);
-    stepperZ.move(Conv*zLength);
-    stepperZ.run();
-    if (digitalRead(LIMIT_MACH_Z0) == LOW) {
-      stopStepperZ();
-      stepperZ.setCurrentPosition(0);
-      z0_count += 1;
-      Serial.println("Z limit reached");
-    }
-  } else if (z0_count == 1) {
-    //stepperZ.setMaxSpeed(speed_x0);
-    // Retract
-    stepperZ.move(-Conv*retract);
-    while (stepperZ.distanceToGo() != 0) {
-      stepperZ.run();
-    }
-    stopStepperZ();
-    delay(100);
-    
-    // Move in for second calibration
-    stepperZ.setSpeed(speed_x1);
-    while (digitalRead(LIMIT_MACH_Z0) == HIGH) {
-      // Run until you hit the limit switch
-      stepperZ.runSpeed();
-    }
-    stopStepperZ();
-    stepperZ.setCurrentPosition(0);
-    // Serial.println(stepperZ.currentPosition());
-    
-    z0_count += 1;      // Stop limit switch function (should go back to 0 for main code)
-    disableStepperZ();  // disable so it can be zeroed to workpiece
+  // Second, slower pass
+  stepperX.setSpeed(speed_x1);
+  while (digitalRead(LIMIT_MACH_X0) == HIGH) {
+    stepperX.runSpeed();
   }
-}
 
-void workZeroXY() {
-  if (readyOrNot == 1) {
-    readyOrNot++;
-
-    // Make sure tool is centered
-    stepperX.moveTo(0);
-    while (stepperX.distanceToGo() != 0) {
-      stepperX.run();
-    }
-
-    // Make sure tool is down
-    stepperZ.moveTo(Conv*restHeight);           // brings tool down to rest height
-    while (abs(stepperZ.distanceToGo()) > (Conv*2)) {
-      stepperZ.run();
-    }
-    stepperZ.setMaxSpeed(round(speed_x1/2));
-    while (stepperZ.distanceToGo() !=0) {
-      stepperZ.run();
-    }
-    stepperZ.setMaxSpeed(speed_x0);
-
-    // Set all working position and orientation data to 0
-    estPos[0] = 0;
-    estPos[1] = 0;
-    estYaw = 0;
-    estPosTool[0] = 0;
-    estPosTool[1] = 0;
-    goal_pnt_ind = 0;           // reset path to initial point
-    goalX = pathArrayX[0];
-    goalY = pathArrayY[1];
+  // Move to the center
+  stepperX.move(-Conv*((gantryLength/2) - xLimitOffset));
+  while (stepperX.distanceToGo() != 0) {
+    stepperX.run();
   }
+
+  // Set current position as 0
+  stepperX.setCurrentPosition(0);
+
+  // Reset speed and accel settings
+  stepperX.setMaxSpeed(maxVel);
+  stepperX.setAcceleration(maxAccel);
 }
 
-void workZeroZ_man() {
-  // Manually set workpiece Z0
-  // This is initiated only after the user has manually moved the tool to the top of the surface.
-
+void workspaceZeroZ() {
+  // Manually set workpiece Z. This is initiated only after 
+  // the user has manually moved the tool to the top of the surface.
   enableStepperZ();
+
+  // Set the starting position as 0, the user manually set this
   stepperZ.setCurrentPosition(0);
 
-  while (z0_count < 2) {
-    stepperZ.move(Conv*zLength);
-    if (z0_count == 0) { 
-      // First calibration
-      //stepperZ.moveTo(Conv*retract);
-      stepperZ.move(Conv*zLength);
-      stepperZ.run();
-      if (digitalRead(LIMIT_MACH_Z0) == LOW) {
-        stopStepperZ();
-        z0_count += 1;
-        Serial.println("Limit reached");
-      }
-    }
-    if (z0_count == 1) {
-      //stepperZ.setMaxSpeed(speed_x0);
-      // Retract
-      stepperZ.move(-Conv*retract);
-      while (stepperZ.distanceToGo() != 0) {
-        stepperZ.run();
-      }
-      stopStepperZ();
-      delay(100);
-      
-      // Move in for second calibration
-      stepperZ.setSpeed(speed_x1);
-      while (digitalRead(LIMIT_MACH_Z0) == HIGH) {
-        // Run until you hit the limit switch
-        stepperZ.runSpeed();
-      }
-      stopStepperZ();
-      maxHeight = stepperZ.currentPosition() / Conv;
-      Serial.printf("Max height = %f", maxHeight);
-      Serial.println();
-
-      // Go back down to manually set height
-      stepperZ.moveTo(Conv*restHeight);                              // go to restheight
-      while (abs(stepperZ.distanceToGo()) > (Conv*2)) {
-        stepperZ.run();
-      }
-      stepperZ.setMaxSpeed(round(speed_x1/2));
-      while (stepperZ.distanceToGo() !=0) {
-        stepperZ.run();
-      }
-
-      // toolRaised = 0;     // [still 1 because it is at restHeight, not -matThickness]
-
-      stepperZ.setMaxSpeed(speed_x0);
-      //disableStepperZ();
-      z0_count += 1;      // Stop limit switch function (should go back to 0 for main code)
-    }
+  // Initial pass
+  stepperZ.setSpeed(speed_x0);
+  while (digitalRead(LIMIT_MACH_Z0) == HIGH) {
+    stepperZ.runSpeed();
   }
+
+  // Retract
+  stepperZ.move(-Conv*retract);
+  while (stepperZ.distanceToGo() != 0) {
+    stepperZ.run();
+  }
+
+  // Second slow pass
+  stepperZ.setSpeed(speed_x1);
+  while (digitalRead(LIMIT_MACH_Z0) == HIGH) {
+    stepperZ.runSpeed();
+  }
+
+  // Set this as the max height
+  maxHeight = stepperZ.currentPosition() / Conv;
+
+  // Return to rest height
+  stepperZ.moveTo(Conv*restHeight);
+  while (stepperZ.distanceToGo() != 0) {
+    stepperZ.run();
+  }
+
+  // Reset max speed
+  stepperZ.setMaxSpeed(speed_x0);
+}
+
+void workspaceZeroXY() {
+  // Make sure tool is centered
+  stepperX.moveTo(0);
+  while (stepperX.distanceToGo() != 0) {
+    stepperX.run();
+  }
+
+  // Make sure tool is at rest height
+  stepperZ.moveTo(Conv*restHeight);
+  while (stepperZ.distanceToGo() != 0) {
+    stepperZ.run();
+  }
+
+  // Set all working position and orientation data to 0
+  estPos[0] = 0;
+  estPos[1] = 0;
+  estYaw = 0;
+  estPosTool[0] = 0;
+  estPosTool[1] = 0;
 }
 
 void raiseZ() {
@@ -1040,7 +996,7 @@ void outputSerial() {
   }
 }
 
-void parseNC(const char* filename, float* pathArrayX, float* pathArrayY) {
+void parseNC(const char* filename) {
   // NC gCode parsing function
   File myFile = SD.open(filename);
   if (!myFile) {
@@ -1058,13 +1014,15 @@ void parseNC(const char* filename, float* pathArrayX, float* pathArrayY) {
       // if (spacePos == -1) {
       //   spacePos = line.length();
       // }
-      pathArrayX[idx] = line.substring(xPos+1, spacePos).toFloat();
+      float x = line.substring(xPos+1, spacePos).toFloat();
 
       spacePos = line.indexOf(' ', yPos);
       if (spacePos == -1) {
         spacePos = line.length();
       }
-      pathArrayY[idx] = line.substring(yPos+1, spacePos).toFloat();
+      float y = line.substring(yPos+1, spacePos).toFloat();
+
+      paths[0][idx] = Point{x,y};
 
       idx++;        // only go to update index if there is a valid XY coordinate
     }
@@ -1089,23 +1047,22 @@ void makePath() {
       Serial.println("Circle path generated!");
       break;
     case 3:
-      parseNC("generic_test02.nc", pathArrayX, pathArrayY);
+      parseNC("generic_test02.nc");
       break;
     case 4:
-      parseNC("stupid_wave02.nc", pathArrayX, pathArrayY);
+      parseNC("stupid_wave02.nc");
       break;
     case 5:
       zigZagGenerator();
       break;
   }
 
-  for (int i = 0; i < num_points; i++) {
-    // TODO: do for any size pathArray
-    Serial.print("PATH:");
-    Serial.printf("%f,%f",pathArrayX[i],pathArrayY[i]);
-    Serial.println();
+  for (int i=0; i < num_paths; i++) {
+    for (int j = 0; j < num_points; j++) {
+        // TODO: do for any size pathArray
+        Serial.printf("PATH %d:%f,%f\n", i, paths[i][j].x, paths[i][j].y);
+      }
   }
-
 }
 
 void DesignModeToggle() {
@@ -1130,6 +1087,8 @@ void DesignModeToggle() {
   makePath();
   
   Serial.println("End of Design Mode Toggle!");
+
+  state = DESIGN_SELECTED;
 }
 
 void readEepromCalibration(float (&cVal)[2][4]) {
