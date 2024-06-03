@@ -332,6 +332,7 @@ void setup() {
     }
   }
   Serial.println("Workspace Z zeroed!");
+  Serial.println(maxHeight);
 
   // Pick a design
   DesignModeToggle();
@@ -357,143 +358,139 @@ void loop() {
     return;
   }
 
-  // Cutting logic
-  Serial.println("OK IMMA START CUTTING NOW");
-  delay(2000);
-  return;
+
 
   // Sensing and Control ---------------------------------------------------------------------------
-  if (readyOrNot > 1) {       // keep in mind this may occur premptively b/c of X0Y0 reading
-    if(micros() - timeLastPoll >= dt) {
-      doSensing();
+  if(micros() - timeLastPoll >= dt) {
+    doSensing();
+  }
+
+  // Motor position
+  motorPosX = stepperX.currentPosition() / (float)Conv;
+  // Tool position
+  estPosTool[0] = estPos[0] + motorPosX*cosf(estYaw);
+  estPosTool[1] = estPos[1] + motorPosX*sinf(estYaw);
+
+  // Control ---------------------------------------------------------------------------------
+  if (digitalRead(BUTT_HANDLE) == LOW  && goal_pnt_ind + 1 < num_points &&
+      abs(motorPosX) < (0.5*gantryLength - xBuffer) && !limitHitX) {
+    // If statement makes sure:
+    //    - user has both hands on device (BUTT_HANDLE)
+    //    - the path hasn't finished (num_points)
+    //    - the tool is not colliding with the wall
+    //    - the tool hasn't hit a limit switch (limitHitX)
+
+    // Lower tool
+    if (toolRaised) {
+      lowerZ();
     }
 
-    // Motor position
-    motorPosX = stepperX.currentPosition() / (float)Conv;
-    // Tool position
-    estPosTool[0] = estPos[0] + motorPosX*cosf(estYaw);
-    estPosTool[1] = estPos[1] + motorPosX*sinf(estYaw);
-  
-    // Control ---------------------------------------------------------------------------------
-    if (digitalRead(BUTT_HANDLE) == LOW  && goal_pnt_ind + 1 < num_points &&
-        abs(motorPosX) < (0.5*gantryLength - xBuffer) && !limitHitX) {
-      // If statement makes sure:
-      //    - user has both hands on device (BUTT_HANDLE)
-      //    - the path hasn't finished (num_points)
-      //    - the tool is not colliding with the wall
-      //    - the tool hasn't hit a limit switch (limitHitX)
-
-      // Lower tool
-      if (toolRaised) {
-        lowerZ();
-      }
-
-      // Update states
-      cutStarted = 1;
-      timeLastDebounce = millis();
-      if (isnan(float(timeLastDebug))) {
-        timeLastDebug = millis();
-      }
-
-      // Determine goal point
-      if (signedDist(estPos[0],estPos[1],goalX,goalY,estYaw) > 0) {
-        // TODO: modify this so that it works for multi-pass when needing to move backwards
-        //  - introduce velocity as an input?
-        // If the goal point has been passed
-        goal_pnt_ind++;
-        prevX = goalX;
-        prevY = goalY;
-        // goalX = pathArrayX[goal_pnt_ind];      // x coordinate of closest point
-        // goalY = pathArrayY[goal_pnt_ind];      // y coordinate of closest point
-      }
-
-      float deltaX = goalX - estPos[0];               // x distance of goal from current router position
-      float deltaY = goalY - estPos[1];               // y distance of goal from current router position
-      
-      // Determine desired actuation
-      desPos = desPosIntersect(estPos[0], estPos[1], estYaw, prevX, prevY, goalX, goalY);
-      if (isnan(desPos)) {
-        // if intersect algorithm gives bad value, go back to OG
-        desPos = desiredPosition(deltaX,deltaY,estYaw);
-        Serial.println("NaN value from interpolation function.");
-      }
-      // desPos = desiredPosition(deltaX,deltaY,estYaw);
-
-      // Velocity control
-      if (!isnan(estTraj)) {
-        desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;    // unused right now
-      }
-
-      // Motor actuation ---------------------------------------------------------------------------
-      stepperX.moveTo(Conv*desPos);           // actuate tool to desired position
-      //  if (Conv*desVel <= maxVel) {
-      //    myStepper.setMaxSpeed(Conv*desVel);
-      //  }
-      //myStepper.setMaxSpeed(maxVel);
-      if (stepperX.distanceToGo() != 0) {
-        //delay(100);
-        stepperX.run();
-      }
-      
-    }
-    // React to non-operational state ---------------------------------------------------------------
-    else if (cutStarted  && (millis() - timeLastDebounce) > debounceDelay) {
-      // USER IS NOT IN CONTROL OF DEVICE -> cancel everything
-      // TO-DO: this is where we would initiate a reset after someone is done demoing
-
-      stopStepperX();
-      //readyOrNot = 0;
-      //Serial.println("User not in control!");
-
-      // Z-up
-      raiseZ();
-
-      // Reset
-      cutStarted = 0;
-      readyOrNot = 1;         // retains z workpiece homing, but not xy
-
-      Serial.println("User is no longer in control");
-      timeLastDebug = nanl;            // stop debug printing
+    // Update states
+    cutStarted = 1;
+    timeLastDebounce = millis();
+    if (isnan(float(timeLastDebug))) {
+      timeLastDebug = millis();
     }
 
-    if (x0_count == 2 && digitalRead(LIMIT_MACH_X0) == LOW) {
-      // If X carriage runs into X limit switch
-      stopStepperX();
-      raiseZ();
-      limitHitX = 1;
-
-      // Reset
-      cutStarted = 0;
-      readyOrNot = 1;         // retains z workpiece homing, but not xy
-      x0_count = 0;           // removes x machine homing
-      
-      Serial.println("X limit reached");
-      timeLastDebug = nanl;            // stop debug printing
+    // Determine goal point
+    if (signedDist(estPos[0],estPos[1],goalX,goalY,estYaw) > 0) {
+      // TODO: modify this so that it works for multi-pass when needing to move backwards
+      //  - introduce velocity as an input?
+      // If the goal point has been passed
+      goal_pnt_ind++;
+      prevX = goalX;
+      prevY = goalY;
+      goalX = paths[0][goal_pnt_ind].x;      // x coordinate of closest point
+      goalY = paths[0][goal_pnt_ind].y;      // y coordinate of closest point
     }
 
-    if (z0_count == 2 && digitalRead(LIMIT_MACH_Z0) == LOW) {
-      // If Z carriage runs into Z limit switch
-      stopStepperZ();
-      limitHitZ = 1;
+    float deltaX = goalX - estPos[0];               // x distance of goal from current router position
+    float deltaY = goalY - estPos[1];               // y distance of goal from current router position
+    
+    // Determine desired actuation
+    desPos = desPosIntersect(estPos[0], estPos[1], estYaw, prevX, prevY, goalX, goalY);
+    if (isnan(desPos)) {
+      // if intersect algorithm gives bad value, go back to OG
+      desPos = desiredPosition(deltaX,deltaY,estYaw);
+      Serial.println("NaN value from interpolation function.");
+    }
+    // desPos = desiredPosition(deltaX,deltaY,estYaw);
 
-      // Reset
-      cutStarted = 0;
-      readyOrNot = 1;         // retains z workpiece homing, but not xy
-      z0_count = 0;           // removes z workpiece/machine homing
-      
-      Serial.println("Z limit reached");
-      timeLastDebug = nanl;            // stop debug printing
+    // Velocity control
+    if (!isnan(estTraj)) {
+      desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;    // unused right now
+    }
+
+    // Motor actuation ---------------------------------------------------------------------------
+    stepperX.moveTo(Conv*desPos);           // actuate tool to desired position
+    //  if (Conv*desVel <= maxVel) {
+    //    myStepper.setMaxSpeed(Conv*desVel);
+    //  }
+    //myStepper.setMaxSpeed(maxVel);
+    if (stepperX.distanceToGo() != 0) {
+      //delay(100);
+      stepperX.run();
     }
     
-    // Debugging -----------------------------------------------------------------------------------
-    if (debugMode) {
-      debugging();
-    }
-
-    if (outputMode) {
-      outputSerial();
-    }
   }
+  // React to non-operational state ---------------------------------------------------------------
+  else if (cutStarted  && (millis() - timeLastDebounce) > debounceDelay) {
+    // USER IS NOT IN CONTROL OF DEVICE -> cancel everything
+    // TO-DO: this is where we would initiate a reset after someone is done demoing
+
+    stopStepperX();
+    //readyOrNot = 0;
+    //Serial.println("User not in control!");
+
+    // Z-up
+    raiseZ();
+
+    // Reset
+    cutStarted = 0;
+    readyOrNot = 1;         // retains z workpiece homing, but not xy
+
+    Serial.println("User is no longer in control");
+    timeLastDebug = nanl;            // stop debug printing
+  }
+
+  if (x0_count == 2 && digitalRead(LIMIT_MACH_X0) == LOW) {
+    // If X carriage runs into X limit switch
+    stopStepperX();
+    raiseZ();
+    limitHitX = 1;
+
+    // Reset
+    cutStarted = 0;
+    readyOrNot = 1;         // retains z workpiece homing, but not xy
+    x0_count = 0;           // removes x machine homing
+    
+    Serial.println("X limit reached");
+    timeLastDebug = nanl;            // stop debug printing
+  }
+
+  if (z0_count == 2 && digitalRead(LIMIT_MACH_Z0) == LOW) {
+    // If Z carriage runs into Z limit switch
+    stopStepperZ();
+    limitHitZ = 1;
+
+    // Reset
+    cutStarted = 0;
+    readyOrNot = 1;         // retains z workpiece homing, but not xy
+    z0_count = 0;           // removes z workpiece/machine homing
+    
+    Serial.println("Z limit reached");
+    timeLastDebug = nanl;            // stop debug printing
+  }
+  
+  // Debugging -----------------------------------------------------------------------------------
+  if (debugMode) {
+    debugging();
+  }
+
+  if (outputMode) {
+    outputSerial();
+  }
+
 }
 
 // ------------------------------------------------------------------------------------------------
