@@ -16,6 +16,21 @@ Sensor configuration (USING 3 SENSORS NOW!!):
 Angle signage: +CCW
 */
 
+// State values
+typedef enum State {
+  POWER_ON,
+  MACHINE_X_ZERO,
+  WORKSPACE_Z_ZERO,
+  DESIGN_SELECTED,
+  READY
+} State;
+
+// Coordinate
+typedef struct Point {
+  float x;
+  float y;
+} Point;
+
 // Function definitions
 // Setup functions
 void sensorSetup();
@@ -28,7 +43,9 @@ void circleGenerator();
 int16_t convTwosComp(int16_t value);
 float myDist(float x1, float y1, float x2, float y2);
 float signedDist(float xr, float yr, float xg, float yg, float th);
+float angleFrom(Point a, Point b);
 float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4);
+float desPosClosestToIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4);
 float desiredPosition(float dX,float dY,float theta);
 float mapF(long x, float in_min, float in_max, float out_min, float out_max);
 void readEepromCalibration(float (&cVal)[2][4]);
@@ -42,6 +59,8 @@ void stopStepperZ();
 void machineZeroX();
 void workspaceZeroZ();
 void workspaceZeroXY();
+void ensureToolLowered();
+void ensureToolRaised();
 void raiseZ();
 void lowerZ();
 // Other loop functions
@@ -88,21 +107,6 @@ int sensorPins[3] = {SS0, SS1, SS2};
 // Max path values
 #define MAX_PATHS  4
 #define MAX_POINTS 1000
-
-// State values
-typedef enum State {
-  POWER_ON,
-  MACHINE_X_ZERO,
-  WORKSPACE_Z_ZERO,
-  DESIGN_SELECTED,
-  READY
-} State;
-
-// Coordinate
-typedef struct Point {
-  float x;
-  float y;
-} Point;
 
 // SD pins
 const int chipSelect = BUILTIN_SDCARD;
@@ -233,8 +237,10 @@ const int num_queries = 2;        // number of points to query for min distance 
 
 // Control Variables ----------------------------------------------------------------
 // Path following
-int prev_pnt_ind = 0;
-int goal_pnt_ind = 0;             // index of current goal point
+int current_path_idx = 0;
+int current_point_idx = 0;
+bool path_started = false;
+
 float goalX = 0.0f;               // goal point x coordinate (mm)
 float goalY = 0.0f;               // goal point y coordinate (mm)
 float prevX = 0.0f;               // previous point x coordinate (mm)
@@ -338,7 +344,12 @@ void setup() {
 }
 
 void loop() {
-  // Serial Interface -----------------------------------------------------------------------------
+  // Sensing
+  if(micros() - timeLastPoll >= dt) {
+    doSensing();
+  }
+  
+  // Serial Interface
   if (Serial.available()) {
     char ch = Serial.read();
     if (ch == 'd') {
@@ -350,6 +361,11 @@ void loop() {
   if (state == DESIGN_SELECTED && digitalRead(BUTT_WORK_X0Y0) == LOW) {
     workspaceZeroXY();
     state = READY;
+
+    // Reset cutting path
+    path_started = false;
+    current_path_idx = 0;
+    current_point_idx = 0;
   }
 
   // Break here until we are ready to cut
@@ -357,135 +373,106 @@ void loop() {
     return;
   }
 
-  // Sensing and Control ---------------------------------------------------------------------------
-  if(micros() - timeLastPoll >= dt) {
-    doSensing();
-  }
-
-  // Motor position
-  motorPosX = stepperX.currentPosition() / (float)Conv;
-  // Tool position
-  estPosTool[0] = estPos[0] + motorPosX*cosf(estYaw);
-  estPosTool[1] = estPos[1] + motorPosX*sinf(estYaw);
-
-  // Control ---------------------------------------------------------------------------------
-  if (digitalRead(BUTT_HANDLE) == LOW  && goal_pnt_ind + 1 < num_points &&
-      abs(motorPosX) < (0.5*gantryLength - xBuffer) && !limitHitX) {
-    // If statement makes sure:
-    //    - user has both hands on device (BUTT_HANDLE)
-    //    - the path hasn't finished (num_points)
-    //    - the tool is not colliding with the wall
-    //    - the tool hasn't hit a limit switch (limitHitX)
-
-    // Lower tool
-    if (toolRaised) {
-      lowerZ();
-    }
-
-    // Update states
-    cutStarted = 1;
-    timeLastDebounce = millis();
-    if (isnan(float(timeLastDebug))) {
-      timeLastDebug = millis();
-    }
-
-    // Determine goal point
-    if (signedDist(estPos[0],estPos[1],goalX,goalY,estYaw) > 0) {
-      // TODO: modify this so that it works for multi-pass when needing to move backwards
-      //  - introduce velocity as an input?
-      // If the goal point has been passed
-      goal_pnt_ind++;
-      prevX = goalX;
-      prevY = goalY;
-      goalX = paths[0][goal_pnt_ind].x;      // x coordinate of closest point
-      goalY = paths[0][goal_pnt_ind].y;      // y coordinate of closest point
-    }
-
-    float deltaX = goalX - estPos[0];               // x distance of goal from current router position
-    float deltaY = goalY - estPos[1];               // y distance of goal from current router position
-    
-    // Determine desired actuation
-    desPos = desPosIntersect(estPos[0], estPos[1], estYaw, prevX, prevY, goalX, goalY);
-    if (isnan(desPos)) {
-      // if intersect algorithm gives bad value, go back to OG
-      desPos = desiredPosition(deltaX,deltaY,estYaw);
-      Serial.println("NaN value from interpolation function.");
-    }
-    // desPos = desiredPosition(deltaX,deltaY,estYaw);
-
-    // Velocity control
-    if (!isnan(estTraj)) {
-      desVel = estVelAbs * cosf(estTraj - estYaw) * 1000000;    // unused right now
-    }
-
-    // Motor actuation ---------------------------------------------------------------------------
-    stepperX.moveTo(Conv*desPos);           // actuate tool to desired position
-    //  if (Conv*desVel <= maxVel) {
-    //    myStepper.setMaxSpeed(Conv*desVel);
-    //  }
-    //myStepper.setMaxSpeed(maxVel);
-    if (stepperX.distanceToGo() != 0) {
-      //delay(100);
-      stepperX.run();
-    }
-    
-  }
-  // React to non-operational state ---------------------------------------------------------------
-  else if (cutStarted  && (millis() - timeLastDebounce) > debounceDelay) {
-    // USER IS NOT IN CONTROL OF DEVICE -> cancel everything
-    // TO-DO: this is where we would initiate a reset after someone is done demoing
-
-    stopStepperX();
-    //readyOrNot = 0;
-    //Serial.println("User not in control!");
-
-    // Z-up
-    raiseZ();
-
-    // Reset
-    cutStarted = 0;
-    readyOrNot = 1;         // retains z workpiece homing, but not xy
-
-    Serial.println("User is no longer in control");
-    timeLastDebug = nanl;            // stop debug printing
-  }
-
-  if (x0_count == 2 && digitalRead(LIMIT_MACH_X0) == LOW) {
+  // Safety stuff
+  if (digitalRead(LIMIT_MACH_X0) == LOW) {
     // If X carriage runs into X limit switch
     stopStepperX();
     raiseZ();
-    limitHitX = 1;
-
-    // Reset
-    cutStarted = 0;
-    readyOrNot = 1;         // retains z workpiece homing, but not xy
-    x0_count = 0;           // removes x machine homing
-    
     Serial.println("X limit reached");
-    timeLastDebug = nanl;            // stop debug printing
+
+    // Reset back to design mode
+    DesignModeToggle();
   }
 
-  if (z0_count == 2 && digitalRead(LIMIT_MACH_Z0) == LOW) {
+  if (digitalRead(LIMIT_MACH_Z0) == LOW) {
     // If Z carriage runs into Z limit switch
     stopStepperZ();
-    limitHitZ = 1;
-
-    // Reset
-    cutStarted = 0;
-    readyOrNot = 1;         // retains z workpiece homing, but not xy
-    z0_count = 0;           // removes z workpiece/machine homing
-    
+    stopStepperX();
     Serial.println("Z limit reached");
-    timeLastDebug = nanl;            // stop debug printing
+
+    // Reset back to design mode
+    DesignModeToggle();
   }
   
-  // Debugging -----------------------------------------------------------------------------------
+  // Debugging
   if (debugMode) {
     debugging();
   }
 
+  // Path logging
   if (outputMode) {
     outputSerial();
+  }
+
+  ///////////////////////////////////
+  // START OF ACTUAL CUTTING LOGIC //
+  ///////////////////////////////////
+  Point goal = paths[current_path_idx][current_point_idx];
+  Point next = paths[current_path_idx][current_point_idx + 1];
+
+  // If we have not started the path, and the first point is behind us
+  // keep the tool raised and return. We wait here until the first point
+  // is in front of us and ready to be cut
+  if (!path_started && signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0) {
+    Serial.println("Cutting path starts behind router current position");
+
+    // Move bit closest to intersect with cutting path
+    desPos = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
+    stepperX.moveTo(Conv*desPos);
+    if (stepperX.distanceToGo() != 0) {
+      stepperX.run();
+    }
+
+    return;
+  }
+
+  // If we get here start the path
+  path_started = true;
+
+  // Desired position if we intersect
+  float desPos = desPosIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
+  // Desired position if we do not intersect
+  float desPosClosest = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
+
+  bool handle_buttons_pressed = digitalRead(BUTT_HANDLE) == LOW;
+  bool gantry_intersects = desPos != NAN;
+  bool goal_behind_router = signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
+  bool gantry_angle_ok = angleFrom(goal, next) < PI / 4;
+
+  if (handle_buttons_pressed && gantry_intersects && goal_behind_router && gantry_angle_ok) {
+    // We are good to cut
+    ensureToolLowered();
+    stepperX.moveTo(Conv*desPos);
+    if (stepperX.distanceToGo() != 0) {
+      stepperX.run();
+    }
+
+    // Update point index if needed
+    if (signedDist(estPos[0], estPos[1], next.x, next.y, estYaw) > 0) {
+      // If next point is behind router, it becomes the new goal.
+      current_point_idx += 1;
+
+      // If we're at the end of the points, stop cutting so we can start the next path
+      if (current_point_idx == num_points-1) {
+        Serial.println("Current path finished.");
+        ensureToolRaised();
+        current_point_idx = 0;
+        current_path_idx += 1;
+
+        // If we're done all paths then go back to design mode.
+        if (current_path_idx == num_paths) {
+          Serial.println("All paths finished.");
+          DesignModeToggle();
+        }
+      }
+    }
+  } else {
+    // Stop cutting
+    ensureToolRaised();
+    stepperX.moveTo(Conv*desPosClosest);
+    if (stepperX.distanceToGo() != 0) {
+      stepperX.run();
+    }
   }
 }
 
@@ -664,6 +651,34 @@ float myDist(float x1, float y1, float x2, float y2) {
   return sqrt(pow(x1 - x2,2) + pow(y1 - y2,2));
 }
 
+float clamp(float val, float min, float max) {
+  if (val < min) {
+    return min;
+  }
+
+  if (val > max) {
+    return max;
+  }
+
+  return val;
+}
+
+// Returns x mapped between 0 and PI. This assumes that
+// the line is infinite, so angle may be 180 degrees
+// different from the original value x.
+// Ex: 3 PI/2 -> PI/2
+float principalAngleRad(float x) {
+  while (x > PI) {
+    x -= PI;
+  }
+
+  while (x < 0) {
+    x += PI;
+  }
+
+  return x;
+}
+
 float signedDist(float xr, float yr, float xg, float yg, float th) {
   // Calculate the signed distance between goal point and line of gantry
   // Note: if the distance is:
@@ -679,10 +694,26 @@ float signedDist(float xr, float yr, float xg, float yg, float th) {
   return (A*xg + B*yg + C)/sqrt(pow(A,2) + pow(B,2));
 }
 
-float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4) {
-  // Determine where two lines intersect (one line will always be the gantry, made by xc, yc, and th)
-  // TODO: if this doesn't work, compare distance between router and goal point and interpolate based off of that
+// Returns the angle (rads) between the gantry and the 
+// line connecting points a and b.
+float angleFrom(Point a, Point b) {
+  float th1 = principalAngleRad(atan2f(b.y-a.y, b.x-a.x));
 
+  // Using yaw here is a bit odd, since yaw is 0 when the router is in the
+  // original orientation, which would actually be 90 degrees from +x. However,
+  // we actually care about the angle of the gantry, which will be 0 degrees from +x
+  // when the yaw is 0, so this works ok.
+  float th2 = principalAngleRad(estYaw);
+
+  return abs(th1-th2);
+}
+
+// desPosIntersect returns the desired stepperX position such that the 
+// cutting tool intersects the infinite line from (x3,y3) to (x4,y4).
+// If the gantry does not intersect the line, this returns NAN.
+// (x,y) is the current position of the router, and th is the yaw.
+float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4) {
+  // https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment
   float x1 = xc - (cosf(th)*gantryLength/2);
   float y1 = yc - (sinf(th)*gantryLength/2);
   float x2 = xc + (cosf(th)*gantryLength/2);
@@ -695,14 +726,14 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
     return NAN;
   }
 
-  // TODO: look at approach where if lines don't intersect
   float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
   float u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
-  // Check if the intersection point is on the line segments
-  // if (t < 0 || t > 1 || u < 0 || u > 1) {
-  //   Serial.println("Intersection point is not on the line segments.");
-  //   return NAN;     // TO-DO: do other stuff like stopping motor
-  // }
+  
+  // Check if the intersection point is on the gantry.
+  if (t < 0 || t > 1) {
+    Serial.println("Gantry does not intersect the line segment.");
+    return NAN;
+  }
   
   float x = x1 + t * (x2 - x1);
   float y = y1 + t * (y2 - y1);
@@ -710,12 +741,42 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
   float dx = x - xc;
   float dy = y - yc;
 
-//  float pointDes[2];
-//  pointDes[0] = (((x1*y2 - y1*x2)*(x3 - x4)) - ((x1 - x2)*(x3*y4 - y3*x4)))/den;
-//  pointDes[1] = (((x1*y2 - y1*x2)*(y3 - y4)) - ((y1 - y2)*(x3*y4 - y3*x4)))/den;
-
-  // return desiredPosition(dx, dy, th);
   return dx*cosf(th) + dy*sinf(th);
+}
+
+// desPosIntersect returns the desired stepperX position such that the 
+// cutting tool intersects the infinite line from (x3,y3) to (x4,y4).
+// If the gantry does not intersect the line, this returns the position
+// that gets the tool closest to intersecting the line.
+// (x,y) is the current position of the router, and th is the yaw.
+float desPosClosestToIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4) {
+  // https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment
+  float x1 = xc - (cosf(th)*gantryLength/2);
+  float y1 = yc - (sinf(th)*gantryLength/2);
+  float x2 = xc + (cosf(th)*gantryLength/2);
+  float y2 = yc + (sinf(th)*gantryLength/2);
+  float den = (x1 - x2)*(y3 - y4) - (y1 - y2)*(x3 - x4);
+
+  // Check for parallel lines (denominator is zero)
+  if (den == 0) {
+    Serial.println("Lines are parallel, no intersection point.");
+    // If lines are parallel, just keep the stepper where it is
+    return stepperX.currentPosition() / Conv;
+  }
+
+  float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+  float u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
+  
+  float x = x1 + t * (x2 - x1);
+  float y = y1 + t * (y2 - y1);
+
+  float dx = x - xc;
+  float dy = y - yc;
+
+  float desiredPos = dx*cosf(th) + dy*sinf(th);
+  float maxPos = gantryLength - xBuffer;
+
+  return clamp(desiredPos, -maxPos, maxPos);
 }
 
 float desiredPosition(float dX,float dY,float theta) {
@@ -915,13 +976,24 @@ void workspaceZeroXY() {
   estPosTool[1] = 0;
 }
 
-void raiseZ() {
-  // Raise tool to top of gantry
+void ensureToolLowered() {
+  if (toolRaised) {
+    lowerZ();
+  }
+}
 
-  stepperZ.moveTo(Conv*(maxHeight - 1));
+void ensureToolRaised() {
+  if (!toolRaised) {
+    raiseZ();
+  }
+}
+
+void raiseZ() {
+  stepperZ.moveTo(Conv*restHeight);
   while (stepperZ.distanceToGo() != 0) {
     stepperZ.run();
   }
+
   toolRaised = 1;
 }
 
