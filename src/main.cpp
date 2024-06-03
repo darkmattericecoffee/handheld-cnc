@@ -358,8 +358,6 @@ void loop() {
     return;
   }
 
-
-
   // Sensing and Control ---------------------------------------------------------------------------
   if(micros() - timeLastPoll >= dt) {
     doSensing();
@@ -581,7 +579,7 @@ void doubleLineGenerator() {
   for (int i=0; i<MAX_POINTS; i++) {
     float scale = (float)i / num_points - 1;
     paths[0][i] = Point{x: -20.0, y: pathMax_y * scale};
-    paths[1][i] = Point{x: 20.0, y: pathMax_y * (1- scale)};
+    paths[1][i] = Point{x: 20.0, y: pathMax_y * (1 - scale)};
   }
 
   num_paths = 2;
