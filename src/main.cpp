@@ -338,6 +338,7 @@ void setup() {
     }
   }
   Serial.println("Workspace Z zeroed!");
+  Serial.println(maxHeight);
 
   // Pick a design
   DesignModeToggle();
