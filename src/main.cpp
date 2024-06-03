@@ -366,6 +366,8 @@ void loop() {
     path_started = false;
     current_path_idx = 0;
     current_point_idx = 0;
+  } else if (state == DESIGN_SELECTED) { // TODO: Remove this `else if` block
+    Serial.println("Waiting for workspace XY zeroing");
   }
 
   // Break here until we are ready to cut
@@ -440,6 +442,8 @@ void loop() {
   bool gantry_angle_ok = angleFrom(goal, next) < PI / 4;
 
   if (handle_buttons_pressed && gantry_intersects && goal_behind_router && gantry_angle_ok) {
+    Serial.println("Cutting");
+
     // We are good to cut
     ensureToolLowered();
     stepperX.moveTo(Conv*desPos);
@@ -451,22 +455,25 @@ void loop() {
     if (signedDist(estPos[0], estPos[1], next.x, next.y, estYaw) > 0) {
       // If next point is behind router, it becomes the new goal.
       current_point_idx += 1;
+      Serial.println("Moving to next point");
 
       // If we're at the end of the points, stop cutting so we can start the next path
       if (current_point_idx == num_points-1) {
-        Serial.println("Current path finished.");
+        Serial.println("Current path finished");
         ensureToolRaised();
         current_point_idx = 0;
         current_path_idx += 1;
 
         // If we're done all paths then go back to design mode.
         if (current_path_idx == num_paths) {
-          Serial.println("All paths finished.");
+          Serial.println("All paths finished");
           DesignModeToggle();
         }
       }
     }
   } else {
+    Serial.println("Cutting Stopped");
+    
     // Stop cutting
     ensureToolRaised();
     stepperX.moveTo(Conv*desPosClosest);
