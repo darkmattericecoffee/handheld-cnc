@@ -1128,6 +1128,10 @@ void makePath() {
     case 5:
       zigZagGenerator();
       break;
+    case 6:
+      doubleLineGenerator();
+      Serial.println("Double line path generated!");
+      break;
   }
 
   for (int i=0; i < num_paths; i++) {
