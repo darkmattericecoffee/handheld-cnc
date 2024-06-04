@@ -118,8 +118,8 @@ const int eepromAddrCy = 12;
 
 // Modes
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
-int debugMode = 1;            // print values (1 = yes; 0 = no)
-int outputMode = 1;           // output data to serial
+int debugMode = 0;            // print values (1 = yes; 0 = no)
+int outputMode = 0;           // output data to serial
 int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
 
 // Path properties
@@ -265,6 +265,8 @@ TMC2209Stepper driverZ(&SERIAL_PORT_Z, R_SENSE, DRIVER_ADDRESS);
 
 // Router state
 State state = POWER_ON;
+bool cutting = false; // TODO: delete me
+bool prevChecks[4]; // TODO: delete me
 
 // -------------------------------------------------------------------------------------------------
 // Setup and Main Loop -----------------------------------------------------------------------------
@@ -323,6 +325,7 @@ void setup() {
   Serial.println("Waiting for machine X to be zeroed...");
   while (state != MACHINE_X_ZERO) {
     if(digitalRead(BUTT_MACH_X0) == LOW) {
+      Serial.println("Zeroing machine x:");
       machineZeroX();
       state = MACHINE_X_ZERO;
     }
@@ -367,8 +370,6 @@ void loop() {
     path_started = false;
     current_path_idx = 0;
     current_point_idx = 0;
-  } else if (state == DESIGN_SELECTED) { // TODO: Remove this `else if` block
-    Serial.println("Waiting for workspace XY zeroing");
   }
 
   // Break here until we are ready to cut
@@ -438,12 +439,38 @@ void loop() {
   float desPosClosest = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
 
   bool handle_buttons_pressed = digitalRead(BUTT_HANDLE) == LOW;
+  bool handle_buttons_debounce = (millis() - timeLastDebounce) < debounceDelay;
+  if (handle_buttons_pressed) {
+    timeLastDebounce = millis();
+  }
+
+  bool handle_buttons_ok = handle_buttons_pressed || handle_buttons_debounce;
   bool gantry_intersects = desPos != NAN;
   bool goal_behind_router = signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
-  bool gantry_angle_ok = angleFrom(goal, next) < PI / 4;
+  bool gantry_angle_ok = angleFrom(goal, next) > PI / 4;
 
-  if (handle_buttons_pressed && gantry_intersects && goal_behind_router && gantry_angle_ok) {
-    Serial.println("Cutting");
+  // TODO: delete me
+  bool newChecks[4] = {handle_buttons_ok, gantry_intersects, goal_behind_router, gantry_angle_ok};
+  bool logged = false;
+  for (int i=0; i<4; i++) {
+    if (prevChecks[i] != newChecks[i] && !logged) {
+      Serial.println("Checks have changed:");
+      Serial.printf("\thandle_buttons_ok: %d\n", handle_buttons_ok);
+      Serial.printf("\tgantry_intersects: %d\n", gantry_intersects);
+      Serial.printf("\tgoal_behind_router: %d\n", goal_behind_router);
+      Serial.printf("\tgantry_angle_ok: %d\n", gantry_angle_ok);
+
+      logged = true;
+    }
+
+    prevChecks[i] = newChecks[i];
+  }
+
+  if (handle_buttons_ok && gantry_intersects && goal_behind_router && gantry_angle_ok) {
+    if (!cutting) {
+      Serial.println("Cutting");
+      cutting = true;
+    }
 
     // We are good to cut
     ensureToolLowered();
@@ -474,7 +501,10 @@ void loop() {
       }
     }
   } else {
-    Serial.println("Cutting Stopped");
+    if (cutting) {
+      Serial.println("Cutting Stopped");
+      cutting = false;
+    }
     
     // Stop cutting
     ensureToolRaised();
@@ -569,11 +599,13 @@ void driverSetup() {
 }
 
 void doubleLineGenerator() {
-  // One line going up at x = -5 and one line going down at x = 5
+  // One line going up at x = -20 and one line going down at x = 20
+  float length = 100.0;
+
   for (int i=0; i<MAX_POINTS; i++) {
-    float scale = (float)i / num_points - 1;
-    paths[0][i] = Point{x: -20.0, y: pathMax_y * scale};
-    paths[1][i] = Point{x: 20.0, y: pathMax_y * (1 - scale)};
+    float scale = (float)i / (MAX_POINTS - 1);
+    paths[0][i] = Point{x: -20.0, y: length * scale};
+    paths[1][i] = Point{x: 20.0, y: length * (1 - scale)};
   }
 
   num_paths = 2;
@@ -731,7 +763,6 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
 
   // Check for parallel lines (denominator is zero)
   if (den == 0) {
-    Serial.println("Lines are parallel, no intersection point.");
     return NAN;
   }
 
@@ -740,7 +771,6 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
   
   // Check if the intersection point is on the gantry.
   if (t < 0 || t > 1) {
-    Serial.println("Gantry does not intersect the line segment.");
     return NAN;
   }
   
@@ -768,7 +798,6 @@ float desPosClosestToIntersect(float xc, float yc, float th, float x3, float y3,
 
   // Check for parallel lines (denominator is zero)
   if (den == 0) {
-    Serial.println("Lines are parallel, no intersection point.");
     // If lines are parallel, just keep the stepper where it is
     return stepperX.currentPosition() / Conv;
   }
@@ -783,7 +812,7 @@ float desPosClosestToIntersect(float xc, float yc, float th, float x3, float y3,
   float dy = y - yc;
 
   float desiredPos = dx*cosf(th) + dy*sinf(th);
-  float maxPos = gantryLength - xBuffer;
+  float maxPos = (gantryLength / 2.0) - xBuffer;
 
   return clamp(desiredPos, -maxPos, maxPos);
 }
@@ -1009,7 +1038,7 @@ void raiseZ() {
 void lowerZ() {
   // Lower tool
 
-  int sensorVal = analogRead(POT_THICK);
+  int sensorVal = analogRead(POT_THICK);      // TODO: remove and implement into UI inste
   matThickness = mapF(sensorVal, 0, 1024, 0, maxThickness);
 
   stepperZ.moveTo(-Conv*matThickness);
