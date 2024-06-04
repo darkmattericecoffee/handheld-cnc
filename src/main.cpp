@@ -462,6 +462,7 @@ void loop() {
       if (current_point_idx == num_points-1) {
         Serial.println("Current path finished");
         ensureToolRaised();
+        path_started = false;
         current_point_idx = 0;
         current_path_idx += 1;
 
