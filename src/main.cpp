@@ -42,6 +42,8 @@ void circleGenerator();
 // Math functions
 int16_t convTwosComp(int16_t value);
 float myDist(float x1, float y1, float x2, float y2);
+float clamp(float val, float min, float max);
+float principalAngleRad(float x);
 float signedDist(float xr, float yr, float xg, float yg, float th);
 float angleFrom(Point a, Point b);
 float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4);
@@ -62,7 +64,7 @@ void workspaceZeroXY();
 // Other loop functions
 void sensorPlotting();
 void debugging();
-void outputSerial();
+void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting);
 void parseNC(const char* filename);
 void makePath();
 void DesignModeToggle();
@@ -116,7 +118,7 @@ const int eepromAddrCy = 12;
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 0;            // print values (1 = yes; 0 = no)
 int outputMode = 0;           // output data to serial
-int designMode = 0;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
+int designMode = 6;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
 
 // Path properties
 int num_paths = 0;  // The actual number of paths
@@ -370,8 +372,8 @@ void loop() {
     current_point_idx = 0;
 
     // Calculate material thickness
-    int sensorVal = analogRead(POT_THICK);      // TODO: remove and implement into UI inste
-    matThickness = mapF(sensorVal, 0, 1024, 0, maxThickness);
+    int sensorVal = analogRead(POT_THICK);      // TODO: remove and implement into UI instead
+    // matThickness = mapF(sensorVal, 0, 1024, 0, maxThickness); // FIXME: Hardcoded to 0 for now
   }
 
   // Break here until we are ready to cut
@@ -408,11 +410,6 @@ void loop() {
     debugging();
   }
 
-  // Path logging
-  if (outputMode) {
-    outputSerial();
-  }
-
   ///////////////////////////////////
   // START OF ACTUAL CUTTING LOGIC //
   ///////////////////////////////////
@@ -423,10 +420,15 @@ void loop() {
   // keep the tool raised and return. We wait here until the first point
   // is in front of us and ready to be cut
   if (!path_started && signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0) {
-    Serial.println("Cutting path starts behind router current position");
+    // Serial.println("Cutting path starts behind router current position");
 
     // Move bit closest to intersect with cutting path
     float desPos = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
+
+    if (outputMode) {
+      outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()/Conv, desPos, false);
+    }
+
     stepperX.moveTo(Conv*desPos);
 
     return;
@@ -469,6 +471,11 @@ void loop() {
   }
 
   if (handle_buttons_ok && gantry_intersects && goal_behind_router && gantry_angle_ok) {
+    // Path logging
+    if (outputMode) {
+      outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()/Conv, desPos, true);
+    }
+
     if (!cutting) {
       Serial.println("Cutting");
       cutting = true;
@@ -500,6 +507,11 @@ void loop() {
       }
     }
   } else {
+    // Path logging
+    if (outputMode) {
+      outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()/Conv, desPosClosest, false);
+    }
+
     if (cutting) {
       Serial.println("Cutting Stopped");
       cutting = false;
@@ -534,16 +546,16 @@ void motorSetup() {
   // Initialize pins
   // pinMode(MS1_X, OUTPUT);
   // pinMode(MS2_X, OUTPUT);
-  pinMode(MS1_Z, OUTPUT);
-  pinMode(MS2_Z, OUTPUT);
+  // pinMode(MS1_Z, OUTPUT);
+  // pinMode(MS2_Z, OUTPUT);
   pinMode(MOT_EN_X, OUTPUT);
   pinMode(MOT_EN_Z, OUTPUT);
 
   // Initialize microstep
   // digitalWrite(MS1_X, LOW);
   // digitalWrite(MS2_X, LOW);
-  digitalWrite(MS1_Z, LOW);
-  digitalWrite(MS2_Z, LOW);
+  // digitalWrite(MS1_Z, LOW);
+  // digitalWrite(MS2_Z, LOW);
 
   // Enable motors (Mark Rober disables steppers initially..?)
   digitalWrite(MOT_EN_X, LOW);
@@ -1040,18 +1052,30 @@ void debugging() {
   }
 }
 
-void outputSerial() {
+// toolPos and desPos in mm
+void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting) {
   if(millis() - timeLastOutput >= dtOutput) {
     timeLastOutput = millis();
 
-    // Starting label
-    Serial.print("POS:");
+    float toolX = estX + toolPos*cosf(estYaw);
+    float toolY = estY + toolPos*sinf(estYaw);
 
-    // Data to output
-    Serial.printf("%f,%f,%f,%f,%f",estPos[0],estPos[1],estYaw,estPosTool[0],estPosTool[1]);
-    Serial.printf(",%f,%f,%f",goalX,goalY,cutStarted);
+    float desX = estX + desPos*cosf(estYaw);
+    float desY = estY + desPos*sinf(estYaw);
 
-    Serial.println();
+    Serial.printf(
+      "POS:%f,%f,%f,%f,%f,%f,%f,%f,%f,%d\n",
+      estX,
+      estY,
+      estYaw,
+      goal.x,
+      goal.y,
+      toolX,
+      toolY,
+      desX,
+      desY,
+      cutting
+    );
   }
 }
 
@@ -1123,29 +1147,31 @@ void makePath() {
   for (int i=0; i < num_paths; i++) {
     for (int j = 0; j < num_points; j++) {
         // TODO: do for any size pathArray
-        Serial.printf("PATH %d:%f,%f\n", i, paths[i][j].x, paths[i][j].y);
+        Serial.printf("PATH:%d,%f,%f\n", i, paths[i][j].x, paths[i][j].y);
       }
   }
 }
 
 void DesignModeToggle() {
   Serial.println("Start Design Mode Toggle");
-  
-  // Clear the serial buffer
-  while (Serial.available()) {
-    Serial.read();
+
+  if (!outputMode) {
+    // Clear the serial buffer
+    while (Serial.available()) {
+      Serial.read();
+    }
+    
+    while (!Serial.available()) {
+      // Wait until there is data available in the serial buffer
+    }
+    
+    int receivedNum = Serial.parseInt();
+    
+    Serial.print("Received num: ");
+    Serial.println(receivedNum);
+    
+    designMode = receivedNum;
   }
-  
-  while (!Serial.available()) {
-    // Wait until there is data available in the serial buffer
-  }
-  
-  int receivedNum = Serial.parseInt();
-  
-  Serial.print("Received num: ");
-  Serial.println(receivedNum);
-  
-  designMode = receivedNum;
   
   makePath();
   
