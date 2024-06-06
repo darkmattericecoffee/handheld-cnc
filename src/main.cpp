@@ -59,10 +59,6 @@ void stopStepperZ();
 void machineZeroX();
 void workspaceZeroZ();
 void workspaceZeroXY();
-void ensureToolLowered();
-void ensureToolRaised();
-void raiseZ();
-void lowerZ();
 // Other loop functions
 void sensorPlotting();
 void debugging();
@@ -247,8 +243,6 @@ float prevX = 0.0f;               // previous point x coordinate (mm)
 float prevY = 0.0f;               // previous point y coordinate (mm)
 
 // Motor control variables
-float desPos = 0.0f;              // desired position of tool (mm - 0 is center of gantry)
-float desVel = 0.0f;              // desired velocity of tool (mm/s)
 
 // Object Initialization ------------------------------------------------------------
 // Sensor object creation
@@ -352,6 +346,10 @@ void loop() {
   if(micros() - timeLastPoll >= dt) {
     doSensing();
   }
+
+  // Run steppers
+  stepperX.run();
+  stepperZ.run();
   
   // Serial Interface
   if (Serial.available()) {
@@ -370,6 +368,10 @@ void loop() {
     path_started = false;
     current_path_idx = 0;
     current_point_idx = 0;
+
+    // Calculate material thickness
+    int sensorVal = analogRead(POT_THICK);      // TODO: remove and implement into UI inste
+    matThickness = mapF(sensorVal, 0, 1024, 0, maxThickness);
   }
 
   // Break here until we are ready to cut
@@ -381,7 +383,10 @@ void loop() {
   if (digitalRead(LIMIT_MACH_X0) == LOW) {
     // If X carriage runs into X limit switch
     stopStepperX();
-    raiseZ();
+    stepperZ.moveTo(Conv*restHeight);
+    while (stepperZ.distanceToGo() != 0) {
+      stepperZ.run();
+    }
     Serial.println("X limit reached");
 
     // Reset back to design mode
@@ -421,11 +426,8 @@ void loop() {
     Serial.println("Cutting path starts behind router current position");
 
     // Move bit closest to intersect with cutting path
-    desPos = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
+    float desPos = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
     stepperX.moveTo(Conv*desPos);
-    if (stepperX.distanceToGo() != 0) {
-      stepperX.run();
-    }
 
     return;
   }
@@ -473,11 +475,8 @@ void loop() {
     }
 
     // We are good to cut
-    ensureToolLowered();
+    stepperZ.moveTo(-Conv*matThickness);
     stepperX.moveTo(Conv*desPos);
-    if (stepperX.distanceToGo() != 0) {
-      stepperX.run();
-    }
 
     // Update point index if needed
     if (signedDist(estPos[0], estPos[1], next.x, next.y, estYaw) > 0) {
@@ -488,7 +487,7 @@ void loop() {
       // If we're at the end of the points, stop cutting so we can start the next path
       if (current_point_idx == num_points-1) {
         Serial.println("Current path finished");
-        ensureToolRaised();
+        stepperZ.moveTo(Conv*restHeight);
         path_started = false;
         current_point_idx = 0;
         current_path_idx += 1;
@@ -507,11 +506,8 @@ void loop() {
     }
     
     // Stop cutting
-    ensureToolRaised();
+    stepperZ.moveTo(Conv*restHeight);
     stepperX.moveTo(Conv*desPosClosest);
-    if (stepperX.distanceToGo() != 0) {
-      stepperX.run();
-    }
   }
 }
 
@@ -1012,46 +1008,6 @@ void workspaceZeroXY() {
   estYaw = 0;
   estPosTool[0] = 0;
   estPosTool[1] = 0;
-}
-
-void ensureToolLowered() {
-  if (toolRaised) {
-    lowerZ();
-  }
-}
-
-void ensureToolRaised() {
-  if (!toolRaised) {
-    raiseZ();
-  }
-}
-
-void raiseZ() {
-  stepperZ.moveTo(Conv*restHeight);
-  while (stepperZ.distanceToGo() != 0) {
-    stepperZ.run();
-  }
-
-  toolRaised = 1;
-}
-
-void lowerZ() {
-  // Lower tool
-
-  int sensorVal = analogRead(POT_THICK);      // TODO: remove and implement into UI inste
-  matThickness = mapF(sensorVal, 0, 1024, 0, maxThickness);
-
-  stepperZ.moveTo(-Conv*matThickness);
-  while (abs(stepperZ.distanceToGo()) > (Conv*1)) {
-    stepperZ.run();
-  }
-  stepperZ.setMaxSpeed(speed_x1);             // initial speed faster now
-  while (stepperZ.distanceToGo() !=0) {
-    stepperZ.run();
-  }
-  stepperZ.setMaxSpeed(speed_x0);
-  
-  toolRaised = 0;
 }
 
 void sensorPlotting() {
