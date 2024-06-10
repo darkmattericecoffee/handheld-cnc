@@ -139,6 +139,7 @@ int designMode = 6;           // choose the design - from hardcode (line = 0; si
 int num_paths = 0;  // The actual number of paths
 int num_points = 0; // The actual number of points
 Point paths[MAX_PATHS][MAX_POINTS];
+int pathDir[MAX_PATHS] = {1,1,1,1};
 
 // Path properties (sine wave)
 const float sinAmp = 5.0;
@@ -174,8 +175,8 @@ int uSteps = 4;                       // microstep configuration
 int Conv = 25*uSteps;                 // conversion factor (mm -> steps)
 float stepPulseWidth = 20.0;          // min pulse width (from Mark Rober's code)
 float maxCurrent_RMS = 640.0;         // motor RMS current rating (mOhm)
-// float maxVel = 6400.0;                // max velocity motor can move at (step/s)
-float maxVel = 80.0*Conv;                // max velocity motor can move at (step/s)
+float maxSpeedX = 80.0*Conv;                // max velocity X motor can move at (step/s)
+float maxSpeedZ = 20.0*Conv;                // max velocity Z motor can move at (step/s)
 float maxAccel = 1600.0*Conv;             // max acceleration (step/s^2)
 float retract = 5;                    // distance to retract (mm)
 float speed_x0 = 20.0 * Conv;             // x zeroing speed (step/s)
@@ -434,7 +435,7 @@ void loop() {
   // If we have not started the path, and the first point is behind us
   // keep the tool raised and return. We wait here until the first point
   // is in front of us and ready to be cut
-  if (!path_started && signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0) {
+  if (!path_started && pathDir[current_path_idx] * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0) {
     // Serial.println("Cutting path starts behind router current position");
 
     // Move bit closest to intersect with cutting path
@@ -463,7 +464,7 @@ void loop() {
   if (handle_buttons_pressed) { timeLastDebounce = millis(); }
   bool handle_buttons_ok = handle_buttons_pressed || handle_buttons_debounce;
   bool gantry_intersects = desPos != NAN;
-  bool goal_behind_router = signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
+  bool goal_behind_router = pathDir[current_path_idx] * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
   bool gantry_angle_ok = angleFrom(goal, next) > PI / 4;
 
   // TODO: delete me
@@ -499,7 +500,7 @@ void loop() {
     stepperX.moveTo(Conv*desPos);
 
     // Update point index if needed
-    if (signedDist(estPos[0], estPos[1], next.x, next.y, estYaw) > 0) {
+    if (pathDir[current_path_idx] * signedDist(estPos[0], estPos[1], next.x, next.y, estYaw) > 0) {
       // If next point is behind router, it becomes the new goal.
       current_point_idx += 1;
       // Serial.println("Moving to next point");
@@ -622,20 +623,6 @@ void driverSetup() {
   driverZ.en_spreadCycle(false);   // false = StealthChop / true = SpreadCycle
 }
 
-void doubleLineGenerator() {
-  // One line going up at x = -20 and one line going down at x = 20
-  float length = 100.0;
-
-  for (int i=0; i<MAX_POINTS; i++) {
-    float scale = (float)i / (MAX_POINTS - 1);
-    paths[0][i] = Point{x: -20.0, y: length * scale};
-    paths[1][i] = Point{x: 20.0, y: length * scale};
-  }
-
-  num_paths = 2;
-  num_points = MAX_POINTS;
-}
-
 void lineGenerator() {
   // Generate line path to cut
   for (int i = 0; i < MAX_POINTS; i++) {
@@ -644,6 +631,48 @@ void lineGenerator() {
 
   num_paths = 1;
   num_points = MAX_POINTS;
+}
+
+void doubleLineGenerator() {
+  // One line going up at x = -20 and one line going down at x = 20
+  float length = 100.0;
+
+  for (int i=0; i<MAX_POINTS; i++) {
+    float scale = (float)i / (MAX_POINTS - 1);
+    paths[0][i] = Point{x: -20.0, y: length * scale};
+    paths[1][i] = Point{x: 20.0, y: length * (1 - scale)};
+  }
+
+  pathDir[0] = 1;
+  pathDir[1] = -1;
+
+  num_paths = 2;
+  num_points = MAX_POINTS;
+}
+
+void diamondGenerator2() {
+  float angle = 60;
+  float angle_rad = angle * (M_PI / 180.0);
+  float segment_length = 100.0;
+
+  // Calculate the x and y increments based on the angle
+  float y_increment = segment_length / (MAX_POINTS - 1);
+  float x_increment = y_increment / tan(angle_rad);
+
+  // Generate line path to cut
+  for (int i = 0; i < MAX_POINTS / 2; i++) {
+    paths[0][i] = Point{x: i * x_increment, y: i * y_increment};
+  }
+  for (int i = MAX_POINTS / 2; i < MAX_POINTS; i++) {
+    paths[0][i] = Point{x: (MAX_POINTS - 1 - i) * x_increment, y: i * y_increment};
+  }
+
+  num_paths = 1;
+  num_points = MAX_POINTS;
+}
+
+void diamondGenerator4() {
+
 }
 
 void sinGenerator() {
@@ -671,6 +700,36 @@ void circleGenerator() {
   }
 
   num_paths = 1;
+  num_points = MAX_POINTS;
+}
+
+// Makes a 4 path circle with the given configuration:
+//  
+void circleGenerator4() {
+  float radius = 30.0;
+  float angle_step = 2.0 * PI / MAX_POINTS;
+  float angle;
+  float last_angle = 0.0;
+  float x;
+  float y;
+  int pathOrder[4] = {3,1,2,0};        // indices of path, according to CCW rotation from 0
+  pathDir[0] = 1;
+  pathDir[1] = -1;
+  pathDir[2] = 1;
+  pathDir[3] = -1;
+
+  for (int p = 0; p < 4; p++) {
+    for (int i = 0; i < MAX_POINTS; i++) {
+      // TODO: flip direction of path for backwards cuts
+      angle = last_angle + (i * angle_step);
+      x = radius * cosf(angle);
+      y = 20.0 + radius + (radius * sinf(angle));
+      paths[pathOrder[p]][i] = Point{x, y};
+    }
+    last_angle = angle;
+  }
+
+  num_paths = 4;
   num_points = MAX_POINTS;
 }
 
@@ -974,7 +1033,7 @@ void machineZeroX() {
   stepperX.setCurrentPosition(0);
 
   // Reset speed and accel settings
-  stepperX.setMaxSpeed(maxVel);
+  stepperX.setMaxSpeed(maxSpeedX);
   stepperX.setAcceleration(maxAccel);
 }
 
@@ -1014,7 +1073,7 @@ void workspaceZeroZ() {
   }
 
   // Reset max speed
-  stepperZ.setMaxSpeed(speed_x0);
+  stepperZ.setMaxSpeed(maxSpeedZ);
 }
 
 void workspaceZeroXY() {
@@ -1157,6 +1216,10 @@ void makePath() {
     case 6:
       doubleLineGenerator();
       Serial.println("Double line path generated!");
+      break;
+    case 7:
+      diamondGenerator2();
+      Serial.println("Diamond path generated!");
       break;
   }
 
