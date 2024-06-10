@@ -5,6 +5,13 @@
 #include <EEPROM.h>
 #include <SPI.h>
 #include <SD.h>
+// #include <Adafruit_GFX.h>
+// #include <Adafruit_GC9A01A.h>
+// #include <EncoderButton.h>
+// #include <fonts/FreeMonoBold12pt7b.h>
+// #include <fonts/FreeMonoBold9pt7b.h>
+// #include <fonts/FreeMono12pt7b.h>
+// #include <fonts/FreeMono9pt7b.h>
 
 /*
 Sensor configuration (USING 3 SENSORS NOW!!):
@@ -85,6 +92,9 @@ int sensorPins[3] = {SS0, SS1, SS2};
 #define BUTT_WORK_Z0    5
 #define BUTT_HANDLE     7
 #define POT_THICK       26
+#define BUTT_ENC        3
+#define ENC_A           21
+#define ENC_B           22
 
 // Motor Pins
 #define MS1_X       17
@@ -97,6 +107,11 @@ int sensorPins[3] = {SS0, SS1, SS2};
 #define MOT_EN_Z    41
 #define MOT_DIR_Z   36
 #define MOT_STEP_Z  33
+
+// LCD Pins
+#define TFT_CS     31
+// #define TFT_RST    9  // Or set to -1 and connect to Arduino RESET pin
+#define TFT_DC     20
 
 // Driver pins
 #define SERIAL_PORT_X         Serial7     // HardwareSerial port
@@ -116,7 +131,7 @@ const int eepromAddrCy = 12;
 
 // Modes
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
-int debugMode = 0;            // print values (1 = yes; 0 = no)
+int debugMode = 1;            // print values (1 = yes; 0 = no)
 int outputMode = 0;           // output data to serial
 int designMode = 6;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
 
@@ -343,7 +358,7 @@ void setup() {
   DesignModeToggle();
 }
 
-void loop() {
+void loop() {  
   // Sensing
   if(micros() - timeLastPoll >= dt) {
     doSensing();
@@ -352,7 +367,7 @@ void loop() {
   // Run steppers
   stepperX.run();
   stepperZ.run();
-  
+
   // Serial Interface
   if (Serial.available()) {
     char ch = Serial.read();
@@ -442,12 +457,10 @@ void loop() {
   // Desired position if we do not intersect
   float desPosClosest = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
 
+  // Conditions for cutting
   bool handle_buttons_pressed = digitalRead(BUTT_HANDLE) == LOW;
   bool handle_buttons_debounce = (millis() - timeLastDebounce) < debounceDelay;
-  if (handle_buttons_pressed) {
-    timeLastDebounce = millis();
-  }
-
+  if (handle_buttons_pressed) { timeLastDebounce = millis(); }
   bool handle_buttons_ok = handle_buttons_pressed || handle_buttons_debounce;
   bool gantry_intersects = desPos != NAN;
   bool goal_behind_router = signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
@@ -489,7 +502,7 @@ void loop() {
     if (signedDist(estPos[0], estPos[1], next.x, next.y, estYaw) > 0) {
       // If next point is behind router, it becomes the new goal.
       current_point_idx += 1;
-      Serial.println("Moving to next point");
+      // Serial.println("Moving to next point");
 
       // If we're at the end of the points, stop cutting so we can start the next path
       if (current_point_idx == num_points-1) {
@@ -501,6 +514,9 @@ void loop() {
 
         // If we're done all paths then go back to design mode.
         if (current_path_idx == num_paths) {
+          while (stepperZ.distanceToGo() != 0) {
+            stepperZ.run();           // make sure tool is raised after path is finished
+          }
           Serial.println("All paths finished");
           DesignModeToggle();
         }
@@ -613,7 +629,7 @@ void doubleLineGenerator() {
   for (int i=0; i<MAX_POINTS; i++) {
     float scale = (float)i / (MAX_POINTS - 1);
     paths[0][i] = Point{x: -20.0, y: length * scale};
-    paths[1][i] = Point{x: 20.0, y: length * (1 - scale)};
+    paths[1][i] = Point{x: 20.0, y: length * scale};
   }
 
   num_paths = 2;
@@ -1040,15 +1056,15 @@ void debugging() {
     // Print debug data
     // Put all Serial print lines here to view
     
-    Serial.printf("x:%f,y:%f,theta:%f",estPos[0],estPos[1],estYaw);
-    Serial.println();
+    // Serial.printf("x:%f,y:%f,theta:%f\n",estPos[0],estPos[1],estYaw);
     // Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
-    Serial.printf("x_raw:%f,y_raw:%f",measVel[0][0],measVel[1][0]);
+    // Serial.printf("x_raw:%f,y_raw:%f\n",measVel[0][0],measVel[1][0]);
     // Serial.printf("thickness:%f, analog: %i",Conv*analogRead(POT_THICK), analogRead(POT_THICK));
     // Serial.printf("x:%f,y:%f,goalX:%f,goalY:%f,desPos:%i",estPosToolX,estPosToolY,goalX,goalY,desPos);
     // Serial.print(motorPosX);
+    // Serial.printf("des_pos:%f,z_stepper_pos:%f\n",desPos,measVel[1][0]);
+    Serial.printf("curr_pnt_idx:%i,curr_path_idx:%i\n",current_point_idx, current_path_idx);
 
-    Serial.println();
   }
 }
 
