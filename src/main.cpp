@@ -654,20 +654,23 @@ void diamondGenerator2() {
   float angle = 60;
   float angle_rad = angle * (M_PI / 180.0);
   float segment_length = 100.0;
+  pathDir[0] = 1;
+  pathDir[1] = -1;
 
   // Calculate the x and y increments based on the angle
   float y_increment = segment_length / (MAX_POINTS - 1);
   float x_increment = y_increment / tan(angle_rad);
 
-  // Generate line path to cut
-  for (int i = 0; i < MAX_POINTS / 2; i++) {
-    paths[0][i] = Point{x: i * x_increment, y: i * y_increment};
-  }
-  for (int i = MAX_POINTS / 2; i < MAX_POINTS; i++) {
-    paths[0][i] = Point{x: (MAX_POINTS - 1 - i) * x_increment, y: i * y_increment};
+  // Generate diamond path to cut
+  for (int p = 0; p < 2; p++) {
+    for (int i = 0; i < MAX_POINTS; i++) {
+      int xIndex = (i >= MAX_POINTS / 2) ? (MAX_POINTS - 1 - i) : i;
+      int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
+      paths[p][i] = Point{x: pathDir[p] * xIndex * x_increment, y: yIndex * y_increment};
+    }
   }
 
-  num_paths = 1;
+  num_paths = 2;
   num_points = MAX_POINTS;
 }
 
