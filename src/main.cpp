@@ -972,6 +972,10 @@ void doSensing() {
   estAngVel[1] = (measVel[0][2] - measVel[0][1])/ly;
   estAngVel[2] = (measVel[1][1] - measVel[1][0])/lx;
   estAngVel[3] = (measVel[1][1] - measVel[1][2])/lx;
+  // TODO: filter out bad sensor measurements
+  //    - compare angular velocities and see if any are a certain threshold or standard deviation off of average
+  //    - compare measVel redings that are colinear (they should be equal)
+  //    - determine if any sensors appear repeatedly erroneous for these checks. If so, throw out their readings
   // Simple average of angular velocities
   float sumAngVel = 0.0f;
   for (int i = 0; i<4; i++) {
