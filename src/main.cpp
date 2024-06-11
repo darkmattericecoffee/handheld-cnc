@@ -674,8 +674,35 @@ void diamondGenerator2() {
   num_points = MAX_POINTS;
 }
 
+// More like a square
 void diamondGenerator4() {
+  float angle = 60;     // TODO: try at 30
+  float angle_rad = angle * (M_PI / 180.0);
+  float segment_length = 50.0;
+  pathDir[0] = 1;
+  pathDir[1] = -1;
+  pathDir[2] = 1;
+  pathDir[3] = -1;
 
+  // Calculate the x and y increments based on the angle
+  float y_increment = segment_length / (MAX_POINTS - 1);
+  float x_increment = y_increment / tan(angle_rad);
+
+  float yOff[4] = {0, segment_length * 2, segment_length, segment_length};
+
+  // Generate diamond path to cut
+  for (int p = 0; p < 4; p++) {
+    for (int i = 0; i < MAX_POINTS; i++) {
+      // TODO: fix this so that path doesn't curve mid path (there probs shouldn't be a xOff var)
+      int xIndex = (i >= MAX_POINTS / 2) ? (MAX_POINTS - 1 - i) : i;
+      int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
+      float xOff = p > 2 ? (MAX_POINTS - 1) * x_increment : 0;
+      paths[p][i] = Point{x: (pathDir[p] * xIndex * x_increment) + xOff, y: (yIndex * y_increment) + yOff[p]};
+    }
+  }
+
+  num_paths = 4;
+  num_points = MAX_POINTS;
 }
 
 void sinGenerator() {
@@ -1222,7 +1249,11 @@ void makePath() {
       break;
     case 7:
       diamondGenerator2();
-      Serial.println("Diamond path generated!");
+      Serial.println("Diamond path2 generated!");
+      break;
+    case 8:
+      diamondGenerator4();
+      Serial.println("Diamond path4 generated!");
       break;
   }
 
