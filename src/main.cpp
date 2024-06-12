@@ -46,6 +46,7 @@ void driverSetup();
 void lineGenerator();
 void sinGenerator();
 void circleGenerator();
+void circleGenerator4();
 // Math functions
 int16_t convTwosComp(int16_t value);
 float myDist(float x1, float y1, float x2, float y2);
@@ -734,29 +735,43 @@ void circleGenerator() {
 }
 
 // Makes a 4 path circle with the given configuration:
-//  
 void circleGenerator4() {
-  float radius = 30.0;
-  float angle_step = 2.0 * PI / MAX_POINTS;
-  float angle;
-  float last_angle = 0.0;
-  float x;
-  float y;
-  int pathOrder[4] = {3,1,2,0};        // indices of path, according to CCW rotation from 0
+  float r = 30.0;
+  Point center = Point{x: 0.0, y: 50.0};
+  float theta;
+  
+  // Path alternates forward and backward
   pathDir[0] = 1;
   pathDir[1] = -1;
   pathDir[2] = 1;
   pathDir[3] = -1;
 
-  for (int p = 0; p < 4; p++) {
-    for (int i = 0; i < MAX_POINTS; i++) {
-      // TODO: flip direction of path for backwards cuts
-      angle = last_angle + (i * angle_step);
-      x = radius * cosf(angle);
-      y = 20.0 + radius + (radius * sinf(angle));
-      paths[pathOrder[p]][i] = Point{x, y};
-    }
-    last_angle = angle;
+  for (int i=0; i<MAX_POINTS; i++) {
+    theta = i/MAX_POINTS*PI/2;
+    
+    // Q4: 270->360
+    paths[0][i] = Point{
+      x: center.x + r*cosf(3*PI/2 + theta), 
+      y: center.y + r*sinf(3*PI/2 + theta)
+    };
+
+    // Q2: 90->180
+    paths[1][i] = Point{
+      x: center.x + r*cosf(PI/2 + theta), 
+      y: center.y + r*sinf(PI/2 + theta)
+    };
+
+    // Q3: 270->180
+    paths[2][i] = Point{
+      x: center.x + r*cosf(3*PI/2 - theta), 
+      y: center.y + r*sinf(3*PI/2 - theta)
+    };
+
+    // Q1: 90->0 
+    paths[3][i] = Point{
+      x: center.x + r*cosf(PI/2 - theta), 
+      y: center.y + r*sinf(PI/2 - theta)
+    };
   }
 
   num_paths = 4;
@@ -1258,6 +1273,10 @@ void makePath() {
     case 8:
       diamondGenerator4();
       Serial.println("Diamond path4 generated!");
+      break;    
+    case 9:
+      circleGenerator4();
+      Serial.println("Circle path4 generated!");
       break;
   }
 
