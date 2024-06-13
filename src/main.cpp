@@ -2,6 +2,7 @@
 #include <AccelStepper.h>
 #include <TMCStepper.h>
 #include <PMW3360.h>
+#include <PMW3360_SPI1.h>
 #include <EEPROM.h>
 #include <SPI.h>
 #include <SD.h>
@@ -265,7 +266,8 @@ float prevY = 0.0f;               // previous point y coordinate (mm)
 
 // Object Initialization ------------------------------------------------------------
 // Sensor object creation
-PMW3360 sensors[3];
+PMW3360 sensors[2];
+PMW3360_SPI1 sensors_SPI1[1];
 //PMW3360 sensors[4];
 
 // Motor object creation
@@ -545,7 +547,7 @@ void loop() {
 // Setup subfunctions -----------------------------------------------------------------------------
 void sensorSetup() {
   // Sensor initialization
-  for (int i = 0; i < ns; i++) {
+  for (int i = 0; i < 2; i++) {
     if (sensors[i].begin(sensorPins[i], CPI)) {
       Serial.print("Sensor");
       Serial.print(i);
@@ -556,6 +558,15 @@ void sensorSetup() {
       Serial.print(i);
       Serial.println(" initialization failed");
     }
+  }
+  if (sensors_SPI1[0].begin(sensorPins[2], CPI)) {
+    Serial.print("Sensor2");
+    Serial.print(" initialization succeeded, with CPI = ");
+    Serial.println(sensors_SPI1[0].getCPI());
+  } else {
+    Serial.print("Sensor");
+    Serial.print("2");
+    Serial.println(" initialization failed");
   }
 }
 
@@ -969,9 +980,10 @@ void doSensing() {
   // Sensing ---------------------------------------------------------------------
   // Collect sensor data (raw)
   PMW3360_DATA data[ns];
-  for (int i = 0; i < ns; i++) {
+  for (int i = 0; i < 2; i++) {
     data[i] = sensors[i].readBurst();
   }
+  data[2] = sensors_SPI1[0].readBurst();
 
   // TODO: check all of the sensors and account for misreads
 
@@ -1164,14 +1176,14 @@ void debugging() {
     // Print debug data
     // Put all Serial print lines here to view
     
-    // Serial.printf("x:%f,y:%f,theta:%f\n",estPos[0],estPos[1],estYaw);
+    Serial.printf("x:%f,y:%f,theta:%f\n",estPos[0],estPos[1],estYaw);
     // Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
     // Serial.printf("x_raw:%f,y_raw:%f\n",measVel[0][0],measVel[1][0]);
     // Serial.printf("thickness:%f, analog: %i",Conv*analogRead(POT_THICK), analogRead(POT_THICK));
     // Serial.printf("x:%f,y:%f,goalX:%f,goalY:%f,desPos:%i",estPosToolX,estPosToolY,goalX,goalY,desPos);
     // Serial.print(motorPosX);
     // Serial.printf("des_pos:%f,z_stepper_pos:%f\n",desPos,measVel[1][0]);
-    Serial.printf("curr_pnt_idx:%i,curr_path_idx:%i\n",current_point_idx, current_path_idx);
+    // Serial.printf("curr_pnt_idx:%i,curr_path_idx:%i\n",current_point_idx, current_path_idx);
 
   }
 }
