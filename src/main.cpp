@@ -6,13 +6,13 @@
 #include <EEPROM.h>
 #include <SPI.h>
 #include <SD.h>
-// #include <Adafruit_GFX.h>
-// #include <Adafruit_GC9A01A.h>
-// #include <EncoderButton.h>
-// #include <fonts/FreeMonoBold12pt7b.h>
-// #include <fonts/FreeMonoBold9pt7b.h>
-// #include <fonts/FreeMono12pt7b.h>
-// #include <fonts/FreeMono9pt7b.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_GC9A01A.h>
+#include <EncoderButton.h>
+#include <fonts/FreeMonoBold12pt7b.h>
+#include <fonts/FreeMonoBold9pt7b.h>
+#include <fonts/FreeMono12pt7b.h>
+#include <fonts/FreeMono9pt7b.h>
 
 /*
 Sensor configuration (USING 3 SENSORS NOW!!):
@@ -29,6 +29,7 @@ typedef enum State {
   POWER_ON,
   MACHINE_X_ZERO,
   WORKSPACE_Z_ZERO,
+  SELECTING_DESIGN,
   DESIGN_SELECTED,
   READY
 } State;
@@ -44,10 +45,13 @@ typedef struct Point {
 void sensorSetup();
 void motorSetup();
 void driverSetup();
+
+// Path functions
 void lineGenerator();
 void sinGenerator();
 void circleGenerator();
-void circleGenerator4();
+void squareGenerator();
+
 // Math functions
 int16_t convTwosComp(int16_t value);
 float myDist(float x1, float y1, float x2, float y2);
@@ -60,8 +64,10 @@ float desPosClosestToIntersect(float xc, float yc, float th, float x3, float y3,
 float desiredPosition(float dX,float dY,float theta);
 float mapF(long x, float in_min, float in_max, float out_min, float out_max);
 void readEepromCalibration(float (&cVal)[2][4]);
+
 // Sensing functions
 void doSensing();
+
 // Motor control functions
 void enableStepperZ();
 void disableStepperZ();
@@ -70,13 +76,26 @@ void stopStepperZ();
 void machineZeroX();
 void workspaceZeroZ();
 void workspaceZeroXY();
+
 // Other loop functions
 void sensorPlotting();
 void debugging();
 void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting);
 void parseNC(const char* filename);
 void makePath();
-void DesignModeToggle();
+void encoderDesignMode();
+
+void drawShape();
+void drawCenteredText(const char* text, int size);
+
+// Encoder functions
+void nullHandler(EncoderButton &eb);
+void onClickResetState(EncoderButton &eb);
+void onClickZeroMachineX(EncoderButton &eb);
+void onClickZeroWorkspaceZ(EncoderButton &eb);
+void onEncoderUpdateDesignMode(EncoderButton &eb);
+void onClickMakePath(EncoderButton &eb);
+void onClickZeroWorkspaceXY(EncoderButton &eb);
 
 // Pin definitions -------------------------------------------------------------------------------
 // Sensor pins
@@ -86,17 +105,12 @@ void DesignModeToggle();
 //#define SS3   32
 int sensorPins[3] = {SS0, SS1, SS2};
 // int sensorPins[4] = {SS0, SS1, SS2, SS3};
-#define LIMIT_MACH_X0   8
-#define LIMIT_MACH_Z0   2
-#define BUTT_MACH_X0    4
-#define BUTT_MACH_Z0    3
-#define BUTT_WORK_X0Y0  6
-#define BUTT_WORK_Z0    5
-#define BUTT_HANDLE     7
-#define POT_THICK       26
-#define BUTT_ENC        3
-#define ENC_A           21
-#define ENC_B           22
+#define LIMIT_MACH_X0       8
+#define LIMIT_MACH_Z0       2
+#define BUTT_HANDLE         7
+#define ENCODER_PIN_A       21
+#define ENCODER_PIN_B       22
+#define ENCODER_BUTTON_PIN  3
 
 // Motor Pins
 #define MS1_X       17
@@ -111,9 +125,8 @@ int sensorPins[3] = {SS0, SS1, SS2};
 #define MOT_STEP_Z  33
 
 // LCD Pins
-#define TFT_CS     31
-// #define TFT_RST    9  // Or set to -1 and connect to Arduino RESET pin
-#define TFT_DC     20
+#define TFT_CS     20
+#define TFT_DC     19
 
 // Driver pins
 #define SERIAL_PORT_X         Serial7     // HardwareSerial port
@@ -122,6 +135,8 @@ int sensorPins[3] = {SS0, SS1, SS2};
 // Max path values
 #define MAX_PATHS  4
 #define MAX_POINTS 1000
+
+#define NUM_DESIGNS 6
 
 // SD pins
 const int chipSelect = BUILTIN_SDCARD;
@@ -135,7 +150,7 @@ const int eepromAddrCy = 12;
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
 int outputMode = 0;           // output data to serial
-int designMode = 6;           // choose the design - from hardcode (line = 0; sine_wave = 1; circle = 2; gCode = 3)
+int designMode = 0;           // choose the design 
 
 // Path properties
 int num_paths = 0;  // The actual number of paths
@@ -283,6 +298,83 @@ State state = POWER_ON;
 bool cutting = false; // TODO: delete me
 bool prevChecks[4]; // TODO: delete me
 
+EncoderButton encoder(ENCODER_PIN_A, ENCODER_PIN_B, ENCODER_BUTTON_PIN);
+Adafruit_GC9A01A screen = Adafruit_GC9A01A(TFT_CS, TFT_DC);
+
+void nullHandler(EncoderButton &eb) {
+  Serial.println("null handler called");
+  return; // Don't do anything
+}
+
+void onClickGoToDesignMode(EncoderButton &eb) {
+  encoderDesignMode();
+}
+
+void onClickResetState(EncoderButton &eb) {
+  drawCenteredText("Zero Machine X", 1);
+  state = POWER_ON;
+  encoder.setClickHandler(onClickZeroMachineX);
+}
+
+void onClickZeroMachineX(EncoderButton &eb) {
+  drawCenteredText("Zeroing Machine X...", 1);
+  // machineZeroX();
+  state = MACHINE_X_ZERO;
+  drawCenteredText("Zero Workspace Z", 1);
+  encoder.setClickHandler(onClickZeroWorkspaceZ);
+}
+
+void onClickZeroWorkspaceZ(EncoderButton &eb) {
+  drawCenteredText("Zeroing Workspace Z...", 1);
+  // workspaceZeroZ();
+  state = WORKSPACE_Z_ZERO;
+  encoderDesignMode();
+}
+
+void onClickZeroWorkspaceXY(EncoderButton &eb) {
+  drawCenteredText("Zeroing Workspace XY...", 1);
+  // workspaceZeroXY();
+
+  // Reset cutting path
+  path_started = false;
+  current_path_idx = 0;
+  current_point_idx = 0;
+
+  state = READY;
+  drawCenteredText("READY", 1);
+  encoder.setClickHandler(nullHandler);
+}
+
+void onEncoderUpdateDesignMode(EncoderButton &eb) {
+  // NUM_DESIGNS to have correct wrapping for negative numbers
+  designMode = (NUM_DESIGNS + designMode + eb.increment()) % NUM_DESIGNS;
+  drawShape();
+  Serial.printf("DesignMode: %d\n", designMode);
+}
+
+void onClickMakePath(EncoderButton &eb) {
+  Serial.printf("Design Selected: %d\n", designMode);
+  makePath();
+  state = DESIGN_SELECTED;
+}
+
+void encoderDesignMode() {
+  Serial.println("Start of design mode");
+  drawShape();
+
+  state = SELECTING_DESIGN;
+  encoder.setEncoderHandler(onEncoderUpdateDesignMode);
+  encoder.setClickHandler(onClickMakePath);
+
+  while (state != DESIGN_SELECTED) {
+    encoder.update();
+  }
+
+  Serial.println("End of design mode"); 
+  encoder.setEncoderHandler(nullHandler);
+  encoder.setClickHandler(onClickZeroWorkspaceXY);
+}
+
 // -------------------------------------------------------------------------------------------------
 // Setup and Main Loop -----------------------------------------------------------------------------
 void setup() {
@@ -292,6 +384,11 @@ void setup() {
     while(!Serial);
   }
   delay(100);         // as opposed to the while(!Serial);
+
+  // Initialize the display
+  screen.begin();
+  drawCenteredText("Initializing...", 1);
+  // screen.setRotation(1);
 
   // Load calibration coeffs
   Serial.println("Loading calibration coefficients:");
@@ -316,9 +413,6 @@ void setup() {
   pinMode(LIMIT_MACH_Z0, INPUT);
 
   // Button initialization
-  pinMode(BUTT_MACH_X0, INPUT);
-  pinMode(BUTT_MACH_Z0, INPUT);
-  pinMode(BUTT_WORK_X0Y0, INPUT);
   pinMode(BUTT_HANDLE, INPUT);
   //handleButton.setDebounceTime(50);
 
@@ -336,30 +430,9 @@ void setup() {
   }
   Serial.println("Initialization done.");
 
-  // Zero the machine X once on startup
-  Serial.println("Waiting for machine X to be zeroed...");
-  while (state != MACHINE_X_ZERO) {
-    if(digitalRead(BUTT_MACH_X0) == LOW) {
-      Serial.println("Zeroing machine x:");
-      machineZeroX();
-      state = MACHINE_X_ZERO;
-    }
-  }
-  Serial.println("Machine x zeroed!");
-
-  // Zero the workspace Z once on startup
-  Serial.println("Waiting for workspace Z to be zeroed...");
-  while (state != WORKSPACE_Z_ZERO) {
-    if(digitalRead(BUTT_WORK_Z0) == LOW) {
-      workspaceZeroZ();
-      state = WORKSPACE_Z_ZERO;
-    }
-  }
-  Serial.println("Workspace Z zeroed!");
-  Serial.println(maxHeight);
-
-  // Pick a design
-  DesignModeToggle();
+  encoder.setClickHandler(onClickZeroMachineX);
+  encoder.setTripleClickHandler(onClickGoToDesignMode);
+  onClickResetState(encoder);
 }
 
 void loop() {  
@@ -371,29 +444,26 @@ void loop() {
   // Run steppers
   stepperX.run();
   stepperZ.run();
+  encoder.update();
 
   // Serial Interface
-  if (Serial.available()) {
-    char ch = Serial.read();
-    if (ch == 'd') {
-      DesignModeToggle();
-    }
-  }
+  // if (Serial.available()) {
+  //   char ch = Serial.read();
+  //   if (ch == 'd') {
+  //     DesignModeToggle();
+  //   }
+  // }
   
   // Workspace X and Y zeroing
-  if (state == DESIGN_SELECTED && digitalRead(BUTT_WORK_X0Y0) == LOW) {
-    workspaceZeroXY();
-    state = READY;
+  // if (state == DESIGN_SELECTED && digitalRead(ENCODER_BUTTON_PIN) == LOW) {
+  //   workspaceZeroXY();
+  //   state = READY;
 
-    // Reset cutting path
-    path_started = false;
-    current_path_idx = 0;
-    current_point_idx = 0;
-
-    // Calculate material thickness
-    int sensorVal = analogRead(POT_THICK);      // TODO: remove and implement into UI instead
-    // matThickness = mapF(sensorVal, 0, 1024, 0, maxThickness); // FIXME: Hardcoded to 0 for now
-  }
+  //   // Reset cutting path
+  //   path_started = false;
+  //   current_path_idx = 0;
+  //   current_point_idx = 0;
+  // }
 
   // Break here until we are ready to cut
   if (state != READY) {
@@ -411,7 +481,7 @@ void loop() {
     Serial.println("X limit reached");
 
     // Reset back to design mode
-    DesignModeToggle();
+    encoderDesignMode();
   }
 
   if (digitalRead(LIMIT_MACH_Z0) == LOW) {
@@ -421,7 +491,7 @@ void loop() {
     Serial.println("Z limit reached");
 
     // Reset back to design mode
-    DesignModeToggle();
+    encoderDesignMode();
   }
   
   // Debugging
@@ -522,7 +592,7 @@ void loop() {
             stepperZ.run();           // make sure tool is raised after path is finished
           }
           Serial.println("All paths finished");
-          DesignModeToggle();
+          encoderDesignMode();
         }
       }
     }
@@ -645,6 +715,41 @@ void lineGenerator() {
   num_points = MAX_POINTS;
 }
 
+void sinGenerator() {
+  // Generate sine path to cut
+  for (int i = 0; i < MAX_POINTS; ++i) {
+    float y = (pathMax_y) * (float)i / (MAX_POINTS - 1);
+    float x = sinAmp * sinf((TWO_PI/sinPeriod)*y);
+    paths[0][i] = Point{x, y};
+  }
+
+  num_paths = 1;
+  num_points = MAX_POINTS;
+}
+
+void zigZagGenerator() {
+  // Generate a zig zaxg to cut
+  int numPLine = 50;
+  int pCount = 0;
+  // int leftRight = 1;
+  float zigSize = 40;
+
+  for (int i = 0; i < MAX_POINTS; ++i) {
+    if (pCount < numPLine) {
+      float y = (pathMax_y) * (float)i / (MAX_POINTS - 1);
+      float x = std::fmod(y, zigSize);
+      if (x > (zigSize / 2)) {
+        x = zigSize - x;
+      }
+      
+      paths[0][i] = Point{x, y};
+    }
+  }
+
+  num_paths = 1;
+  num_points = MAX_POINTS;
+}
+
 void doubleLineGenerator() {
   // One line going up at x = -20 and one line going down at x = 20
   float length = 100.0;
@@ -662,91 +767,8 @@ void doubleLineGenerator() {
   num_points = MAX_POINTS;
 }
 
-void diamondGenerator2() {
-  float angle = 60;
-  float angle_rad = angle * (M_PI / 180.0);
-  float segment_length = 100.0;
-  pathDir[0] = 1;
-  pathDir[1] = -1;
-
-  // Calculate the x and y increments based on the angle
-  float y_increment = segment_length / (MAX_POINTS - 1);
-  float x_increment = y_increment / tan(angle_rad);
-
-  // Generate diamond path to cut
-  for (int p = 0; p < 2; p++) {
-    for (int i = 0; i < MAX_POINTS; i++) {
-      int xIndex = (i >= MAX_POINTS / 2) ? (MAX_POINTS - 1 - i) : i;
-      int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
-      paths[p][i] = Point{x: pathDir[p] * xIndex * x_increment, y: yIndex * y_increment};
-    }
-  }
-
-  num_paths = 2;
-  num_points = MAX_POINTS;
-}
-
-// More like a square
-void diamondGenerator4() {
-  float angle = 60;     // TODO: try at 30
-  float angle_rad = angle * (M_PI / 180.0);
-  float segment_length = 50.0;
-  pathDir[0] = 1;
-  pathDir[1] = -1;
-  pathDir[2] = 1;
-  pathDir[3] = -1;
-
-  // Calculate the x and y increments based on the angle
-  float y_increment = segment_length / (MAX_POINTS - 1);
-  float x_increment = y_increment / tan(angle_rad);
-
-  float yOff[4] = {0, segment_length * 2, segment_length, segment_length};
-
-  // Generate diamond path to cut
-  for (int p = 0; p < 4; p++) {
-    for (int i = 0; i < MAX_POINTS; i++) {
-      // TODO: fix this so that path doesn't curve mid path (there probs shouldn't be a xOff var)
-      int xIndex = (i >= MAX_POINTS / 2) ? (MAX_POINTS - 1 - i) : i;
-      int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
-      float xOff = p > 2 ? (MAX_POINTS - 1) * x_increment : 0;
-      paths[p][i] = Point{x: (pathDir[p] * xIndex * x_increment) + xOff, y: (yIndex * y_increment) + yOff[p]};
-    }
-  }
-
-  num_paths = 4;
-  num_points = MAX_POINTS;
-}
-
-void sinGenerator() {
-  // Generate sine path to cut
-  for (int i = 0; i < MAX_POINTS; ++i) {
-    float y = (pathMax_y) * (float)i / (MAX_POINTS - 1);
-    float x = sinAmp * sinf((TWO_PI/sinPeriod)*y);
-    paths[0][i] = Point{x, y};
-  }
-
-  num_paths = 1;
-  num_points = MAX_POINTS;
-}
-
-void circleGenerator() {
-  // Generate a circle path to cut
-  float radius = circleDiameter / 2.0;
-  float angle_step = 2.0 * PI / MAX_POINTS;
-
-  for (int i = 0; i < MAX_POINTS; i++) {
-    float angle = i * angle_step;
-    float x = -radius + (radius * cosf(angle));
-    float y = radius * sinf(angle);
-    paths[0][i] = Point{x, y};
-  }
-
-  num_paths = 1;
-  num_points = MAX_POINTS;
-}
-
 // Makes a 4 path circle with the given configuration:
-void circleGenerator4() {
+void circleGenerator() {
   float r = 30.0;
   Point center = Point{x: 0.0, y: 50.0};
   float theta;
@@ -789,26 +811,27 @@ void circleGenerator4() {
   num_points = MAX_POINTS;
 }
 
-void zigZagGenerator() {
-  // Generate a zig zaxg to cut
-  int numPLine = 50;
-  int pCount = 0;
-  // int leftRight = 1;
-  float zigSize = 40;
+void squareGenerator() {
+  float angle = 60;
+  float angle_rad = angle * (M_PI / 180.0);
+  float segment_length = 100.0;
+  pathDir[0] = 1;
+  pathDir[1] = -1;
 
-  for (int i = 0; i < MAX_POINTS; ++i) {
-    if (pCount < numPLine) {
-      float y = (pathMax_y) * (float)i / (MAX_POINTS - 1);
-      float x = std::fmod(y, zigSize);
-      if (x > (zigSize / 2)) {
-        x = zigSize - x;
-      }
-      
-      paths[0][i] = Point{x, y};
+  // Calculate the x and y increments based on the angle
+  float y_increment = segment_length / (MAX_POINTS - 1);
+  float x_increment = y_increment / tan(angle_rad);
+
+  // Generate diamond path to cut
+  for (int p = 0; p < 2; p++) {
+    for (int i = 0; i < MAX_POINTS; i++) {
+      int xIndex = (i >= MAX_POINTS / 2) ? (MAX_POINTS - 1 - i) : i;
+      int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
+      paths[p][i] = Point{x: pathDir[p] * xIndex * x_increment, y: yIndex * y_increment};
     }
   }
 
-  num_paths = 1;
+  num_paths = 2;
   num_points = MAX_POINTS;
 }
 
@@ -1262,33 +1285,20 @@ void makePath() {
       Serial.println("Sine wave path generated!");
       break;
     case 2:
-      circleGenerator();
-      Serial.println("Circle path generated!");
+      zigZagGenerator();
+      Serial.println("Zig-zag path generated!");
       break;
     case 3:
-      parseNC("generic_test02.nc");
-      break;
-    case 4:
-      parseNC("stupid_wave02.nc");
-      break;
-    case 5:
-      zigZagGenerator();
-      break;
-    case 6:
       doubleLineGenerator();
       Serial.println("Double line path generated!");
       break;
-    case 7:
-      diamondGenerator2();
-      Serial.println("Diamond path2 generated!");
+    case 4:
+      circleGenerator();
+      Serial.println("Circle path generated!");
       break;
-    case 8:
-      diamondGenerator4();
-      Serial.println("Diamond path4 generated!");
-      break;    
-    case 9:
-      circleGenerator4();
-      Serial.println("Circle path4 generated!");
+    case 5:
+      squareGenerator();
+      Serial.println("Square path generated!");
       break;
   }
 
@@ -1298,34 +1308,6 @@ void makePath() {
         Serial.printf("PATH:%d,%f,%f\n", i, paths[i][j].x, paths[i][j].y);
       }
   }
-}
-
-void DesignModeToggle() {
-  Serial.println("Start Design Mode Toggle");
-
-  if (!outputMode) {
-    // Clear the serial buffer
-    while (Serial.available()) {
-      Serial.read();
-    }
-    
-    while (!Serial.available()) {
-      // Wait until there is data available in the serial buffer
-    }
-    
-    int receivedNum = Serial.parseInt();
-    
-    Serial.print("Received num: ");
-    Serial.println(receivedNum);
-    
-    designMode = receivedNum;
-  }
-  
-  makePath();
-  
-  Serial.println("End of Design Mode Toggle!");
-
-  state = DESIGN_SELECTED;
 }
 
 void readEepromCalibration(float (&cVal)[2][4]) {
@@ -1348,4 +1330,88 @@ void readEepromCalibration(float (&cVal)[2][4]) {
       addr += sizeof(float);
     }
   }
+}
+
+void drawShape() {
+  int16_t tftWidth = screen.width();
+  int16_t tftHeight = screen.height();
+  int16_t centerX = tftWidth / 2;
+  int16_t centerY = tftHeight / 2;
+  int16_t size = min(tftWidth, tftHeight) / 3;
+
+  float scale;
+  int16_t minY,maxY,minX,maxX,y_quarter,y_3_quarter,x;
+
+  screen.fillScreen(GC9A01A_BLACK);
+
+  switch (designMode) {
+    case 0:
+      // line
+      screen.drawLine(centerX, centerY-size, centerX, centerY+size, GC9A01A_WHITE);
+      break;
+    case 1:
+      // sin
+      scale = size / PI;
+      for (int y = centerY-size; y <= centerY+size; y++) {
+        x = (int16_t) (scale*sin(y));
+        screen.drawPixel(centerX+x, centerY+y, GC9A01A_WHITE);
+      }
+      break;
+    case 2:
+      // zigzag
+      minY = centerY - size;
+      maxY = centerY + size;
+      minX = centerX - size / 2;
+      maxX = centerX + size / 2;
+
+      y_quarter = minY + size / 2;
+      y_3_quarter = maxY - size / 2;
+
+      screen.drawLine(centerX, minY, maxX, y_quarter, GC9A01A_WHITE);
+      screen.drawLine(maxX, y_quarter, minX, y_3_quarter, GC9A01A_WHITE);
+      screen.drawLine(minX, y_3_quarter, centerX, maxY, GC9A01A_WHITE);
+
+      break;
+    case 3:
+      // double line
+      screen.drawLine(centerX-size/4, centerY-size, centerX-size/4, centerY+size, GC9A01A_WHITE);
+      screen.drawLine(centerX+size/4, centerY-size, centerX+size/4, centerY+size, GC9A01A_WHITE);
+      break;
+    case 4:
+      // circle
+      screen.drawCircle(centerX, centerY, size, GC9A01A_WHITE);
+      break;
+    case 5:
+      // diamond
+      screen.drawLine(centerX-size, centerY, centerX, centerY+size, GC9A01A_WHITE);
+      screen.drawLine(centerX, centerY+size, centerX+size, centerY, GC9A01A_WHITE);
+      screen.drawLine(centerX+size, centerY, centerX, centerY-size, GC9A01A_WHITE);
+      screen.drawLine(centerX, centerY-size, centerX-size, centerY, GC9A01A_WHITE);
+      break;
+  }
+}
+
+void drawCenteredText(const char* text, int size) {
+  Serial.print("SCREEN: ");
+  Serial.println(text);
+
+  screen.fillScreen(GC9A01A_BLACK);
+
+  int16_t tftWidth = screen.width();
+  int16_t tftHeight = screen.height();
+  int16_t centerX = tftWidth / 2;
+  int16_t centerY = tftHeight / 2;
+  int16_t x1, y1;
+  uint16_t w, h;
+  screen.setFont(&FreeMonoBold9pt7b);
+  screen.setTextSize(size);
+  screen.getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
+
+  // Calculate the top-left corner to start the text so that it gets centered
+  int16_t xStart = centerX - w / 2;
+  int16_t yStart = centerY - h / 2;
+
+  screen.setCursor(xStart, yStart);
+  screen.setTextColor(GC9A01A_WHITE);
+  screen.println(text);
 }
