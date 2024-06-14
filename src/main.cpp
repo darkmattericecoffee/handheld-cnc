@@ -88,7 +88,7 @@ void encoderDesignMode();
 void drawShape();
 void drawCenteredText(const char* text, int size);
 void drawFixedUI();
-void drawUI(Point goal, Point next);
+void drawUI(Point goal, Point next, uint8_t i);
 
 // Encoder functions
 void nullHandler(EncoderButton &eb);
@@ -278,6 +278,12 @@ float goalX = 0.0f;               // goal point x coordinate (mm)
 float goalY = 0.0f;               // goal point y coordinate (mm)
 float prevX = 0.0f;               // previous point x coordinate (mm)
 float prevY = 0.0f;               // previous point y coordinate (mm)
+
+long lastDraw = 0;
+
+uint8_t iter = 0;
+
+int16_t lastX0, lastY0, lastX1, lastY1, lastX2, lastY2, lastX3, lastY3, lastTargetCircleX, lastTargetCircleY;
 
 // Motor control variables
 
@@ -507,7 +513,14 @@ void loop() {
   Point goal = paths[current_path_idx][current_point_idx];
   Point next = paths[current_path_idx][current_point_idx + 1];
 
-  drawUI(goal, next);
+  if ((millis()-lastDraw) > 15) {
+    iter = (iter + 1)%7;
+    // unsigned long now = micros();
+    drawUI(goal, next, iter);
+    // Serial.printf("draw %d took %i us\n", iter, micros()-now);
+    // lastDraw = millis();
+  }
+  
 
   // If we have not started the path, and the first point is behind us
   // keep the tool raised and return. We wait here until the first point
@@ -1440,28 +1453,57 @@ void drawFixedUI() {
   }
 }
 
-void drawUI(Point goal, Point next) {
+void drawUI(Point goal, Point next, uint8_t i) {
   int16_t radius = screen.width()*0.95 / 4;
   int16_t centerX = screen.width() / 2;
   int16_t centerY = screen.width() / 2;
 
-  screen.fillCircle(centerX, centerY, radius*1.1, GC9A01A_BLACK);
-
-  // Draw the target circle in the center
-  int16_t centerCircleRadius = 20;
-  screen.drawCircle(centerX, centerY, centerCircleRadius, GC9A01A_WHITE);
-
-  // Draw the goal angle
   float dTheta = estYaw + PI/2 - atan2f(next.y-goal.y, next.x-goal.x);
-  screen.drawLine(centerX + 0.6*radius*cosf(dTheta), centerY + 0.6*radius*sinf(dTheta), centerX + radius*cosf(dTheta), centerY + radius*sinf(dTheta), GC9A01A_WHITE);
-  screen.drawLine(centerX - 0.6*radius*cosf(dTheta), centerY - 0.6*radius*sinf(dTheta), centerX - radius*cosf(dTheta), centerY - radius*sinf(dTheta), GC9A01A_WHITE);
 
-  // Draw the goal circle
   float theta = estYaw - atan2f(goal.y-estPos[1], goal.x-estPos[0]);
   float dist = myDist(estPos[0], estPos[1], goal.x, goal.y);
 
-  Serial.printf("(%f,%f) -> (%f,%f): %f\n", estPos[0], estPos[1], goal.x, goal.y, dist);
+  float offsetRadius = radius*0.8*tanh(dist*0.1);
 
-  float offsetRadius = radius*0.8*tanh(dist);
-  screen.drawCircle(centerX + offsetRadius*cosf(theta), centerY + offsetRadius*sinf(theta), 5, GC9A01A_WHITE);
+  switch (i%7) {
+    case 0:
+      // Draw the target circle in the center
+      screen.drawLine(centerX, centerY-5, centerX, centerY+5, GC9A01A_WHITE);
+      screen.drawLine(centerX-5, centerY, centerX+5, centerY, GC9A01A_WHITE);
+      break;
+    case 1:
+      // clear the old line left
+      screen.drawLine(lastX0, lastY0, lastX1, lastY1, GC9A01A_BLACK);
+      break;
+    case 2:
+      // clear old line right
+      screen.drawLine(lastX2, lastY2, lastX3, lastY3, GC9A01A_BLACK);
+      break;
+    case 3:
+      // draw the new line left
+      lastX0 = centerX + 0.6*radius*cosf(dTheta);
+      lastY0 = centerY + 0.6*radius*sinf(dTheta);
+      lastX1 = centerX + radius*cosf(dTheta);
+      lastY1 = centerY + radius*sinf(dTheta);
+
+      screen.drawLine(lastX0, lastY0, lastX1, lastY1, GC9A01A_WHITE);
+      break;
+    case 4:
+      lastX2 = centerX - radius*cosf(dTheta);
+      lastY2 = centerY - radius*sinf(dTheta);
+      lastX3 = centerX - 0.6*radius*cosf(dTheta);
+      lastY3 = centerY - 0.6*radius*sinf(dTheta);
+      
+      screen.drawLine(lastX2, lastY2, lastX3, lastY3, GC9A01A_WHITE);
+      break;
+    case 5:
+      // Clear the old target circle
+      screen.drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GC9A01A_BLACK);
+      break;
+    case 6:
+      lastTargetCircleX = centerX + offsetRadius*cosf(theta);
+      lastTargetCircleY = centerY + offsetRadius*sinf(theta);
+      screen.drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GC9A01A_WHITE);
+      break;
+  }
 }
