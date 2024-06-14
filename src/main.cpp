@@ -301,7 +301,8 @@ bool cutting = false; // TODO: delete me
 bool prevChecks[4]; // TODO: delete me
 
 EncoderButton encoder(ENCODER_PIN_A, ENCODER_PIN_B, ENCODER_BUTTON_PIN);
-Adafruit_GC9A01A screen = Adafruit_GC9A01A(TFT_CS, TFT_DC);
+// Adafruit_GC9A01A screen = Adafruit_GC9A01A(TFT_CS, TFT_DC);
+Adafruit_GC9A01A screen = Adafruit_GC9A01A(&SPI1, TFT_DC, TFT_CS);
 
 void nullHandler(EncoderButton &eb) {
   Serial.println("null handler called");
@@ -320,7 +321,7 @@ void onClickResetState(EncoderButton &eb) {
 
 void onClickZeroMachineX(EncoderButton &eb) {
   drawCenteredText("Zeroing Machine X...", 1);
-  // machineZeroX();
+  machineZeroX();
   state = MACHINE_X_ZERO;
   drawCenteredText("Zero Workspace Z", 1);
   encoder.setClickHandler(onClickZeroWorkspaceZ);
@@ -328,14 +329,14 @@ void onClickZeroMachineX(EncoderButton &eb) {
 
 void onClickZeroWorkspaceZ(EncoderButton &eb) {
   drawCenteredText("Zeroing Workspace Z...", 1);
-  // workspaceZeroZ();
+  workspaceZeroZ();
   state = WORKSPACE_Z_ZERO;
   encoderDesignMode();
 }
 
 void onClickZeroWorkspaceXY(EncoderButton &eb) {
   drawCenteredText("Zeroing Workspace XY...", 1);
-  // workspaceZeroXY();
+  workspaceZeroXY();
 
   // Reset cutting path
   path_started = false;
@@ -706,6 +707,7 @@ void driverSetup() {
   driverX.TPWMTHRS(TPWMTHRS);     // enable hybrid mode with velocity threshold
   driverZ.pwm_autoscale(true);    // Needed for stealthChop
   driverZ.en_spreadCycle(false);   // false = StealthChop / true = SpreadCycle
+  driverX.TPWMTHRS(TPWMTHRS);     // enable hybrid mode with velocity threshold
 }
 
 void lineGenerator() {
@@ -783,7 +785,7 @@ void circleGenerator() {
   pathDir[3] = -1;
 
   for (int i=0; i<MAX_POINTS; i++) {
-    theta = i/MAX_POINTS*PI/2;
+    theta = (float)i/MAX_POINTS*PI/2;
     
     // Q4: 270->360
     paths[0][i] = Point{
