@@ -87,6 +87,8 @@ void encoderDesignMode();
 
 void drawShape();
 void drawCenteredText(const char* text, int size);
+void drawFixedUI();
+void drawUI(Point goal, Point next);
 
 // Encoder functions
 void nullHandler(EncoderButton &eb);
@@ -341,7 +343,7 @@ void onClickZeroWorkspaceXY(EncoderButton &eb) {
   current_point_idx = 0;
 
   state = READY;
-  drawCenteredText("READY", 1);
+  drawFixedUI();
   encoder.setClickHandler(nullHandler);
 }
 
@@ -384,6 +386,8 @@ void setup() {
 
   // Initialize the display
   screen.begin();
+  screen.fillScreen(GC9A01A_BLACK);
+
   drawCenteredText("Initializing...", 1);
   // screen.setRotation(1);
 
@@ -501,6 +505,8 @@ void loop() {
   ///////////////////////////////////
   Point goal = paths[current_path_idx][current_point_idx];
   Point next = paths[current_path_idx][current_point_idx + 1];
+
+  drawUI(goal, next);
 
   // If we have not started the path, and the first point is behind us
   // keep the tool raised and return. We wait here until the first point
@@ -1411,4 +1417,49 @@ void drawCenteredText(const char* text, int size) {
   screen.setCursor(xStart, yStart);
   screen.setTextColor(GC9A01A_WHITE);
   screen.println(text);
+}
+
+void drawFixedUI() {
+  screen.fillScreen(GC9A01A_BLACK);
+
+  int16_t radius = screen.width()*0.95 / 2;
+  int16_t centerX = screen.width() / 2;
+  int16_t centerY = screen.width() / 2;
+
+  // Draw the arcs on the edge of the screen
+  for (int i=0; i<radius; i++) {
+    float xOffset = radius*cosf(PI/6*i/radius);
+    float yOffset = radius*sinf(PI/6*i/radius);
+
+    screen.drawPixel(centerX - xOffset, centerY - yOffset, GC9A01A_WHITE);
+    screen.drawPixel(centerX - xOffset, centerY + yOffset, GC9A01A_WHITE);
+    screen.drawPixel(centerX + xOffset, centerY - yOffset, GC9A01A_WHITE);
+    screen.drawPixel(centerX + xOffset, centerY + yOffset, GC9A01A_WHITE);
+  }
+}
+
+void drawUI(Point goal, Point next) {
+  int16_t radius = screen.width()*0.95 / 4;
+  int16_t centerX = screen.width() / 2;
+  int16_t centerY = screen.width() / 2;
+
+  screen.fillCircle(centerX, centerY, radius*1.1, GC9A01A_BLACK);
+
+  // Draw the target circle in the center
+  int16_t centerCircleRadius = 20;
+  screen.drawCircle(centerX, centerY, centerCircleRadius, GC9A01A_WHITE);
+
+  // Draw the goal angle
+  float dTheta = estYaw + PI/2 - atan2f(next.y-goal.y, next.x-goal.x);
+  screen.drawLine(centerX + 0.6*radius*cosf(dTheta), centerY + 0.6*radius*sinf(dTheta), centerX + radius*cosf(dTheta), centerY + radius*sinf(dTheta), GC9A01A_WHITE);
+  screen.drawLine(centerX - 0.6*radius*cosf(dTheta), centerY - 0.6*radius*sinf(dTheta), centerX - radius*cosf(dTheta), centerY - radius*sinf(dTheta), GC9A01A_WHITE);
+
+  // Draw the goal circle
+  float theta = estYaw - atan2f(goal.y-estPos[1], goal.x-estPos[0]);
+  float dist = myDist(estPos[0], estPos[1], goal.x, goal.y);
+
+  Serial.printf("(%f,%f) -> (%f,%f): %f\n", estPos[0], estPos[1], goal.x, goal.y, dist);
+
+  float offsetRadius = radius*0.8*tanh(dist);
+  screen.drawCircle(centerX + offsetRadius*cosf(theta), centerY + offsetRadius*sinf(theta), 5, GC9A01A_WHITE);
 }
