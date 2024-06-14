@@ -349,17 +349,14 @@ void onEncoderUpdateDesignMode(EncoderButton &eb) {
   // NUM_DESIGNS to have correct wrapping for negative numbers
   designMode = (NUM_DESIGNS + designMode + eb.increment()) % NUM_DESIGNS;
   drawShape();
-  Serial.printf("DesignMode: %d\n", designMode);
 }
 
 void onClickMakePath(EncoderButton &eb) {
-  Serial.printf("Design Selected: %d\n", designMode);
   makePath();
   state = DESIGN_SELECTED;
 }
 
 void encoderDesignMode() {
-  Serial.println("Start of design mode");
   drawShape();
 
   state = SELECTING_DESIGN;
@@ -370,7 +367,7 @@ void encoderDesignMode() {
     encoder.update();
   }
 
-  Serial.println("End of design mode"); 
+  drawCenteredText("Zero Workspace XY", 1);
   encoder.setEncoderHandler(nullHandler);
   encoder.setClickHandler(onClickZeroWorkspaceXY);
 }
@@ -1352,8 +1349,8 @@ void drawShape() {
     case 1:
       // sin
       scale = size / PI;
-      for (int y = centerY-size; y <= centerY+size; y++) {
-        x = (int16_t) (scale*sin(y));
+      for (int y = -size; y <= size; y++) {
+        x = (int16_t) (scale*sin(y/scale));
         screen.drawPixel(centerX+x, centerY+y, GC9A01A_WHITE);
       }
       break;
