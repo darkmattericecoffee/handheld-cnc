@@ -89,6 +89,9 @@ void drawShape();
 void drawCenteredText(const char* text, int size);
 void drawFixedUI();
 void drawUI(Point goal, Point next, uint8_t i);
+void drawDirection();
+
+void calibrate();
 
 // Encoder functions
 void nullHandler(EncoderButton &eb);
@@ -138,7 +141,21 @@ int sensorPins[3] = {SS0, SS1, SS2};
 #define MAX_PATHS  4
 #define MAX_POINTS 1000
 
-#define NUM_DESIGNS 6
+#define NUM_DESIGNS 5
+
+// Webwork green is 0x88FF88 or RGB (136,255,136)
+// The adafruit color mapping is a bit weird, and outlined here
+// https://learn.adafruit.com/adafruit-gfx-graphics-library?view=all
+// 
+// Here are the converted values into the adafruit mapping
+// r: 136/255 * 31 = 17 -> 0b10001
+// g: 255/255 * 63 = 63 -> 0b111111
+// b: 136/255 * 31 = 17 -> 0b10001
+//
+// Putting that together, the color code is 
+// 0b1000111111110001 -> 0x8FF1
+// 
+#define GC9A01A_WEBWORK_GREEN 0x8FF1
 
 // SD pins
 const int chipSelect = BUILTIN_SDCARD;
@@ -163,7 +180,7 @@ int pathDir[MAX_PATHS] = {1,1,1,1};
 // Path properties (sine wave)
 const float sinAmp = 5.0;
 const float sinPeriod = 50.0;
-const float pathMax_y = 300.0;            // x-length of entire path (mm) (used for line too)
+const float pathMax_y = 100.0;            // x-length of entire path (mm) (used for line too)
 // Path properties (circle)
 const float circleDiameter = 800.0;       // Diameter of the circle
 
@@ -217,12 +234,17 @@ float zLimitOffset = 2.13;          // distance from wall when zeroed (mm)
 float maxHeight = zLength;          // max height that z can actuate without collision
                                     // (really depends on zeroed position)
 
+int16_t radius, centerX, centerY, x2, y2 = 0;
+
 // Variables ------------------------------------------------------------------------
 // Calibration coeffs, these are variables since we set them by accessing eeprom in setup
 // float Cx[3] = {0.00997506234f,0.01003310926f,0.00996611521f};
 // float Cy[3] = {0.01011531459f,0.01026588646f,0.01019056354f};
 float cVal[2][4] = {{0.0f,0.0f,0.0f,0.0f},
                   {0.0f,0.0f,0.0f,0.0f}};
+// (1.000000, 1.000000) 1: (0.997606, 1.004717) 2: (0.989168, 1.000850)
+float selfCal[2][3] = {{1.0f,0.997606f,0.989168f},
+                      {1.0f,1.004717f,1.000850f}};
 
 // Run states
 int limitHitX = 0;
@@ -350,7 +372,7 @@ void onClickZeroWorkspaceXY(EncoderButton &eb) {
   current_point_idx = 0;
 
   state = READY;
-  drawFixedUI();
+  // drawFixedUI();
   encoder.setClickHandler(nullHandler);
 }
 
@@ -376,9 +398,26 @@ void encoderDesignMode() {
     encoder.update();
   }
 
-  drawCenteredText("Zero Workspace XY", 1);
+  // Hack for opensauce, auto-zero XY
+  workspaceZeroXY();
+
+  // Reset cutting path
+  path_started = false;
+  current_path_idx = 0;
+  current_point_idx = 0;
+
+  state = READY;
   encoder.setEncoderHandler(nullHandler);
-  encoder.setClickHandler(onClickZeroWorkspaceXY);
+  encoder.setClickHandler(nullHandler);
+
+  screen.fillScreen(GC9A01A_BLACK);
+
+  drawDirection();
+
+  // TODO: uncomment to add in manual XY zeroing
+  // drawCenteredText("Zero Workspace XY", 1);
+  // encoder.setEncoderHandler(nullHandler);
+  // encoder.setClickHandler(onClickZeroWorkspaceXY);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -394,6 +433,10 @@ void setup() {
   // Initialize the display
   screen.begin();
   screen.fillScreen(GC9A01A_BLACK);
+
+  radius = screen.width()*0.95 / 4;
+  centerX = screen.width() / 2;
+  centerY = screen.width() / 2;
 
   drawCenteredText("Initializing...", 1);
   // screen.setRotation(1);
@@ -437,6 +480,8 @@ void setup() {
     return;
   }
   Serial.println("Initialization done.");
+
+  // calibrate();
 
   encoder.setClickHandler(onClickZeroMachineX);
   encoder.setTripleClickHandler(onClickGoToDesignMode);
@@ -512,14 +557,15 @@ void loop() {
   ///////////////////////////////////
   Point goal = paths[current_path_idx][current_point_idx];
   Point next = paths[current_path_idx][current_point_idx + 1];
-
-  if ((millis()-lastDraw) > 15) {
-    iter = (iter + 1)%7;
-    // unsigned long now = micros();
-    drawUI(goal, next, iter);
-    // Serial.printf("draw %d took %i us\n", iter, micros()-now);
-    // lastDraw = millis();
-  }
+  
+  // TODO: removed this for the opensauce UI. Add back if you want.
+  // if ((millis()-lastDraw) > 15) {
+  //   iter = (iter + 1)%7;
+  //   // unsigned long now = micros();
+  //   drawUI(goal, next, iter);
+  //   // Serial.printf("draw %d took %i us\n", iter, micros()-now);
+  //   lastDraw = millis();
+  // }
   
 
   // If we have not started the path, and the first point is behind us
@@ -555,7 +601,7 @@ void loop() {
   bool handle_buttons_ok = handle_buttons_pressed || handle_buttons_debounce;
   bool gantry_intersects = desPos != NAN;
   bool goal_behind_router = pathDir[current_path_idx] * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
-  bool gantry_angle_ok = angleFrom(goal, next) > PI / 4;
+  bool gantry_angle_ok = angleFrom(goal, next) > (PI / 6);
 
   // TODO: delete me
   bool newChecks[4] = {handle_buttons_ok, gantry_intersects, goal_behind_router, gantry_angle_ok};
@@ -610,6 +656,8 @@ void loop() {
           }
           Serial.println("All paths finished");
           encoderDesignMode();
+        } else {
+          drawDirection();
         }
       }
     }
@@ -1031,8 +1079,8 @@ void doSensing() {
   // Sensor velocity sensing
   for (int i = 0; i < ns; i++) {
     // Sensor velocity sensing
-    measVel[0][i] = -convTwosComp(data[i].dx)*cVal[0][i]/dt;     // '-' convention is used to flip sensor's z axis
-    measVel[1][i] = convTwosComp(data[i].dy)*cVal[1][i]/dt;
+    measVel[0][i] = -convTwosComp(data[i].dx)*cVal[0][i]*selfCal[0][i]/dt;     // '-' convention is used to flip sensor's z axis
+    measVel[1][i] = convTwosComp(data[i].dy)*cVal[1][i]*selfCal[1][i]/dt;
   }
 
   // Body angle estimation
@@ -1049,6 +1097,7 @@ void doSensing() {
   for (int i = 0; i<4; i++) {
     sumAngVel = sumAngVel + estAngVel[i];
   }
+
   estAngVel1 = sumAngVel / 4.0f;
   // Integrate angular velocity to get angle
   estYaw = estYaw + estAngVel1*dt;
@@ -1217,7 +1266,11 @@ void debugging() {
     // Print debug data
     // Put all Serial print lines here to view
     
-    Serial.printf("x:%f,y:%f,theta:%f\n",estPos[0],estPos[1],estYaw);
+    // Serial.printf("x:%f,y:%f,theta:%f\n",estPos[0],estPos[1],estYaw);
+    // Serial.printf("S0 | x: %f, y: %f\n", measVel[0][0], measVel[1][0]);
+    // Serial.printf("S1 | x: %f, y: %f\n", measVel[0][1], measVel[1][1]);
+    // Serial.printf("S2 | x: %f, y: %f\n", measVel[0][2], measVel[1][2]);
+    // Serial.printf("w0:%f,w0:%f,w0:%f,%w0:%f\n", 1000*estAngVel[0], 1000*estAngVel[1], 1000*estAngVel[2], 1000*estAngVel[3]);
     // Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
     // Serial.printf("x_raw:%f,y_raw:%f\n",measVel[0][0],measVel[1][0]);
     // Serial.printf("thickness:%f, analog: %i",Conv*analogRead(POT_THICK), analogRead(POT_THICK));
@@ -1311,12 +1364,8 @@ void makePath() {
       Serial.println("Double line path generated!");
       break;
     case 4:
-      circleGenerator();
-      Serial.println("Circle path generated!");
-      break;
-    case 5:
       squareGenerator();
-      Serial.println("Square path generated!");
+      Serial.println("Circle path generated!");
       break;
   }
 
@@ -1348,6 +1397,57 @@ void readEepromCalibration(float (&cVal)[2][4]) {
       addr += sizeof(float);
     }
   }
+}
+
+void calibrate(){
+
+  float calDistance = 100.0;
+
+  float calPos[2][3] = {{0.0f, 0.0f, 0.0f},
+                    {0.0f,0.0f,0.0f}};
+
+// do for each axis
+  for (int axis = 0; axis <2; axis++){
+    delay(500);
+    calPos[axis][0] = 0.0;
+
+    screen.fillScreen(GC9A01A_BLACK);
+
+    Serial.println("about to sprintf");
+    char *msg;
+    // sprintf(msg, "Move %f mm in %d direction", calDistance, axis);
+    drawCenteredText("Move router in direction", 1);
+    Serial.printf("Move router in %i direction", axis);
+
+    // Serial.println("sprintf worked!");
+    // move calDistance cm in given axis direction
+    while (calPos[axis][0]<calDistance){
+      if(micros() - timeLastPoll >= dt) {
+        doSensing();
+        for (int i = 0; i < ns; i++){
+          calPos[axis][i] = calPos[axis][i] + estVel[axis][i]*dt;
+        }
+      }
+
+      Serial.println(calPos[axis][0]);
+    }
+    
+    screen.fillScreen(GC9A01A_BLACK);
+
+    // Serial.println("STOP");
+    drawCenteredText("STOP",  1);
+    delay(100);
+    // set calibration coefficients based on sensor0
+    for (int i = 0; i<ns; i++){
+      selfCal[axis][i] = calPos[axis][0]/calPos[axis][i];
+    }    
+  }
+
+  Serial.println("Calibration values:");
+  Serial.printf("\t0: (%f, %f)", selfCal[0][0], selfCal[1][0]);
+  Serial.printf("\t1: (%f, %f)", selfCal[0][1], selfCal[1][1]);
+  Serial.printf("\t2: (%f, %f)", selfCal[0][2], selfCal[1][2]);
+
 }
 
 void drawShape() {
@@ -1396,10 +1496,6 @@ void drawShape() {
       screen.drawLine(centerX+size/4, centerY-size, centerX+size/4, centerY+size, GC9A01A_WHITE);
       break;
     case 4:
-      // circle
-      screen.drawCircle(centerX, centerY, size, GC9A01A_WHITE);
-      break;
-    case 5:
       // diamond
       screen.drawLine(centerX-size, centerY, centerX, centerY+size, GC9A01A_WHITE);
       screen.drawLine(centerX, centerY+size, centerX+size, centerY, GC9A01A_WHITE);
@@ -1434,6 +1530,44 @@ void drawCenteredText(const char* text, int size) {
   screen.println(text);
 }
 
+void drawDirection() {
+  float width = 30;
+  float height = screen.height() / 3;
+  float spacing = 5;
+
+  int16_t centerX = screen.height() / 2;
+  int16_t centerY = screen.height() / 2;
+  
+  // Forward triangle
+  int16_t x0 = centerX - width;
+  int16_t y0 = centerY-spacing;
+  int16_t x1 = centerX;
+  int16_t y1 = centerY-height;
+  int16_t x2 = centerX + width;
+  int16_t y2 = centerY-spacing;
+
+  // Backward triangle
+  int16_t x3 = centerX - width;
+  int16_t y3 = centerY+spacing;
+  int16_t x4 = centerX;
+  int16_t y4 = centerY+height;
+  int16_t x5 = centerX + width;
+  int16_t y5 = centerY+spacing;
+
+  uint16_t forwardColor, reverseColor;
+
+  if (pathDir[current_path_idx] > 0) {
+    forwardColor = GC9A01A_WEBWORK_GREEN;
+    reverseColor = GC9A01A_DARKGREY;
+  } else {
+    forwardColor = GC9A01A_DARKGREY;
+    reverseColor = GC9A01A_WEBWORK_GREEN;
+  }
+
+  screen.drawTriangle(x0,y0,x1,y1,x2,y2,forwardColor);
+  screen.drawTriangle(x3,y3,x4,y4,x5,y5,reverseColor);
+}
+
 void drawFixedUI() {
   screen.fillScreen(GC9A01A_BLACK);
 
@@ -1462,6 +1596,8 @@ void drawUI(Point goal, Point next, uint8_t i) {
 
   float theta = estYaw - atan2f(goal.y-estPos[1], goal.x-estPos[0]);
   float dist = myDist(estPos[0], estPos[1], goal.x, goal.y);
+
+  // Serial.printf("yaw: %f\n", degrees(estYaw));
 
   float offsetRadius = radius*0.8*tanh(dist*0.1);
 
