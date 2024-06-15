@@ -197,7 +197,7 @@ long unsigned dtOutput = 20;            // (ms)
 // Sensor properties
 const int ns = 3;                   // number of sensors
 const int CPI = 2500;               // This value changes calibration coefficients
-long unsigned dt = 500;       // microseconds (freq = 1,000,000/timestepPoll [Hz])
+long unsigned dt = 900;       // microseconds (freq = 1,000,000/timestepPoll [Hz])
 const float lx = 120.0f;                // x length of rectangular sensor configuration
 const float ly = 140.0f;                // y length of rectangular sensor configuration
 const float xOff[3] = {-lx/2,lx/2,-lx/2};
@@ -266,6 +266,7 @@ long unsigned timeLastPoll = 0;
 long unsigned timeLastOutput = 0;
 long unsigned timeLastDebug = 0;
 long unsigned timeLastDebounce = 0;   // (ms)
+long unsigned sensingTime = 0;        // (us)
 
 // Measured quantities
 float measVel[2][3] = {{0.0f,0.0f,0.0f},
@@ -491,6 +492,7 @@ void setup() {
 void loop() {  
   // Sensing
   if(micros() - timeLastPoll >= dt) {
+    sensingTime = micros() - timeLastPoll;
     doSensing();
   }
 
@@ -801,17 +803,19 @@ void zigZagGenerator() {
   float zigSize = 40;
 
   for (int i = 0; i < MAX_POINTS; ++i) {
-    if (pCount < numPLine) {
-      float y = (pathMax_y) * (float)i / (MAX_POINTS - 1);
-      float x = std::fmod(y, zigSize);
-      if (x > (zigSize / 2)) {
-        x = zigSize - x;
-      }
-      
-      paths[0][i] = Point{x, y};
+
+    float y = (pathMax_y) * (float)i / (MAX_POINTS - 1);
+    float x = std::fmod(y, zigSize);
+    if (x > (zigSize / 2)) {
+      x = zigSize - x;
     }
+    
+    // Serial.printf("Points (%f, %f) \n ", x, y);
+    paths[0][i] = Point{x, y};
+
   }
 
+  
   num_paths = 1;
   num_points = MAX_POINTS;
 }
@@ -1079,8 +1083,8 @@ void doSensing() {
   // Sensor velocity sensing
   for (int i = 0; i < ns; i++) {
     // Sensor velocity sensing
-    measVel[0][i] = -convTwosComp(data[i].dx)*cVal[0][i]*selfCal[0][i]/dt;     // '-' convention is used to flip sensor's z axis
-    measVel[1][i] = convTwosComp(data[i].dy)*cVal[1][i]*selfCal[1][i]/dt;
+    measVel[0][i] = -convTwosComp(data[i].dx)*cVal[0][i]/sensingTime;     // '-' convention is used to flip sensor's z axis
+    measVel[1][i] = convTwosComp(data[i].dy)*cVal[1][i]/sensingTime;
   }
 
   // Body angle estimation
@@ -1100,7 +1104,7 @@ void doSensing() {
 
   estAngVel1 = sumAngVel / 4.0f;
   // Integrate angular velocity to get angle
-  estYaw = estYaw + estAngVel1*dt;
+  estYaw = estYaw + estAngVel1*sensingTime;
 
   // Body position estimation
   // TODO: simplify with matrix operation for rotation (using for loops)
@@ -1120,8 +1124,8 @@ void doSensing() {
   estVel1[0] = sumVelX / ns;
   estVel1[1] = sumVelY / ns;
   // Integrate linear velocities to get position
-  estPos[0] = estPos[0] + estVel1[0]*dt;
-  estPos[1] = estPos[1] + estVel1[1]*dt;
+  estPos[0] = estPos[0] + estVel1[0]*sensingTime;
+  estPos[1] = estPos[1] + estVel1[1]*sensingTime;
 
   // Additional values
   estTraj = atanf(estVel1[1]/estVel1[0]);    // trajectory angle w.r.t inertial frame
@@ -1278,6 +1282,7 @@ void debugging() {
     // Serial.print(motorPosX);
     // Serial.printf("des_pos:%f,z_stepper_pos:%f\n",desPos,measVel[1][0]);
     // Serial.printf("curr_pnt_idx:%i,curr_path_idx:%i\n",current_point_idx, current_path_idx);
+    Serial.printf("Sensing time = %i\n", sensingTime);
 
   }
 }
@@ -1363,6 +1368,10 @@ void makePath() {
       doubleLineGenerator();
       Serial.println("Double line path generated!");
       break;
+    // case 4:
+    //   circleGenerator();
+    //   Serial.println("Circle path generated!");
+    //   break;
     case 4:
       squareGenerator();
       Serial.println("Circle path generated!");
@@ -1495,6 +1504,10 @@ void drawShape() {
       screen.drawLine(centerX-size/4, centerY-size, centerX-size/4, centerY+size, GC9A01A_WHITE);
       screen.drawLine(centerX+size/4, centerY-size, centerX+size/4, centerY+size, GC9A01A_WHITE);
       break;
+    // case 4:
+    //   // circle
+    //   screen.drawCircle(centerX, centerY, size, GC9A01A_WHITE);
+    //   break;
     case 4:
       // diamond
       screen.drawLine(centerX-size, centerY, centerX, centerY+size, GC9A01A_WHITE);
