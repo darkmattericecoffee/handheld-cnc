@@ -138,7 +138,7 @@ int sensorPins[3] = {SS0, SS1, SS2};
 #define MAX_PATHS  4
 #define MAX_POINTS 1000
 
-#define NUM_DESIGNS 6
+#define NUM_DESIGNS 5
 
 // SD pins
 const int chipSelect = BUILTIN_SDCARD;
@@ -515,12 +515,12 @@ void loop() {
   Point goal = paths[current_path_idx][current_point_idx];
   Point next = paths[current_path_idx][current_point_idx + 1];
 
-  if ((millis()-lastDraw) > 15) {
+  if ((millis()-lastDraw) > 30) {
     iter = (iter + 1)%7;
     // unsigned long now = micros();
     drawUI(goal, next, iter);
     // Serial.printf("draw %d took %i us\n", iter, micros()-now);
-    // lastDraw = millis();
+    lastDraw = millis();
   }
   
 
@@ -557,7 +557,7 @@ void loop() {
   bool handle_buttons_ok = handle_buttons_pressed || handle_buttons_debounce;
   bool gantry_intersects = desPos != NAN;
   bool goal_behind_router = pathDir[current_path_idx] * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
-  bool gantry_angle_ok = angleFrom(goal, next) > PI / 4;
+  bool gantry_angle_ok = angleFrom(goal, next) > PI / 6;
 
   // TODO: delete me
   bool newChecks[4] = {handle_buttons_ok, gantry_intersects, goal_behind_router, gantry_angle_ok};
@@ -755,17 +755,19 @@ void zigZagGenerator() {
   float zigSize = 40;
 
   for (int i = 0; i < MAX_POINTS; ++i) {
-    if (pCount < numPLine) {
-      float y = (pathMax_y) * (float)i / (MAX_POINTS - 1);
-      float x = std::fmod(y, zigSize);
-      if (x > (zigSize / 2)) {
-        x = zigSize - x;
-      }
-      
-      paths[0][i] = Point{x, y};
+
+    float y = (pathMax_y) * (float)i / (MAX_POINTS - 1);
+    float x = std::fmod(y, zigSize);
+    if (x > (zigSize / 2)) {
+      x = zigSize - x;
     }
+    
+    // Serial.printf("Points (%f, %f) \n ", x, y);
+    paths[0][i] = Point{x, y};
+
   }
 
+  
   num_paths = 1;
   num_points = MAX_POINTS;
 }
@@ -1313,11 +1315,11 @@ void makePath() {
       doubleLineGenerator();
       Serial.println("Double line path generated!");
       break;
+    // case 4:
+    //   circleGenerator();
+    //   Serial.println("Circle path generated!");
+    //   break;
     case 4:
-      circleGenerator();
-      Serial.println("Circle path generated!");
-      break;
-    case 5:
       squareGenerator();
       Serial.println("Square path generated!");
       break;
@@ -1398,11 +1400,11 @@ void drawShape() {
       screen.drawLine(centerX-size/4, centerY-size, centerX-size/4, centerY+size, GC9A01A_WHITE);
       screen.drawLine(centerX+size/4, centerY-size, centerX+size/4, centerY+size, GC9A01A_WHITE);
       break;
+    // case 4:
+    //   // circle
+    //   screen.drawCircle(centerX, centerY, size, GC9A01A_WHITE);
+    //   break;
     case 4:
-      // circle
-      screen.drawCircle(centerX, centerY, size, GC9A01A_WHITE);
-      break;
-    case 5:
       // diamond
       screen.drawLine(centerX-size, centerY, centerX, centerY+size, GC9A01A_WHITE);
       screen.drawLine(centerX, centerY+size, centerX+size, centerY, GC9A01A_WHITE);
