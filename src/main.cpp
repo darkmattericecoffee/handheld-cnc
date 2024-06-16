@@ -412,8 +412,12 @@ void encoderDesignMode() {
   encoder.setClickHandler(nullHandler);
 
   screen.fillScreen(GC9A01A_BLACK);
-
   drawDirection();
+
+  // Clear out sensors in case we moved while in design mode
+  sensors[0].readBurst();
+  sensors[1].readBurst();
+  sensors_SPI1[0].readBurst();
 
   // TODO: uncomment to add in manual XY zeroing
   // drawCenteredText("Zero Workspace XY", 1);
