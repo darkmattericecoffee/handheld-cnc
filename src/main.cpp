@@ -247,6 +247,7 @@ float selfCal[2][3] = {{1.0f,0.997606f,0.989168f},
                       {1.0f,1.004717f,1.000850f}};
 
 // Run states
+int firstPass = 1;
 int limitHitX = 0;
 int limitHitZ = 0;
 int cutStarted = 0;
@@ -372,6 +373,8 @@ void onClickZeroWorkspaceXY(EncoderButton &eb) {
   current_path_idx = 0;
   current_point_idx = 0;
 
+  firstPass = 1;
+
   state = READY;
   // drawFixedUI();
   encoder.setClickHandler(nullHandler);
@@ -386,6 +389,7 @@ void onEncoderUpdateDesignMode(EncoderButton &eb) {
 void onClickMakePath(EncoderButton &eb) {
   makePath();
   state = DESIGN_SELECTED;
+  // workspaceZeroXY();
 }
 
 void encoderDesignMode() {
@@ -399,13 +403,19 @@ void encoderDesignMode() {
     encoder.update();
   }
 
+  delay(100);
+
   // Hack for opensauce, auto-zero XY
   workspaceZeroXY();
+  // estPos[0] = 0.0;
+  // estPos[1] = 0.0;
 
   // Reset cutting path
   path_started = false;
   current_path_idx = 0;
   current_point_idx = 0;
+
+  firstPass = 1;
 
   state = READY;
   encoder.setEncoderHandler(nullHandler);
@@ -496,6 +506,19 @@ void loop() {
     doSensing();
   }
 
+  if (state == READY && firstPass) {
+    firstPass = 0;
+
+    // Set all working position and orientation data to 0
+    estPos[0] = 0;
+    estPos[1] = 0;
+    estYaw = 0;
+    estPosTool[0] = 0;
+    estPosTool[1] = 0;
+  }
+
+  Serial.printf("firstPass = %i\n", firstPass);
+
   // Run steppers
   stepperX.run();
   stepperZ.run();
@@ -522,6 +545,7 @@ void loop() {
 
   // Break here until we are ready to cut
   if (state != READY) {
+    firstPass = 1;
     return;
   }
 
@@ -1232,6 +1256,15 @@ void workspaceZeroZ() {
 }
 
 void workspaceZeroXY() {
+  // Set all working position and orientation data to 0
+  estPos[0] = 0;
+  estPos[1] = 0;
+  estYaw = 0;
+  estPosTool[0] = 0;
+  estPosTool[1] = 0;
+
+  Serial.println("Zero workspace XY");
+
   // Make sure tool is centered
   stepperX.moveTo(0);
   while (stepperX.distanceToGo() != 0) {
@@ -1270,7 +1303,7 @@ void debugging() {
     // Print debug data
     // Put all Serial print lines here to view
     
-    // Serial.printf("x:%f,y:%f,theta:%f\n",estPos[0],estPos[1],estYaw);
+    Serial.printf("x:%f,y:%f,theta:%f\n",estPos[0],estPos[1],estYaw);
     // Serial.printf("S0 | x: %f, y: %f\n", measVel[0][0], measVel[1][0]);
     // Serial.printf("S1 | x: %f, y: %f\n", measVel[0][1], measVel[1][1]);
     // Serial.printf("S2 | x: %f, y: %f\n", measVel[0][2], measVel[1][2]);
