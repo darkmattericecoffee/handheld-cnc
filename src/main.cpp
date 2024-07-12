@@ -141,7 +141,7 @@ int sensorPins[3] = {SS0, SS1, SS2};
 #define MAX_PATHS  4
 #define MAX_POINTS 1000
 
-#define NUM_DESIGNS 5
+#define NUM_DESIGNS 6
 
 // Webwork green is 0x88FF88 or RGB (136,255,136)
 // The adafruit color mapping is a bit weird, and outlined here
@@ -1372,12 +1372,12 @@ void makePath() {
       doubleLineGenerator();
       Serial.println("Double line path generated!");
       break;
-    // case 4:
-    //   circleGenerator();
-    //   Serial.println("Circle path generated!");
-    //   break;
     case 4:
       squareGenerator();
+      Serial.println("Circle path generated!");
+      break;
+    case 5:
+      circleGenerator();
       Serial.println("Circle path generated!");
       break;
   }
@@ -1508,16 +1508,16 @@ void drawShape() {
       screen.drawLine(centerX-size/4, centerY-size, centerX-size/4, centerY+size, GC9A01A_WHITE);
       screen.drawLine(centerX+size/4, centerY-size, centerX+size/4, centerY+size, GC9A01A_WHITE);
       break;
-    // case 4:
-    //   // circle
-    //   screen.drawCircle(centerX, centerY, size, GC9A01A_WHITE);
-    //   break;
     case 4:
       // diamond
       screen.drawLine(centerX-size, centerY, centerX, centerY+size, GC9A01A_WHITE);
       screen.drawLine(centerX, centerY+size, centerX+size, centerY, GC9A01A_WHITE);
       screen.drawLine(centerX+size, centerY, centerX, centerY-size, GC9A01A_WHITE);
       screen.drawLine(centerX, centerY-size, centerX-size, centerY, GC9A01A_WHITE);
+      break;
+    case 5:
+      // circle
+      screen.drawCircle(centerX, centerY, size, GC9A01A_WHITE);
       break;
   }
 }
