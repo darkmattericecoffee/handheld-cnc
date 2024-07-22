@@ -168,7 +168,7 @@ const int eepromAddrCy = 12;
 // Modes
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
-int outputMode = 0;           // output data to serial
+int outputMode = 1;           // output data to serial
 int designMode = 0;           // choose the design 
 
 // Path properties
@@ -632,10 +632,10 @@ void loop() {
       outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()/Conv, desPos, true);
     }
 
-    if (!cutting) {
-      Serial.println("Cutting");
-      cutting = true;
-    }
+    // if (!cutting) {
+    //   Serial.println("Cutting");
+    //   cutting = true;
+    // }
 
     // We are good to cut
     stepperZ.moveTo(-Conv*matThickness);
@@ -673,10 +673,10 @@ void loop() {
       outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()/Conv, desPosClosest, false);
     }
 
-    if (cutting) {
-      Serial.println("Cutting Stopped");
-      cutting = false;
-    }
+    // if (cutting) {
+    //   Serial.println("Cutting Stopped");
+    //   cutting = false;
+    // }
     
     // Stop cutting
     stepperZ.moveTo(Conv*restHeight);
@@ -1274,7 +1274,7 @@ void debugging() {
     // Print debug data
     // Put all Serial print lines here to view
     
-    // Serial.printf("x:%f,y:%f,theta:%f\n",estPos[0],estPos[1],estYaw);
+    Serial.printf("x:%f,y:%f,theta:%f\n",estPos[0],estPos[1],estYaw);
     // Serial.printf("S0 | x: %f, y: %f\n", measVel[0][0], measVel[1][0]);
     // Serial.printf("S1 | x: %f, y: %f\n", measVel[0][1], measVel[1][1]);
     // Serial.printf("S2 | x: %f, y: %f\n", measVel[0][2], measVel[1][2]);
@@ -1286,7 +1286,7 @@ void debugging() {
     // Serial.print(motorPosX);
     // Serial.printf("des_pos:%f,z_stepper_pos:%f\n",desPos,measVel[1][0]);
     // Serial.printf("curr_pnt_idx:%i,curr_path_idx:%i\n",current_point_idx, current_path_idx);
-    Serial.printf("Sensing time = %i\n", sensingTime);
+    // Serial.printf("Sensing time = %i\n", sensingTime);
 
   }
 }
