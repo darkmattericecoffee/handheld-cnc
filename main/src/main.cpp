@@ -29,6 +29,8 @@ typedef enum State {
   POWER_ON,
   MACHINE_X_ZERO,
   WORKSPACE_Z_ZERO,
+  SETTING_THICKNESS,
+  THICKNESS_SET,
   SELECTING_DESIGN,
   DESIGN_SELECTED,
   READY
@@ -83,6 +85,7 @@ void debugging();
 void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting);
 void parseNC(const char* filename);
 void makePath();
+void encoderSetThickness();
 void encoderDesignMode();
 
 void drawShape();
@@ -98,6 +101,8 @@ void nullHandler(EncoderButton &eb);
 void onClickResetState(EncoderButton &eb);
 void onClickZeroMachineX(EncoderButton &eb);
 void onClickZeroWorkspaceZ(EncoderButton &eb);
+void onClickSetThickness(EncoderButton &eb);
+void onEncoderSetThickness(EncoderButton &eb);
 void onEncoderUpdateDesignMode(EncoderButton &eb);
 void onClickMakePath(EncoderButton &eb);
 void onClickZeroWorkspaceXY(EncoderButton &eb);
@@ -168,7 +173,7 @@ const int eepromAddrCy = 12;
 // Modes
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
-int outputMode = 1;           // output data to serial
+int outputMode = 0;           // output data to serial
 int designMode = 0;           // choose the design 
 
 // Path properties
@@ -360,7 +365,7 @@ void onClickZeroWorkspaceZ(EncoderButton &eb) {
   drawCenteredText("Zeroing Workspace Z...", 1);
   workspaceZeroZ();
   state = WORKSPACE_Z_ZERO;
-  encoderDesignMode();
+  encoderSetThickness();
 }
 
 void onClickZeroWorkspaceXY(EncoderButton &eb) {
@@ -375,6 +380,41 @@ void onClickZeroWorkspaceXY(EncoderButton &eb) {
   state = READY;
   // drawFixedUI();
   encoder.setClickHandler(nullHandler);
+}
+
+void onEncoderUpdateThickness(EncoderButton &eb) {
+  // NUM_DESIGNS to have correct wrapping for negative numbers
+  float incrScalar = 0.1;
+  float tempThickness = matThickness + eb.increment()*incrScalar;
+
+  if (tempThickness <= maxThickness && tempThickness >= 0) {
+    matThickness = tempThickness;
+  }
+  
+  char text2send[50]; // Define a buffer large enough to hold the formatted string
+  sprintf(text2send, "Turn to set thickness\n%.2f mm", matThickness);
+  drawCenteredText(text2send, 1);
+  // Serial.println(matThickness);
+}
+
+void onClickSetThickness(EncoderButton &eb) {
+  state = THICKNESS_SET;
+}
+
+void encoderSetThickness() {
+  char text2send[50]; // Define a buffer large enough to hold the formatted string
+  sprintf(text2send, "Turn to set thickness\n%.2f mm", matThickness);
+  drawCenteredText(text2send, 1);
+
+  state = SETTING_THICKNESS;
+  encoder.setEncoderHandler(onEncoderUpdateThickness);
+  encoder.setClickHandler(onClickSetThickness);
+
+  while (state != THICKNESS_SET) {
+    encoder.update();
+  }
+
+  encoderDesignMode();
 }
 
 void onEncoderUpdateDesignMode(EncoderButton &eb) {
@@ -1532,19 +1572,37 @@ void drawCenteredText(const char* text, int size) {
   int16_t tftHeight = screen.height();
   int16_t centerX = tftWidth / 2;
   int16_t centerY = tftHeight / 2;
-  int16_t x1, y1;
-  uint16_t w, h;
+
   screen.setFont(&FreeMonoBold9pt7b);
   screen.setTextSize(size);
-  screen.getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
-
-  // Calculate the top-left corner to start the text so that it gets centered
-  int16_t xStart = centerX - w / 2;
-  int16_t yStart = centerY - h / 2;
-
-  screen.setCursor(xStart, yStart);
   screen.setTextColor(GC9A01A_WHITE);
-  screen.println(text);
+
+  // Split the text into lines based on '\n'
+  char *line = strtok(text, "\n");
+  int lineCount = 0;
+  char *lines[10];  // Assuming a maximum of 10 lines for simplicity
+
+  while (line != NULL) {
+    lines[lineCount++] = line;
+    line = strtok(NULL, "\n");
+  }
+  Serial.println(lineCount);
+
+  // Calculate the total height of the text block
+  int16_t totalHeight = lineCount * size * 10; // Approximate height per line based on text size
+  int16_t yStart = centerY - totalHeight / 2;
+
+  for (int i = 0; i < lineCount; i++) {
+    int16_t x1, y1;
+    uint16_t w, h;
+    screen.getTextBounds(lines[i], 0, 0, &x1, &y1, &w, &h);
+
+    // Calculate the top-left corner to start the text so that it gets centered
+    int16_t xStart = centerX - w / 2;
+
+    screen.setCursor(xStart, yStart + i * size * 10);
+    screen.println(lines[i]);
+  }
 }
 
 void drawDirection() {
