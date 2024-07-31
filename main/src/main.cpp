@@ -40,6 +40,7 @@ typedef enum State {
 typedef struct Point {
   float x;
   float y;
+  float z;
 } Point;
 
 // Function definitions
@@ -192,7 +193,7 @@ const float circleDiameter = 800.0;       // Diameter of the circle
 // Material properties
 float matThickness = 0.0;                   // thickness of material
 float maxThickness = 10.0;                // upper bound of thickness knob (mm)
-float restHeight = 4.0;                   // rest height of tool before cutting
+float restHeight = 2.0;                   // rest height of tool before cutting
 
 // Timing constants
 long unsigned debounceDelay = 50;      // the debounce time; increase if the output flickers
@@ -552,17 +553,6 @@ void loop() {
   //     DesignModeToggle();
   //   }
   // }
-  
-  // Workspace X and Y zeroing
-  // if (state == DESIGN_SELECTED && digitalRead(ENCODER_BUTTON_PIN) == LOW) {
-  //   workspaceZeroXY();
-  //   state = READY;
-
-  //   // Reset cutting path
-  //   path_started = false;
-  //   current_path_idx = 0;
-  //   current_point_idx = 0;
-  // }
 
   // Break here until we are ready to cut
   if (state != READY) {
@@ -637,6 +627,7 @@ void loop() {
 
   // Desired position if we intersect
   float desPos = desPosIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
+  float desZ = goal.z;
   // Desired position if we do not intersect
   float desPosClosest = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
 
@@ -650,21 +641,21 @@ void loop() {
   bool gantry_angle_ok = angleFrom(goal, next) > (PI / 6);
 
   // TODO: delete me
-  bool newChecks[4] = {handle_buttons_ok, gantry_intersects, goal_behind_router, gantry_angle_ok};
-  bool logged = false;
-  for (int i=0; i<4; i++) {
-    if (prevChecks[i] != newChecks[i] && !logged) {
-      Serial.println("Checks have changed:");
-      Serial.printf("\thandle_buttons_ok: %d\n", handle_buttons_ok);
-      Serial.printf("\tgantry_intersects: %d\n", gantry_intersects);
-      Serial.printf("\tgoal_behind_router: %d\n", goal_behind_router);
-      Serial.printf("\tgantry_angle_ok: %d\n", gantry_angle_ok);
+  // bool newChecks[4] = {handle_buttons_ok, gantry_intersects, goal_behind_router, gantry_angle_ok};
+  // bool logged = false;
+  // for (int i=0; i<4; i++) {
+  //   if (prevChecks[i] != newChecks[i] && !logged) {
+  //     Serial.println("Checks have changed:");
+  //     Serial.printf("\thandle_buttons_ok: %d\n", handle_buttons_ok);
+  //     Serial.printf("\tgantry_intersects: %d\n", gantry_intersects);
+  //     Serial.printf("\tgoal_behind_router: %d\n", goal_behind_router);
+  //     Serial.printf("\tgantry_angle_ok: %d\n", gantry_angle_ok);
 
-      logged = true;
-    }
+  //     logged = true;
+  //   }
 
-    prevChecks[i] = newChecks[i];
-  }
+  //   prevChecks[i] = newChecks[i];
+  // }
 
   if (handle_buttons_ok && gantry_intersects && goal_behind_router && gantry_angle_ok) {
     // Path logging
@@ -678,7 +669,7 @@ void loop() {
     // }
 
     // We are good to cut
-    stepperZ.moveTo(-Conv*matThickness);
+    stepperZ.moveTo(Conv*desZ);
     stepperX.moveTo(Conv*desPos);
 
     // Update point index if needed
@@ -946,6 +937,43 @@ void squareGenerator() {
   }
 
   num_paths = 2;
+  num_points = MAX_POINTS;
+}
+
+void squareGeneratorFancy() {
+  float angle = 45;
+  float angle_rad = angle * (M_PI / 180.0);
+  float segment_length = 100.0;
+  float engrave_depth = matThickness / 4;
+  pathDir[0] = 1;
+  pathDir[1] = -1;
+  pathDir[2] = 1;
+
+  // Generate design engraving
+  for (int i = 0; i < MAX_POINTS; ++i) {
+    float y = (segment_length) * (float)i / (MAX_POINTS - 1);
+    float x = sinAmp * sinf((TWO_PI/sinPeriod)*y);
+    paths[0][i] = Point{x, y, -engrave_depth};
+  }
+
+  // Calculate the x and y increments based on the angle
+  float y_increment = segment_length / (MAX_POINTS - 1);
+  float x_increment = y_increment / tan(angle_rad);
+
+  // Generate diamond path to cut
+  for (int p = 0; p < 2; p++) {
+    for (int i = 0; i < MAX_POINTS; i++) {
+      int xIndex = (i >= MAX_POINTS / 2) ? (MAX_POINTS - 1 - i) : i;
+      int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
+      if (p == 0) {       // TODO: this if statement was a quick fix to get a working multi-path design
+        paths[2][i] = Point{x: pathDir[p] * xIndex * x_increment, y: yIndex * y_increment, z: -matThickness};
+      } else {
+        paths[1][i] = Point{x: pathDir[p] * xIndex * x_increment, y: yIndex * y_increment, z: -matThickness};
+      }
+    }
+  }
+
+  num_paths = 3;
   num_points = MAX_POINTS;
 }
 
@@ -1314,7 +1342,7 @@ void debugging() {
     // Print debug data
     // Put all Serial print lines here to view
     
-    Serial.printf("x:%f,y:%f,theta:%f\n",estPos[0],estPos[1],estYaw);
+    Serial.printf("x:%f,y:%f,theta:%f\n",estPos[0],estPos[1],estYaw * 180.0 / PI);
     // Serial.printf("S0 | x: %f, y: %f\n", measVel[0][0], measVel[1][0]);
     // Serial.printf("S1 | x: %f, y: %f\n", measVel[0][1], measVel[1][1]);
     // Serial.printf("S2 | x: %f, y: %f\n", measVel[0][2], measVel[1][2]);
@@ -1413,8 +1441,8 @@ void makePath() {
       Serial.println("Double line path generated!");
       break;
     case 4:
-      squareGenerator();
-      Serial.println("Circle path generated!");
+      squareGeneratorFancy();
+      Serial.println("Fancy square path generated!");
       break;
     case 5:
       circleGenerator();
@@ -1425,7 +1453,7 @@ void makePath() {
   for (int i=0; i < num_paths; i++) {
     for (int j = 0; j < num_points; j++) {
         // TODO: do for any size pathArray
-        Serial.printf("PATH:%d,%f,%f\n", i, paths[i][j].x, paths[i][j].y);
+        Serial.printf("PATH:%d,%f,%f,%f\n", i, paths[i][j].x, paths[i][j].y, paths[i][j].z);
       }
   }
 }
