@@ -174,7 +174,7 @@ const int eepromAddrCy = 12;
 // Modes
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
-int outputMode = 0;           // output data to serial
+int outputMode = 1;           // output data to serial
 int designMode = 0;           // choose the design 
 
 // Path properties
@@ -206,8 +206,8 @@ const int CPI = 2500;               // This value changes calibration coefficien
 long unsigned dt = 900;       // microseconds (freq = 1,000,000/timestepPoll [Hz])
 const float lx = 120.0f;                // x length of rectangular sensor configuration
 const float ly = 140.0f;                // y length of rectangular sensor configuration
-const float xOff[3] = {-lx/2,lx/2,-lx/2};
-const float yOff[3] = {ly/2,ly/2,-ly/2};
+// const float xOff[3] = {-lx/2,lx/2,-lx/2};
+// const float yOff[3] = {ly/2,ly/2,-ly/2};
 
 // Motor properties
 // Note: Constants are in units (steps/*) whereas variables are (mm/*). Kind of
@@ -235,6 +235,7 @@ int TPWMTHRS = 0x753;                  // threshold velocity for spreadCycle (at
 float gantryLength = 106.0;         // usable length of x-gantry (mm)
 float xLimitOffset = 2.54;          // distance from wall of stepper when zeroed (mm)
 float xBuffer = 3.0;                // safety buffer between tool body and walls (mm)
+float yOffset = 0.0;               // offset to try to counteract weird rotation behavior (mm)
 float zLength = 34.0;               // usable length of z-gantry (mm)
 float zLimitOffset = 2.13;          // distance from wall when zeroed (mm)
 float maxHeight = zLength;          // max height that z can actuate without collision
@@ -1160,8 +1161,8 @@ void doSensing() {
   }
 
   // Body angle estimation
-  estAngVel[0] = (measVel[0][2] - measVel[0][0])/ly;
-  estAngVel[1] = (measVel[0][2] - measVel[0][1])/ly;
+  estAngVel[0] = (measVel[0][2] - measVel[0][0])/(ly+yOffset);
+  estAngVel[1] = (measVel[0][2] - measVel[0][1])/(ly+yOffset);
   estAngVel[2] = (measVel[1][1] - measVel[1][0])/lx;
   estAngVel[3] = (measVel[1][1] - measVel[1][2])/lx;
   // TODO: filter out bad sensor measurements
@@ -1180,12 +1181,12 @@ void doSensing() {
 
   // Body position estimation
   // TODO: simplify with matrix operation for rotation (using for loops)
-  estVel[0][0] = measVel[0][0]*cosf(estYaw)-measVel[1][0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-ly*sinf(estYaw));
-  estVel[0][1] = measVel[0][1]*cosf(estYaw)-measVel[1][1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+ly*sinf(estYaw));
-  estVel[0][2] = measVel[0][2]*cosf(estYaw)-measVel[1][2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-ly*sinf(estYaw));
-  estVel[1][0] = measVel[0][0]*sinf(estYaw)+measVel[1][0]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)+lx*sinf(estYaw));
-  estVel[1][1] = measVel[0][1]*sinf(estYaw)+measVel[1][1]*cosf(estYaw) + 0.5*estAngVel1*(-ly*cosf(estYaw)+lx*sinf(estYaw));
-  estVel[1][2] = measVel[0][2]*sinf(estYaw)+measVel[1][2]*cosf(estYaw) + 0.5*estAngVel1*(ly*cosf(estYaw)-lx*sinf(estYaw));
+  estVel[0][0] = measVel[0][0]*cosf(estYaw)-measVel[1][0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-(ly+yOffset)*sinf(estYaw));
+  estVel[0][1] = measVel[0][1]*cosf(estYaw)-measVel[1][1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+(ly+yOffset)*sinf(estYaw));
+  estVel[0][2] = measVel[0][2]*cosf(estYaw)-measVel[1][2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-(ly+yOffset)*sinf(estYaw));
+  estVel[1][0] = measVel[0][0]*sinf(estYaw)+measVel[1][0]*cosf(estYaw) + 0.5*estAngVel1*((ly+yOffset)*cosf(estYaw)+lx*sinf(estYaw));
+  estVel[1][1] = measVel[0][1]*sinf(estYaw)+measVel[1][1]*cosf(estYaw) + 0.5*estAngVel1*(-(ly+yOffset)*cosf(estYaw)+lx*sinf(estYaw));
+  estVel[1][2] = measVel[0][2]*sinf(estYaw)+measVel[1][2]*cosf(estYaw) + 0.5*estAngVel1*((ly+yOffset)*cosf(estYaw)-lx*sinf(estYaw));
   // Simple average of linear velocities
   float sumVelX = 0.0f;
   float sumVelY = 0.0f;
