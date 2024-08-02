@@ -349,6 +349,10 @@ void onClickGoToDesignMode(EncoderButton &eb) {
   encoderDesignMode();
 }
 
+void onClickGoToSetThickness(EncoderButton &eb){
+  encoderSetThickness();
+}
+
 void onClickResetState(EncoderButton &eb) {
   drawCenteredText("Zero Machine X", 1);
   state = POWER_ON;
@@ -389,7 +393,7 @@ void onEncoderUpdateThickness(EncoderButton &eb) {
   float incrScalar = 0.1;
   float tempThickness = matThickness + eb.increment()*incrScalar;
 
-  if (tempThickness <= maxThickness && tempThickness >= 0) {
+  if (tempThickness <= maxThickness && tempThickness >= 0.0) {
     matThickness = tempThickness;
   }
   
@@ -531,7 +535,7 @@ void setup() {
   // calibrate();
 
   encoder.setClickHandler(onClickZeroMachineX);
-  encoder.setTripleClickHandler(onClickGoToDesignMode);
+  encoder.setTripleClickHandler(onClickGoToSetThickness);
   onClickResetState(encoder);
 }
 
