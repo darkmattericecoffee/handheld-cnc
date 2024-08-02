@@ -235,7 +235,7 @@ int TPWMTHRS = 0x753;                  // threshold velocity for spreadCycle (at
 float gantryLength = 106.0;         // usable length of x-gantry (mm)
 float xLimitOffset = 2.54;          // distance from wall of stepper when zeroed (mm)
 float xBuffer = 3.0;                // safety buffer between tool body and walls (mm)
-float yOffset = 0.0;               // offset to try to counteract weird rotation behavior (mm)
+float ySensorOffset = -3.5;               // offset to try to counteract weird rotation behavior (mm)
 float zLength = 34.0;               // usable length of z-gantry (mm)
 float zLimitOffset = 2.13;          // distance from wall when zeroed (mm)
 float maxHeight = zLength;          // max height that z can actuate without collision
@@ -615,7 +615,7 @@ void loop() {
     float desPos = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
 
     if (outputMode) {
-      outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()/Conv, desPos, false);
+      outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
     }
 
     stepperX.moveTo(Conv*desPos);
@@ -661,7 +661,7 @@ void loop() {
   if (handle_buttons_ok && gantry_intersects && goal_behind_router && gantry_angle_ok) {
     // Path logging
     if (outputMode) {
-      outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()/Conv, desPos, true);
+      outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
     }
 
     // if (!cutting) {
@@ -702,7 +702,7 @@ void loop() {
   } else {
     // Path logging
     if (outputMode) {
-      outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()/Conv, desPosClosest, false);
+      outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
     }
 
     // if (cutting) {
@@ -1104,7 +1104,7 @@ float desPosClosestToIntersect(float xc, float yc, float th, float x3, float y3,
   // Check for parallel lines (denominator is zero)
   if (den == 0) {
     // If lines are parallel, just keep the stepper where it is
-    return stepperX.currentPosition() / Conv;
+    return stepperX.currentPosition()*1.0f / Conv;
   }
 
   float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
@@ -1161,8 +1161,8 @@ void doSensing() {
   }
 
   // Body angle estimation
-  estAngVel[0] = (measVel[0][2] - measVel[0][0])/(ly+yOffset);
-  estAngVel[1] = (measVel[0][2] - measVel[0][1])/(ly+yOffset);
+  estAngVel[0] = (measVel[0][2] - measVel[0][0])/ly;
+  estAngVel[1] = (measVel[0][2] - measVel[0][1])/ly;
   estAngVel[2] = (measVel[1][1] - measVel[1][0])/lx;
   estAngVel[3] = (measVel[1][1] - measVel[1][2])/lx;
   // TODO: filter out bad sensor measurements
@@ -1181,12 +1181,12 @@ void doSensing() {
 
   // Body position estimation
   // TODO: simplify with matrix operation for rotation (using for loops)
-  estVel[0][0] = measVel[0][0]*cosf(estYaw)-measVel[1][0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-(ly+yOffset)*sinf(estYaw));
-  estVel[0][1] = measVel[0][1]*cosf(estYaw)-measVel[1][1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+(ly+yOffset)*sinf(estYaw));
-  estVel[0][2] = measVel[0][2]*cosf(estYaw)-measVel[1][2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-(ly+yOffset)*sinf(estYaw));
-  estVel[1][0] = measVel[0][0]*sinf(estYaw)+measVel[1][0]*cosf(estYaw) + 0.5*estAngVel1*((ly+yOffset)*cosf(estYaw)+lx*sinf(estYaw));
-  estVel[1][1] = measVel[0][1]*sinf(estYaw)+measVel[1][1]*cosf(estYaw) + 0.5*estAngVel1*(-(ly+yOffset)*cosf(estYaw)+lx*sinf(estYaw));
-  estVel[1][2] = measVel[0][2]*sinf(estYaw)+measVel[1][2]*cosf(estYaw) + 0.5*estAngVel1*((ly+yOffset)*cosf(estYaw)-lx*sinf(estYaw));
+  estVel[0][0] = measVel[0][0]*cosf(estYaw)-measVel[1][0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-(ly)*sinf(estYaw));
+  estVel[0][1] = measVel[0][1]*cosf(estYaw)-measVel[1][1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+(ly)*sinf(estYaw));
+  estVel[0][2] = measVel[0][2]*cosf(estYaw)-measVel[1][2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-(ly)*sinf(estYaw));
+  estVel[1][0] = measVel[0][0]*sinf(estYaw)+measVel[1][0]*cosf(estYaw) + 0.5*estAngVel1*((ly)*cosf(estYaw)+lx*sinf(estYaw));
+  estVel[1][1] = measVel[0][1]*sinf(estYaw)+measVel[1][1]*cosf(estYaw) + 0.5*estAngVel1*(-(ly)*cosf(estYaw)+lx*sinf(estYaw));
+  estVel[1][2] = measVel[0][2]*sinf(estYaw)+measVel[1][2]*cosf(estYaw) + 0.5*estAngVel1*((ly)*cosf(estYaw)-lx*sinf(estYaw));
   // Simple average of linear velocities
   float sumVelX = 0.0f;
   float sumVelY = 0.0f;
@@ -1194,8 +1194,8 @@ void doSensing() {
     sumVelX = sumVelX + estVel[0][i];
     sumVelY = sumVelY + estVel[1][i];
   }
-  estVel1[0] = sumVelX / ns;
-  estVel1[1] = sumVelY / ns;
+  estVel1[0] = (sumVelX / ns) - estAngVel1*ySensorOffset*cosf(estYaw);
+  estVel1[1] = (sumVelY / ns) - estAngVel1*ySensorOffset*sinf(estYaw);
   // Integrate linear velocities to get position
   estPos[0] = estPos[0] + estVel1[0]*sensingTime;
   estPos[1] = estPos[1] + estVel1[1]*sensingTime;
@@ -1292,7 +1292,7 @@ void workspaceZeroZ() {
   }
 
   // Set this as the max height
-  maxHeight = stepperZ.currentPosition() / Conv;
+  maxHeight = stepperZ.currentPosition()*1.0f / Conv;
 
   // Return to rest height
   stepperZ.moveTo(Conv*restHeight);
@@ -1372,7 +1372,7 @@ void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPo
     float desY = estY + desPos*sinf(estYaw);
 
     Serial.printf(
-      "POS:%f,%f,%f,%f,%f,%f,%f,%f,%f,%d\n",
+      "POS:%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f\n",
       estX,
       estY,
       estYaw,
@@ -1382,7 +1382,8 @@ void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPo
       toolY,
       desX,
       desY,
-      cutting
+      cutting,
+      toolPos
     );
   }
 }
