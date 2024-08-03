@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def read_gcode_csv(file_path):
@@ -17,11 +18,16 @@ def line_from_point_point(pt1, pt2):
     return [m, b]
 
 
+def calculate_distance(p1, p2):
+    return np.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
+
+
 def create_segments(gcode_df, gantry_orientation):
     # compute direction between point i and point i+1
     # see if it is within 45 deg of gantry orientation
     # label green or red, continue
     gcode_df["can_cut"] = False
+    gcode_df["angle_d"] = 0
     for i in range(len(gcode_df) - 1):
         print("pt1 = " + str([gcode_df.x[i], gcode_df.y[i]]))
         print("pt2 = " + str([gcode_df.x[i + 1], gcode_df.y[i + 1]]))
@@ -32,6 +38,9 @@ def create_segments(gcode_df, gantry_orientation):
             segment_angle = 0
         else:
             segment_angle = 90 - np.rad2deg(np.arctan(mi))
+        # storing point to point angle here in deg
+        gcode_df.loc[i, "angle_d"] = segment_angle
+
         # TODO: need to make sure we stay on one side of this angle for a continuous segment
         # ie we cannot go from 30 to -30 or somebting even though it's in range.....
         if abs(segment_angle) - gantry_orientation < 45:
@@ -40,15 +49,121 @@ def create_segments(gcode_df, gantry_orientation):
     return gcode_df
 
 
-# take in file
-# parse to get x y z
-# go through array and see how many points in a row have a diff parallel (or parallel +/-45 deg) to gantry access
-# if segment is longer
+def filter_segments_by_length(gcode_df, min_segment_length=0.05):
+    # min segment length input in m
+    segments = []
+    current_segment = []
+    for i in range(len(gcode_df)):
+        if gcode_df.loc[i, "can_cut"]:
+            current_segment.append(i)
+        else:
+            if len(current_segment) > 0:
+                segments.append(current_segment)
+                current_segment = []
+
+    if len(current_segment) > 0:
+        segments.append(current_segment)
+
+    # Filter segments based on length
+    filtered_segments = []
+
+    for segment in segments:
+        segment_points = gcode_df.iloc[segment]
+        length = 0
+
+        for i in range(len(segment_points) - 1):
+            p1 = [segment_points.iloc[i].x, segment_points.iloc[i].y]
+            p2 = [segment_points.iloc[i + 1].x, segment_points.iloc[i + 1].y]
+            length += calculate_distance(p1, p2)
+
+        if length > min_segment_length:
+            filtered_segments.append(segment)
+
+    return filtered_segments
+
+
+def filter_segments_by_angle(gcode_df):
+    # loop through the df, and create list of lists representing segments where
+    # the angle for all the points in the segment is less than +/-45deg
+    # once you break out of that, save that as segmnet
+    # then return this, and we can filter by segmnet length with filter_semgments_by_length()
+    prev_angle = gcode_df.iloc[0].angle_d
+    segments = []
+    current_segment = []
+    for i in range(1, len(gcode_df)):
+        print("current angle = " + str(gcode_df.iloc[i].angle_d))
+        print("previous angle = " + str(prev_angle))
+        print("diff = " + str(gcode_df.iloc[i].angle_d - prev_angle))
+        if gcode_df.iloc[i].angle_d - prev_angle < 45:
+            current_segment.append(i)
+            # continue adding to this list biatch
+        else:
+            if len(current_segment) > 0:
+                segments.append(current_segment)
+                current_segment = []
+            # TODO: do we need to just always be updating the initial angle?
+        prev_angle = gcode_df.iloc[i].angle_d
+
+    return segments
+
+
+def plot_segments(gcode_df, filtered_segments):
+    plt.figure(figsize=(10, 6))
+
+    for segment in filtered_segments:
+        segment_points = gcode_df.iloc[segment]
+        x = segment_points["x"]
+        y = segment_points["y"]
+
+        plt.scatter(x, y, label="Segment Points")
+
+        # Optionally plot lines connecting points in the segment
+        plt.plot(x, y, linestyle="-", marker="o", label="Segment Path")
+
+    plt.xlabel("X Coordinate")
+    plt.ylabel("Y Coordinate")
+    plt.title("Filtered Segments")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
+def plot_segment_by_angle(gcode_df, segments_list):
+    plt.figure(figsize=(10, 6))
+
+    for indices in segments_list:
+        # Extract x and y values using the indices
+        x = gcode_df.loc[indices, "x"]
+        y = gcode_df.loc[indices, "y"]
+
+        # Plot with markers
+        plt.plot(x, y, marker="o")
+
+    plt.xlabel("X-axis")
+    plt.ylabel("Y-axis")
+    plt.title("Plot of Indexed Data from DataFrame")
+    plt.grid(True)
+    plt.legend([f"Sublist {i+1}" for i in range(len(segments_list))])
+    plt.show()
 
 
 def main():
     my_df = read_gcode_csv("dev/gCode/basePlate_test.csv")
+
+    plt.scatter(my_df.x, my_df.y)
+    plt.grid()
+    plt.show()
+
     gcode_df_with_segment_flag = create_segments(my_df, 0)
+
+    segments_list_angle_filtered = filter_segments_by_angle(gcode_df_with_segment_flag)
+
+    segments_list_length_filtered = filter_segments_by_length(
+        gcode_df_with_segment_flag
+    )
+    plot_segment_by_angle(my_df, segments_list_angle_filtered)
+
+    plot_segments(gcode_df_with_segment_flag, segments_list_angle_filtered)
     print("hi")
 
 
