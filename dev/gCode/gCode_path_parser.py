@@ -96,7 +96,7 @@ def filter_segments_by_angle(gcode_df):
 
         if (
             abs(current_angle - initial_angle) <= 45
-        ):  # compare with initial angle of segment
+        ):  # compare with initial angle of seggy
             if current_segment:
                 segment_distance_mm += calculate_distance(current_segment[-1], point)
             current_segment.append(point)
@@ -115,12 +115,12 @@ def filter_segments_by_angle(gcode_df):
                 )
                 current_segment = []
                 segment_distance_mm = 0
-                initial_angle = current_angle  # start new segment
+                initial_angle = current_angle  # start new seggy
                 min_angle_d = current_angle
                 max_angle_d = current_angle
                 current_segment.append(point)
 
-    # Add the last segment if it exists
+    # add last seggy if it's not empty
     if current_segment:
         segments.append(
             {
@@ -132,7 +132,6 @@ def filter_segments_by_angle(gcode_df):
             }
         )
 
-    # Convert segments list to DataFrame
     segments_df = pd.DataFrame(
         segments,
         columns=[
@@ -186,22 +185,14 @@ def plot_segment_by_angle(segments_df):
 
 def main():
     my_df = read_gcode_csv("dev/gCode/basePlate_test.csv")
-
-    # plt.scatter(my_df.x, my_df.y)
-    # plt.grid()
-    # plt.show()
+    plt.scatter(my_df.x, my_df.y)
+    plt.grid()
+    plt.title("Plotting whole GCODE Path (just the points)")
+    plt.show()
 
     gcode_df_with_segment_flag = create_segments(my_df, 0)
-
     segments_list_angle_filtered = filter_segments_by_angle(gcode_df_with_segment_flag)
-
-    # segments_list_length_filtered = filter_segments_by_length(
-    #     gcode_df_with_segment_flag
-    # )
     plot_segment_by_angle(segments_list_angle_filtered)
-
-    # plot_segments(gcode_df_with_segment_flag, segments_list_angle_filtered)
-    # print("hi")
 
 
 if __name__ == "__main__":
