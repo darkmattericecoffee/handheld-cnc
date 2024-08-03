@@ -235,7 +235,8 @@ int TPWMTHRS = 0x753;                  // threshold velocity for spreadCycle (at
 float gantryLength = 106.0;         // usable length of x-gantry (mm)
 float xLimitOffset = 2.54;          // distance from wall of stepper when zeroed (mm)
 float xBuffer = 3.0;                // safety buffer between tool body and walls (mm)
-float ySensorOffset = -3.5;               // offset to try to counteract weird rotation behavior (mm)
+float xSensorOffset = -2.32;
+float ySensorOffset = -3.2;               // offset to try to counteract weird rotation behavior (mm)
 float zLength = 34.0;               // usable length of z-gantry (mm)
 float zLimitOffset = 2.13;          // distance from wall when zeroed (mm)
 float maxHeight = zLength;          // max height that z can actuate without collision
@@ -1198,8 +1199,8 @@ void doSensing() {
     sumVelX = sumVelX + estVel[0][i];
     sumVelY = sumVelY + estVel[1][i];
   }
-  estVel1[0] = (sumVelX / ns) - estAngVel1*ySensorOffset*cosf(estYaw);
-  estVel1[1] = (sumVelY / ns) - estAngVel1*ySensorOffset*sinf(estYaw);
+  estVel1[0] = (sumVelX / ns) - estAngVel1*(xSensorOffset*sinf(estYaw) + ySensorOffset*cosf(estYaw));
+  estVel1[1] = (sumVelY / ns) + estAngVel1*(xSensorOffset*cosf(estYaw) - ySensorOffset*sinf(estYaw));
   // Integrate linear velocities to get position
   estPos[0] = estPos[0] + estVel1[0]*sensingTime;
   estPos[1] = estPos[1] + estVel1[1]*sensingTime;
