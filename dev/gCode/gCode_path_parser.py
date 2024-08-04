@@ -3,11 +3,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+# TODO: make this actually parce gcode + nc files...
 def read_gcode_csv(file_path):
     df = pd.read_csv(file_path)
     return df
 
 
+# geo function
 def line_from_point_point(pt1, pt2):
     """
     Takes in a point of the form, [x,y]
@@ -18,11 +20,13 @@ def line_from_point_point(pt1, pt2):
     return [m, b]
 
 
+# geo function
 def calculate_distance(p1, p2):
     return np.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
 
 
-def create_segments(gcode_df, gantry_orientation):
+# TODO: this needs to be fixed to properly create segments
+def create_segments_flag(gcode_df, gantry_orientation):
     # compute direction between point i and point i+1
     # see if it is within 45 deg of gantry orientation
     # label green or red, continue
@@ -49,39 +53,7 @@ def create_segments(gcode_df, gantry_orientation):
     return gcode_df
 
 
-def filter_segments_by_length(gcode_df, min_segment_length=0.05):
-    # min segment length input in m
-    segments = []
-    current_segment = []
-    for i in range(len(gcode_df)):
-        if gcode_df.loc[i, "can_cut"]:
-            current_segment.append(i)
-        else:
-            if len(current_segment) > 0:
-                segments.append(current_segment)
-                current_segment = []
-
-    if len(current_segment) > 0:
-        segments.append(current_segment)
-
-    # Filter segments based on length
-    filtered_segments = []
-
-    for segment in segments:
-        segment_points = gcode_df.iloc[segment]
-        length = 0
-
-        for i in range(len(segment_points) - 1):
-            p1 = [segment_points.iloc[i].x, segment_points.iloc[i].y]
-            p2 = [segment_points.iloc[i + 1].x, segment_points.iloc[i + 1].y]
-            length += calculate_distance(p1, p2)
-
-        if length > min_segment_length:
-            filtered_segments.append(segment)
-
-    return filtered_segments
-
-
+# This seems to be working, getting
 def filter_segments_by_angle(gcode_df):
     initial_angle = gcode_df.iloc[0].angle_d
     segments = []
@@ -190,7 +162,7 @@ def main():
     plt.title("Plotting whole GCODE Path (just the points)")
     plt.show()
 
-    gcode_df_with_segment_flag = create_segments(my_df, 0)
+    gcode_df_with_segment_flag = create_segments_flag(my_df, 0)
     segments_list_angle_filtered = filter_segments_by_angle(gcode_df_with_segment_flag)
     plot_segment_by_angle(segments_list_angle_filtered)
 
