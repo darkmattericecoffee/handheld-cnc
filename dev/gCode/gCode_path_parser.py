@@ -26,7 +26,7 @@ def calculate_distance(p1, p2):
 
 
 # TODO: this needs to be fixed to properly create segments
-def create_segments_flag(gcode_df, gantry_orientation):
+def gen_point_to_point_angles(gcode_df, gantry_orientation):
     # compute direction between point i and point i+1
     # see if it is within 45 deg of gantry orientation
     # label green or red, continue
@@ -47,14 +47,14 @@ def create_segments_flag(gcode_df, gantry_orientation):
 
         # TODO: need to make sure we stay on one side of this angle for a continuous segment
         # ie we cannot go from 30 to -30 or somebting even though it's in range.....
-        if abs(segment_angle) - gantry_orientation < 45:
-            gcode_df.loc[i, "can_cut"] = True
+        # if abs(segment_angle) - gantry_orientation < 45:
+        # gcode_df.loc[i, "can_cut"] = True
 
     return gcode_df
 
 
 # This seems to be working, getting
-def filter_segments_by_angle(gcode_df):
+def create_segments_by_angle(gcode_df):
     initial_angle = gcode_df.iloc[0].angle_d
     segments = []
     current_segment = []
@@ -155,6 +155,12 @@ def plot_segment_by_angle(segments_df):
     plt.show()
 
 
+# all we need to add:
+# compute necessary gantry orientations given our segments and segment angle min/max
+# optimize for minimizing # of segmennts and also maximuizing segment length
+# also minimize unique gantry orientations
+
+
 def main():
     my_df = read_gcode_csv("dev/gCode/basePlate_test.csv")
     plt.scatter(my_df.x, my_df.y)
@@ -162,8 +168,9 @@ def main():
     plt.title("Plotting whole GCODE Path (just the points)")
     plt.show()
 
-    gcode_df_with_segment_flag = create_segments_flag(my_df, 0)
-    segments_list_angle_filtered = filter_segments_by_angle(gcode_df_with_segment_flag)
+    gcode_df_with_segment_flag = gen_point_to_point_angles(my_df, 0)
+    # i might be creating segments from all of it and not just what i can cut from initial segment flag
+    segments_list_angle_filtered = create_segments_by_angle(gcode_df_with_segment_flag)
     plot_segment_by_angle(segments_list_angle_filtered)
 
 
