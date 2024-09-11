@@ -174,7 +174,7 @@ const int eepromAddrCy = 12;
 // Modes
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
 int debugMode = 1;            // print values (1 = yes; 0 = no)
-int outputMode = 1;           // output data to serial
+int outputMode = 0;           // output data to serial
 int designMode = 0;           // choose the design 
 
 // Path properties
@@ -214,7 +214,8 @@ const float ly = 140.0f;                // y length of rectangular sensor config
 // confusing, but whenedver the variables are used within an accelStepper function,
 // multiply by Conv. This can be made simpler by using SpeedyStepper library.
 int uSteps = 4;                       // microstep configuration
-int Conv = 25*uSteps;                 // conversion factor (mm -> steps)
+float lead = 8;                       // lead screw lead (mm)
+float Conv = 200/lead*uSteps;         // conversion factor (mm -> steps)
 float stepPulseWidth = 20.0;          // min pulse width (from Mark Rober's code)
 float maxCurrent_RMS = 640.0;         // motor RMS current rating (mOhm)
 float maxSpeedX = 80.0*Conv;                // max velocity X motor can move at (step/s)
@@ -1151,10 +1152,16 @@ void doSensing() {
   // Sensing ---------------------------------------------------------------------
   // Collect sensor data (raw)
   PMW3360_DATA data[ns];
+  // unsigned long timeBurstStart = micros();
+  // unsigned long timeBurst[3] = {0, 0, 0};
   for (int i = 0; i < 2; i++) {
     data[i] = sensors[i].readBurst();
+    // timeBurst[i] = micros() - timeBurstStart;
+    // timeBurstStart = micros();
   }
   data[2] = sensors_SPI1[0].readBurst();
+  // timeBurst[2] = micros() - timeBurstStart;
+  // Serial.printf("tsck = {%i,%i,%i}\n", timeBurst[0], timeBurst[1], timeBurst[2]);
 
   // TODO: check all of the sensors and account for misreads
 
@@ -1406,20 +1413,39 @@ void parseNC(const char* filename) {
     String line = myFile.readStringUntil('\n');
     int xPos = line.indexOf('X');
     int yPos = line.indexOf('Y');
-    if (xPos != -1 && yPos != -1) {
-      int spacePos = line.indexOf(' ', xPos);
-      // if (spacePos == -1) {
-      //   spacePos = line.length();
-      // }
-      float x = line.substring(xPos+1, spacePos).toFloat();
-
-      spacePos = line.indexOf(' ', yPos);
-      if (spacePos == -1) {
-        spacePos = line.length();
+    int zPos = line.indexOf('Z');
+    if (xPos != -1 || yPos != -1 || zPos != -1) {
+      if (xPos == -1) {
+        float x = path[0][idx-1].x;         // TODO: make this work for multiple multiple paths
+      } else {
+        int spacePos = line.indexOf(' ', xPos);
+        // if (spacePos == -1) {
+        //   spacePos = line.length();
+        // }
+        float x = line.substring(xPos+1, spacePos).toFloat();
       }
-      float y = line.substring(yPos+1, spacePos).toFloat();
+      
+      if (yPos == -1) {
+        float y = path[0][idx-1].y;
+      } else {
+        spacePos = line.indexOf(' ', yPos);     // TODO: what is this doing?
+        if (spacePos == -1) {
+          spacePos = line.length();
+        }
+        float y = line.substring(yPos+1, spacePos).toFloat();
+      }
 
-      paths[0][idx] = Point{x,y};
+      if (zPos == -1) {
+        float z = path[0][idx-1].z;
+      } else {
+        spacePos = line.indexOf(' ', zPos);     // TODO: what is this doing?
+        if (spacePos == -1) {
+          spacePos = line.length();
+        }
+        float z = line.substring(zPos+1, spacePos).toFloat();
+      }
+
+      paths[0][idx] = Point{x,y,z};
 
       idx++;        // only go to update index if there is a valid XY coordinate
     }
