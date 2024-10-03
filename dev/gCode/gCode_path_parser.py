@@ -1,3 +1,5 @@
+# Matt's code
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -26,7 +28,7 @@ def calculate_distance(p1, p2):
     return np.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
 
 
-# TODO: this needs to be fixed to properly create segments
+# TODO: this needs to be fixed to properly create paths
 def gen_point_to_point_angles(gcode_df, gantry_orientation):
     # compute direction between point i and point i+1
     # see if it is within 45 deg of gantry orientation
@@ -55,13 +57,13 @@ def gen_point_to_point_angles(gcode_df, gantry_orientation):
 
 
 # This seems to be working, getting
-def create_segments_by_angle(gcode_df):
+def create_paths_by_angle(gcode_df):
     initial_angle = gcode_df.iloc[0].angle_d
-    segments = []
-    current_segment = []
+    paths = []
+    current_path = []
     min_angle_d = initial_angle
     max_angle_d = initial_angle
-    segment_distance_mm = 0
+    path_distance_mm = 0
 
     for i in range(len(gcode_df)):
         current_angle = gcode_df.iloc[i].angle_d
@@ -70,109 +72,110 @@ def create_segments_by_angle(gcode_df):
         if (
             abs(current_angle - initial_angle) <= 45
         ):  # compare with initial angle of seggy
-            if current_segment:
-                segment_distance_mm += calculate_distance(current_segment[-1], point)
-            current_segment.append(point)
+            if current_path:
+                path_distance_mm += calculate_distance(current_path[-1], point)
+            current_path.append(point)
             min_angle_d = min(min_angle_d, current_angle)
             max_angle_d = max(max_angle_d, current_angle)
-        else:  # angle too large, close current segment and start a new one
-            if current_segment:
-                segments.append(
+        else:  # angle too large, close current path and start a new one
+            if current_path:
+                # add current_path to paths list and reset current_path
+                paths.append(
                     {
-                        "segment_points": current_segment,
+                        "path_points": current_path,
                         "min_angle_d": min_angle_d,
                         "max_angle_d": max_angle_d,
-                        "num_points": len(current_segment),
-                        "segment_distance_mm": segment_distance_mm,
+                        "num_points": len(current_path),
+                        "path_distance_mm": path_distance_mm,
                     }
                 )
-                current_segment = []
-                segment_distance_mm = 0
+                current_path = []
+                path_distance_mm = 0
                 initial_angle = current_angle  # start new seggy
                 min_angle_d = current_angle
                 max_angle_d = current_angle
-                current_segment.append(point)
+                current_path.append(point)
 
-    # add last seggy if it's not empty
-    if current_segment:
-        segments.append(
+    # add last path if it's not empty
+    if current_path:
+        paths.append(
             {
-                "segment_points": current_segment,
+                "path_points": current_path,
                 "min_angle_d": min_angle_d,
                 "max_angle_d": max_angle_d,
-                "num_points": len(current_segment),
-                "segment_distance_mm": segment_distance_mm,
+                "num_points": len(current_path),
+                "path_distance_mm": path_distance_mm,
             }
         )
 
-    segments_df = pd.DataFrame(
-        segments,
+    paths_df = pd.DataFrame(
+        paths,
         columns=[
-            "segment_points",
+            "path_points",
             "min_angle_d",
             "max_angle_d",
             "num_points",
-            "segment_distance_mm",
+            "path_distance_mm",
         ],
     )
 
-    return segments_df
+    return paths_df
 
 
-def plot_segments(gcode_df, filtered_segments):
+def plot_paths(gcode_df, filtered_paths):
     plt.figure(figsize=(10, 6))
 
-    for segment in filtered_segments:
-        segment_points = gcode_df.iloc[segment]
-        x = segment_points["x"]
-        y = segment_points["y"]
+    for path in filtered_paths:
+        path_points = gcode_df.iloc[path]
+        x = path_points["x"]
+        y = path_points["y"]
 
-        plt.scatter(x, y, label="Segment Points")
+        plt.scatter(x, y, label="Path Points")
 
-        # Optionally plot lines connecting points in the segment
-        plt.plot(x, y, linestyle="-", marker="o", label="Segment Path")
+        # Optionally plot lines connecting points in the path
+        plt.plot(x, y, linestyle="-", marker="o", label="Path")
 
     plt.xlabel("X Coordinate")
     plt.ylabel("Y Coordinate")
-    plt.title("Filtered Segments")
+    plt.title("Filtered Paths")
     plt.legend()
     plt.grid(True)
     plt.show()
 
 
-def plot_segment_by_angle(segments_df):
+def plot_path_by_angle(paths_df):
     plt.figure(figsize=(10, 6))
 
-    for i, segment in segments_df.iterrows():
-        x = [point[0] for point in segment["segment_points"]]
-        y = [point[1] for point in segment["segment_points"]]
-        plt.plot(x, y, label=f"Segment {i+1}")
+    for i, path in paths_df.iterrows():
+        x = [point[0] for point in path["path_points"]]
+        y = [point[1] for point in path["path_points"]]
+        plt.plot(x, y, label=f"Path {i+1}")
 
     plt.xlabel("X-axis")
     plt.ylabel("Y-axis")
-    plt.title("Plot of Segments by Angle")
+    plt.title("Plot of Paths by Angle")
     plt.grid(True)
     plt.legend()
     plt.show()
 
 
 # all we need to add:
-# compute necessary gantry orientations given our segments and segment angle min/max
-# optimize for minimizing # of segmennts and also maximuizing segment length
+# compute necessary gantry orientations given our paths and path angle min/max
+# optimize for minimizing # of segmennts and also maximuizing path length
 # also minimize unique gantry orientations
 
 
 def main():
-    my_df = read_gcode_csv("handheld-cnc/dev/gCode/basePlate_test.csv")
+    my_df = read_gcode_csv("dev/gCode/basePlate_test.csv")
     plt.scatter(my_df.x, my_df.y)
     plt.grid()
     plt.title("Plotting whole GCODE Path (just the points)")
     plt.show()
 
-    gcode_df_with_segment_flag = gen_point_to_point_angles(my_df, 0)
-    # i might be creating segments from all of it and not just what i can cut from initial segment flag
-    segments_list_angle_filtered = create_segments_by_angle(gcode_df_with_segment_flag)
-    plot_segment_by_angle(segments_list_angle_filtered)
+    gcode_df_with_path_flag = gen_point_to_point_angles(my_df, 0)
+    # i might be creating paths from all of it and not just what i can cut from initial path flag
+    paths_list_angle_filtered = create_paths_by_angle(gcode_df_with_path_flag)
+    plot_path_by_angle(paths_list_angle_filtered)
 
 
 if __name__ == "__main__":

@@ -1,150 +1,143 @@
+# Cam's code
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
 
 angle_thresh = 45
 
 # TODO: make this actually parce gcode + nc files...
 def read_gcode_csv(file_path):
     df = pd.read_csv(file_path)
+    new_row = pd.DataFrame([[0, 0, 0]], columns=df.columns)     # add home point to start
+    df = pd.concat([new_row, df], ignore_index=True)
     return df
 
 def read_gcode(file_path):
-    # dataframe with columns: x, y, z, 
+    # dataframe with columns: x, y, z
 
-# geo function
-def line_from_point_point(pt1, pt2):
-    """
-    Takes in two points of the form, [x,y]
-    Returns slope, "m", and y-intercept, "b"
-    """
-    m = (pt1[1] - pt2[1]) / (pt1[0] - pt2[0])
-    b = pt2[1] - (m * pt2[0])
-    return [m, b]
-
+    return
 
 # geo function
 def calculate_distance(p1, p2):
     return np.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
 
+# geo function
+def get_line_info(p1, p2):
+    # takes in two points and calculates the angle and length of the line they make
+    dx = p2[0] - p1[0]
+    dy = p2[1] - p1[1]
+    m = (dy) / (dx)
+    b = p2[1] - (m * p2[0])
+
+    #dist = (dx**2 + dy**2)**(1/2)
+    dist = calculate_distance(p1,p2)
+
+    if np.isnan(m):
+        # if dx = dy = 0
+        beta = 0
+    else:
+        # alpha = np.rad2deg(np.arctan(m))
+        # beta = 90 - alpha
+        beta = np.rad2deg(np.arctan(1/m))           # angle from y-axis
+
+    return [beta, dist]
+
 def process_raw_gcode(gcode_df):
     # make line segments from raw gcode points
     # determine angle of all line segments
     # determine length of all line segments
+    # turn into line segments
+    # TODO: might make more sense to determine angle and length after points have been made into segments
+    # TODO: delete travel moves
 
-    for i in range(len(gcode_df) - 1):
-        print("pt1 = " + str([gcode_df.x[i], gcode_df.y[i]]))
-        print("pt2 = " + str([gcode_df.x[i + 1], gcode_df.y[i + 1]]))
-        mi, bi = line_from_point_point(
-            [gcode_df.x[i], gcode_df.y[i]], [gcode_df.x[i + 1], gcode_df.y[i + 1]]
-        )
-        if np.isnan(mi):
-            segment_angle = 0
-        else:
-            segment_angle = 90 - np.rad2deg(np.arctan(mi))
-        # storing point to point angle here in deg
-        gcode_df.loc[i, "angle_d"] = segment_angle
+    segments_df = pd.DataFrame(columns=["p0","p1", "angle_d", "length"])
 
-        # TODO: need to make sure we stay on one side of this angle for a continuous segment
-        # ie we cannot go from 30 to -30 or somebting even though it's in range.....
-        if abs(segment_angle) - gantry_orientation < angle_thresh:
-            gcode_df.loc[i, "can_cut"] = True
+    # segment_df["index"] = 0
+    # segments_df["p0"] = []
+    # segments_df["p1"] = []
+    segments_df["angle_d"] = 0
+    segments_df["length"] = 0
 
-    return gcode_df
+    row = []
+    index = 0
+    
+    cut_depth = min(gcode_df.z)
 
-# TODO: this needs to be fixed to properly create segments
-def create_segments_flag(gcode_df, gantry_orientation):
-    # compute direction between point i and point i+1
-    # see if it is within 45 deg of gantry orientation
-    # label green or red, continue
-    gcode_df["can_cut"] = False
-    gcode_df["angle_d"] = 0
-    for i in range(len(gcode_df) - 1):
-        print("pt1 = " + str([gcode_df.x[i], gcode_df.y[i]]))
-        print("pt2 = " + str([gcode_df.x[i + 1], gcode_df.y[i + 1]]))
-        mi, bi = line_from_point_point(
-            [gcode_df.x[i], gcode_df.y[i]], [gcode_df.x[i + 1], gcode_df.y[i + 1]]
-        )
-        if np.isnan(mi):
-            segment_angle = 0
-        else:
-            segment_angle = 90 - np.rad2deg(np.arctan(mi))
-        # storing point to point angle here in deg
-        gcode_df.loc[i, "angle_d"] = segment_angle
-
-        # TODO: need to make sure we stay on one side of this angle for a continuous segment
-        # ie we cannot go from 30 to -30 or somebting even though it's in range.....
-        if abs(segment_angle) - gantry_orientation < angle_thresh:
-            gcode_df.loc[i, "can_cut"] = True
-
-    return gcode_df
-
-
-# This seems to be working, getting
-def filter_segments_by_angle(gcode_df):
-    initial_angle = gcode_df.iloc[0].angle_d
-    segments = []
-    current_segment = []
-    min_angle_d = initial_angle
-    max_angle_d = initial_angle
-    segment_distance_mm = 0
-
-    for i in range(len(gcode_df)):
-        current_angle = gcode_df.iloc[i].angle_d
-        point = [gcode_df.iloc[i].x, gcode_df.iloc[i].y, gcode_df.iloc[i].z]
-
-        if (
-            abs(current_angle - initial_angle) <= 45
-        ):  # compare with initial angle of seggy
-            if current_segment:
-                segment_distance_mm += calculate_distance(current_segment[-1], point)
-            current_segment.append(point)
-            min_angle_d = min(min_angle_d, current_angle)
-            max_angle_d = max(max_angle_d, current_angle)
-        else:  # angle too large, close current segment and start a new one
-            if current_segment:
-                segments.append(
-                    {
-                        "segment_points": current_segment,
-                        "min_angle_d": min_angle_d,
-                        "max_angle_d": max_angle_d,
-                        "num_points": len(current_segment),
-                        "segment_distance_mm": segment_distance_mm,
-                    }
-                )
-                current_segment = []
-                segment_distance_mm = 0
-                initial_angle = current_angle  # start new seggy
-                min_angle_d = current_angle
-                max_angle_d = current_angle
-                current_segment.append(point)
-
-    # add last seggy if it's not empty
-    if current_segment:
-        segments.append(
-            {
-                "segment_points": current_segment,
-                "min_angle_d": min_angle_d,
-                "max_angle_d": max_angle_d,
-                "num_points": len(current_segment),
-                "segment_distance_mm": segment_distance_mm,
-            }
+    for i in range(1, len(gcode_df)):
+        print("pt1 = " + str([gcode_df.x[i - 1], gcode_df.y[i - 1]]))
+        print("pt2 = " + str([gcode_df.x[i], gcode_df.y[i]]))
+        [angle,length] = get_line_info(
+            [gcode_df.x[i-1], gcode_df.y[i-1]], [gcode_df.x[i], gcode_df.y[i]]
         )
 
-    segments_df = pd.DataFrame(
-        segments,
-        columns=[
-            "segment_points",
-            "min_angle_d",
-            "max_angle_d",
-            "num_points",
-            "segment_distance_mm",
-        ],
-    )
+        # don't collect travel moves
+        if (gcode_df.z[i] > cut_depth):
+            continue
+
+        point0 = [gcode_df.x[i-1], gcode_df.y[i-1], gcode_df.z[i-1]]
+        point1 = [gcode_df.x[i], gcode_df.y[i], gcode_df.z[i]]
+
+        # fill out temp list
+        row.append({
+            "p0": point0,
+            "p1": point1,
+            "angle_d": angle,
+            "length": length
+        })
+
+        index = index + 1
+
+    segments_df = pd.concat([segments_df, pd.DataFrame(row)], ignore_index=True)
 
     return segments_df
 
+def convert_angles_to_radians(angles_deg):
+    return np.radians(angles_deg)
 
+def group_segments(segments_df):
+    angle_range = 90     # this range is 2x the range of one side of y-axis
+
+    # start with angle 0
+    group_angle = 0
+
+    k = 1           # can they all fit in one bucket?
+    buckets_valid = 0
+
+    while (not buckets_valid):
+        kmeans_df = segments_df
+        kmeans_df['x'] = np.cos(convert_angles_to_radians(kmeans_df.angle_d))
+        kmeans_df['y'] = np.sin(convert_angles_to_radians(kmeans_df.angle_d))
+
+        kmeans = KMeans(n_clusters=k, random_state=0).fit(kmeans_df[['x', 'y']])
+        kmeans_df['cluster_label'] = kmeans.labels_
+
+        cluster_centers = kmeans.cluster_centers_
+        cluster_centers_deg = np.degrees(np.arctan2(cluster_centers[:, 1], cluster_centers[:, 0])) % 360
+
+        buckets_valid = 1
+
+        for cluster_label in np.unique(kmeans_df['cluster_label']):
+            # Extract the angles in degrees for the current cluster
+            cluster_angles = kmeans_df[kmeans_df['cluster_label'] == cluster_label]['angle_d']
+
+            # Compute the min and max angles within the cluster
+            min_angle = cluster_angles.min()
+            max_angle = cluster_angles.max()
+
+            # Handle wraparound at 360 degrees by considering both directions
+            angular_range = min((max_angle - min_angle), (min_angle + 360 - max_angle))
+
+            # Check if the angular range exceeds the boundary
+            if angular_range > angle_range:
+                k = k + 1
+                buckets_valid = 0
+                break
+
+    return kmeans_df
+
+# Plotting
 def plot_segments(gcode_df, filtered_segments):
     plt.figure(figsize=(10, 6))
 
@@ -166,13 +159,27 @@ def plot_segments(gcode_df, filtered_segments):
     plt.show()
 
 
-def plot_segment_by_angle(segments_df):
+def plot_segment_by_group(segments_df):
     plt.figure(figsize=(10, 6))
 
-    for i, segment in segments_df.iterrows():
-        x = [point[0] for point in segment["segment_points"]]
-        y = [point[1] for point in segment["segment_points"]]
-        plt.plot(x, y, label=f"Segment {i+1}")
+    unique_clusters = np.unique(segments_df['cluster_label'])
+    cmap = plt.get_cmap('tab10', len(unique_clusters))  # 'tab10' gives up to 10 distinct colors
+    idx = 0
+    
+    for cluster_label in unique_clusters:
+        cluster_segments_df = segments_df[segments_df['cluster_label'] == cluster_label]
+        c = cmap(idx)
+
+        # TODO: label and color each cluster
+        for i, segment in cluster_segments_df.iterrows():
+            x = [segment.p0[0], segment.p1[0]]
+            y = [segment.p0[1], segment.p1[1]]
+            if i == cluster_segments_df.index[0]:
+                plt.plot(x, y, color=c, label=f'Cluster {cluster_label}')
+            else:
+                plt.plot(x, y, color=c)
+        idx = idx + 1
+
 
     plt.xlabel("X-axis")
     plt.ylabel("Y-axis")
@@ -183,15 +190,17 @@ def plot_segment_by_angle(segments_df):
 
 
 def main():
-    my_df = read_gcode_csv("dev/gCode/basePlate_test.csv")
+    # my_df = read_gcode_csv("dev/gCode/basePlate_test.csv")
+    my_df = read_gcode_csv("dev/gCode/cal.csv")
+    # my_df = read_gcode("dev/gCode/basePlate_test.nc")
     plt.scatter(my_df.x, my_df.y)
     plt.grid()
     plt.title("Plotting whole GCODE Path (just the points)")
     plt.show()
 
-    gcode_df_with_segment_flag = create_segments_flag(my_df, 0)
-    segments_list_angle_filtered = filter_segments_by_angle(gcode_df_with_segment_flag)
-    plot_segment_by_angle(segments_list_angle_filtered)
+    gcode_df_processed = process_raw_gcode(my_df)
+    grouped_segments_df = group_segments(gcode_df_processed)
+    plot_segment_by_group(grouped_segments_df)
 
 
 if __name__ == "__main__":

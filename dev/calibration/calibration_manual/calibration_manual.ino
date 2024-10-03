@@ -25,9 +25,9 @@ float eepromRead(int address);
 
 // Pin definitions -------------------------------------------------------------------------------
 // Sensor pins
-#define SS0   37   // Chip select pin. Connect this to SS on the module.
+#define SS0   39   // Chip select pin. Connect this to SS on the module.
 #define SS1   10
-#define SS2   36
+#define SS2   40
 #define SS3   32   // ...if working
 int sensorPins[4] = {SS0, SS1, SS2, SS3};
 
@@ -74,6 +74,8 @@ void setup() {
 
   while(!Serial);         // we actually want to make sure serial is opened for calibration
   delay(100);
+
+  Serial.println("Serial set up!");
 
   // Setup systems
   sensorSetup();
