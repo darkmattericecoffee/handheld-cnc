@@ -1406,35 +1406,40 @@ void parseNC(const char* filename) {
     int xPos = line.indexOf('X');
     int yPos = line.indexOf('Y');
     int zPos = line.indexOf('Z');
+    int spacePos = 0;
+    float x = 0;
+    float y = 0;
+    float z = 0;
+
     if (xPos != -1 || yPos != -1 || zPos != -1) {
       if (xPos == -1) {
-        float x = path[0][idx-1].x;         // TODO: make this work for multiple multiple paths
+        x = paths[0][idx-1].x;         // TODO: make this work for multiple multiple paths
       } else {
-        int spacePos = line.indexOf(' ', xPos);
+        spacePos = line.indexOf(' ', xPos);
         // if (spacePos == -1) {
         //   spacePos = line.length();
         // }
-        float x = line.substring(xPos+1, spacePos).toFloat();
+        x = line.substring(xPos+1, spacePos).toFloat();
       }
       
       if (yPos == -1) {
-        float y = path[0][idx-1].y;
+        y = paths[0][idx-1].y;
       } else {
         spacePos = line.indexOf(' ', yPos);     // TODO: what is this doing?
         if (spacePos == -1) {
           spacePos = line.length();
         }
-        float y = line.substring(yPos+1, spacePos).toFloat();
+        y = line.substring(yPos+1, spacePos).toFloat();
       }
 
       if (zPos == -1) {
-        float z = path[0][idx-1].z;
+        z = paths[0][idx-1].z;
       } else {
         spacePos = line.indexOf(' ', zPos);     // TODO: what is this doing?
         if (spacePos == -1) {
           spacePos = line.length();
         }
-        float z = line.substring(zPos+1, spacePos).toFloat();
+        z = line.substring(zPos+1, spacePos).toFloat();
       }
 
       paths[0][idx] = Point{x,y,z};
