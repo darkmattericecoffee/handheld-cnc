@@ -113,9 +113,6 @@ def group_segments(segments_df):
         kmeans = KMeans(n_clusters=k, random_state=0).fit(kmeans_df[['x', 'y']])
         kmeans_df['cluster_label'] = kmeans.labels_
 
-        cluster_centers = kmeans.cluster_centers_
-        cluster_centers_deg = np.degrees(np.arctan2(cluster_centers[:, 1], cluster_centers[:, 0])) % 360
-
         buckets_valid = 1
 
         for cluster_label in np.unique(kmeans_df['cluster_label']):
@@ -135,7 +132,30 @@ def group_segments(segments_df):
                 buckets_valid = 0
                 break
 
-    return kmeans_df
+    cluster_centers = kmeans.cluster_centers_
+    cluster_centers_deg = np.degrees(np.arctan2(cluster_centers[:, 1], cluster_centers[:, 0]))
+    cluster_centers_deg = np.where(cluster_centers_deg > 180, cluster_centers_deg - 360, cluster_centers_deg)   # (-180,180)
+    kmeans_df['cluster_angle'] = cluster_centers_deg
+
+    # for label in kmeans_df['cluster_label']:
+        
+
+    # Reorganize dataframe
+    group_df = pd.DataFrame(columns=['p0', 'p1', 'cluster_angle_d'])
+    row = []
+    for cluster_label in np.unique(kmeans_df['cluster_label']):
+        point0 = kmeans_df[kmeans_df['cluster_label'] == cluster_label]['p0']
+        point1 = kmeans_df[kmeans_df['cluster_label'] == cluster_label]['p1']
+        cluster_angles = kmeans_df[kmeans_df['cluster_label'] == cluster_label]['angle_d']
+
+        row.append({
+            "p0": point0,
+            "p1": point1,
+            "cluster_angle": cluster_angles
+        })
+    group_df = pd.concat([group_df, pd.DataFrame(row)], ignore_index=True)
+
+    return group_df
 
 # Plotting
 def plot_segments(gcode_df, filtered_segments):
@@ -159,26 +179,23 @@ def plot_segments(gcode_df, filtered_segments):
     plt.show()
 
 
-def plot_segment_by_group(segments_df):
+def plot_segment_by_group(grouped_segs_df):
     plt.figure(figsize=(10, 6))
 
-    unique_clusters = np.unique(segments_df['cluster_label'])
-    cmap = plt.get_cmap('tab10', len(unique_clusters))  # 'tab10' gives up to 10 distinct colors
-    idx = 0
+    cmap = plt.get_cmap('tab10', len(grouped_segs_df))  # 'tab10' gives up to 10 distinct colors
     
-    for cluster_label in unique_clusters:
-        cluster_segments_df = segments_df[segments_df['cluster_label'] == cluster_label]
+    for idx in range(len(grouped_segs_df)):
+        points0 = grouped_segs_df.p0[idx]
+        points1 = grouped_segs_df.p1[idx]
         c = cmap(idx)
 
-        # TODO: label and color each cluster
-        for i, segment in cluster_segments_df.iterrows():
-            x = [segment.p0[0], segment.p1[0]]
-            y = [segment.p0[1], segment.p1[1]]
-            if i == cluster_segments_df.index[0]:
-                plt.plot(x, y, color=c, label=f'Cluster {cluster_label}')
+        for i in range(len(points0)):
+            x = [points0[0], points1[0]]
+            y = [points0[1], points1[1]]
+            if i == 0:
+                plt.plot(x, y, color=c, label=f'Cluster {idx}')
             else:
                 plt.plot(x, y, color=c)
-        idx = idx + 1
 
 
     plt.xlabel("X-axis")
