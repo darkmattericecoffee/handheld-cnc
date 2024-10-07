@@ -116,32 +116,33 @@ void onClickZeroWorkspaceXY(EncoderButton &eb);
 //#define SS3   32
 int sensorPins[3] = {SS0, SS1, SS2};
 // int sensorPins[4] = {SS0, SS1, SS2, SS3};
-#define LIMIT_MACH_X0       8
-#define LIMIT_MACH_Z0       2
-#define BUTT_HANDLE         7
+#define LIMIT_MACH_X0       6
+#define LIMIT_MACH_Z0       5
+#define BUTT_HANDLE_L       2
+#define BUTT_HANDLE_R       3
 #define ENCODER_PIN_A       21
 #define ENCODER_PIN_B       22
-#define ENCODER_BUTTON_PIN  3
+#define ENCODER_BUTTON_PIN  4
 
 // Motor Pins
-#define MS1_X       17
-#define MS2_X       16
+// #define MS1_X       17
+// #define MS2_X       16
 #define MOT_EN_X    18
 #define MOT_DIR_X   14
 #define MOT_STEP_X  15
-#define MS1_Z       37
-#define MS2_Z       38
+// #define MS1_Z       37
+// #define MS2_Z       38
 #define MOT_EN_Z    41
 #define MOT_DIR_Z   36
 #define MOT_STEP_Z  33
 
 // LCD Pins
-#define TFT_CS     20
-#define TFT_DC     19
+#define TFT_CS     31
+#define TFT_DC     30
 
 // Driver pins
-#define SERIAL_PORT_X         Serial7     // HardwareSerial port
-#define SERIAL_PORT_Z         Serial6
+#define SERIAL_PORT_X         Serial4     // HardwareSerial port
+#define SERIAL_PORT_Z         Serial8     // HardwareSerial port
 
 // Max path values
 #define MAX_PATHS  4
@@ -510,7 +511,8 @@ void setup() {
   pinMode(LIMIT_MACH_Z0, INPUT);
 
   // Button initialization
-  pinMode(BUTT_HANDLE, INPUT);
+  pinMode(BUTT_HANDLE_L, INPUT);
+  pinMode(BUTT_HANDLE_R, INPUT);
   //handleButton.setDebounceTime(50);
 
   // Setup systems
@@ -632,7 +634,7 @@ void loop() {
   float desPosClosest = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
 
   // Conditions for cutting
-  bool handle_buttons_pressed = digitalRead(BUTT_HANDLE) == LOW;
+  bool handle_buttons_pressed = (digitalRead(BUTT_HANDLE_L) && digitalRead(BUTT_HANDLE_R)) == LOW;
   bool handle_buttons_debounce = (millis() - timeLastDebounce) < debounceDelay;
   if (handle_buttons_pressed) { timeLastDebounce = millis(); }
   bool handle_buttons_ok = handle_buttons_pressed || handle_buttons_debounce;
@@ -745,18 +747,8 @@ void sensorSetup() {
 void motorSetup() {
   // Set up motors
   // Initialize pins
-  // pinMode(MS1_X, OUTPUT);
-  // pinMode(MS2_X, OUTPUT);
-  // pinMode(MS1_Z, OUTPUT);
-  // pinMode(MS2_Z, OUTPUT);
   pinMode(MOT_EN_X, OUTPUT);
   pinMode(MOT_EN_Z, OUTPUT);
-
-  // Initialize microstep
-  // digitalWrite(MS1_X, LOW);
-  // digitalWrite(MS2_X, LOW);
-  // digitalWrite(MS1_Z, LOW);
-  // digitalWrite(MS2_Z, LOW);
 
   // Enable motors (Mark Rober disables steppers initially..?)
   digitalWrite(MOT_EN_X, LOW);
