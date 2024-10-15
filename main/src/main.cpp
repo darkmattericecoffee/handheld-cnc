@@ -111,11 +111,14 @@ void onClickZeroWorkspaceXY(EncoderButton &eb);
 // Pin definitions -------------------------------------------------------------------------------
 // Sensor pins
 #define SS0   39   // Chip select pin. Connect this to SS on the module.
-#define SS1   10
-#define SS2   40
-//#define SS3   32
-int sensorPins[3] = {SS0, SS1, SS2};
-// int sensorPins[4] = {SS0, SS1, SS2, SS3};
+// #define SS1   10
+// #define SS2   40
+// #define SS3   32
+#define SS1   9       // *** changed when soldering *** TODO: change back once ready
+#define SS2   32      // *** swapped when soldering *** TODO: swap back once ready
+#define SS3   40      // *** swapped when soldering *** TODO: swap back once ready
+// int sensorPins[3] = {SS0, SS1, SS2};
+int sensorPins[4] = {SS0, SS1, SS2, SS3};
 #define LIMIT_MACH_X0       6
 #define LIMIT_MACH_Z0       5
 #define BUTT_HANDLE_L       2
@@ -174,7 +177,7 @@ const int eepromAddrCy = 12;
 
 // Modes
 int plotting = 0;             // plot values  (1 = yes; 0 = no)
-int debugMode = 1;            // print values (1 = yes; 0 = no)
+int debugMode = 0;            // print values (1 = yes; 0 = no)
 int outputMode = 0;           // output data to serial
 int designMode = 0;           // choose the design 
 
@@ -197,12 +200,13 @@ float maxThickness = 10.0;                // upper bound of thickness knob (mm)
 float restHeight = 2.0;                   // rest height of tool before cutting
 
 // Timing constants
-long unsigned debounceDelay = 50;      // the debounce time; increase if the output flickers
-long unsigned dtDebug = 500;                   // (ms)
+long unsigned debounceDelay = 50;       // the debounce time; increase if the output flickers
+long unsigned dtDebug = 500;            // (ms)
+long unsigned dtPlot = 50;              // (ms)
 long unsigned dtOutput = 20;            // (ms)
 
 // Sensor properties
-const int ns = 3;                   // number of sensors
+const int ns = 4;                   // number of sensors
 const int CPI = 2500;               // This value changes calibration coefficients
 long unsigned dt = 900;       // microseconds (freq = 1,000,000/timestepPoll [Hz])
 const float lx = 120.0f;                // x length of rectangular sensor configuration
@@ -218,7 +222,7 @@ int uSteps = 4;                       // microstep configuration
 float lead = 8;                       // lead screw lead (mm)
 float Conv = 200/lead*uSteps;         // conversion factor (mm -> steps)
 float stepPulseWidth = 20.0;          // min pulse width (from Mark Rober's code)
-float maxCurrent_RMS = 640.0;         // motor RMS current rating (mOhm)
+float maxCurrent_RMS = 1273.0;         // motor RMS current rating (mA)
 float maxSpeedX = 80.0*Conv;                // max velocity X motor can move at (step/s)
 float maxSpeedZ = 20.0*Conv;                // max velocity Z motor can move at (step/s)
 float maxAccel = 1600.0*Conv;             // max acceleration (step/s^2)
@@ -274,21 +278,24 @@ int z0_count = 2;           // z zeroing count variable (start as "false")
 int firstPoint = 1;
 long unsigned timeLastPoll = 0;
 long unsigned timeLastOutput = 0;
-long unsigned timeLastDebug = 0;
+long unsigned timeLastDebug = 0;      // (ms)
+long unsigned timeLastPlot = 0;       // (ms)
 long unsigned timeLastDebounce = 0;   // (ms)
 long unsigned sensingTime = 0;        // (us)
 
 // Measured quantities
-float measVel[2][3] = {{0.0f,0.0f,0.0f},
-                      {0.0f,0.0f,0.0f}};     // BFF (x,y) velocity of each sensor (mm/us)
+float measVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
+                      {0.0f,0.0f,0.0f,0.0f}};     // BFF (x,y) velocity of each sensor (mm/us)
 
 // Estimated quantities
-float estVel[2][3] = {{0.0f,0.0f,0.0f},
-                    {0.0f,0.0f,0.0f}};      // world frame (x,y) velocity of router (mm/us)
+float estVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
+                    {0.0f,0.0f,0.0f,0.0f}};      // world frame (x,y) velocity of router (mm/us)
 float estVel1[2] = {0.0f,0.0f};              // averaged (x,y) velocity calculation (mm/us)
+float estPosSen[2][4] = {{0.0f,0.0f,0.0f,0.0f},
+                      {0.0f,0.0f,0.0f,0.0f}};       // "sensor position" for debugging
 float estPos[2] = {0.0f,0.0f};                // router center position (x,y)
 float estPosTool[2] = {0.0f,0.0f};            // tool center position (x,y)
-float estAngVel[4] = {0.0f,0.0f,0.0f,0.0f};   // angular velocity of router (rad/s) (4 vals from 3 sensors)
+float estAngVel[8] = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};   // angular velocity of router (rad/s) (4 vals from 3 sensors)
 float estAngVel1 = 0.0f;                      // averaged velocity calculation (rad/s)
 float estYaw = 0.0f;                          // orientation of router (rad)
 float estTraj = 0.0f;                     // (..?) trajectory angle wrt. world frame (n. direction of velocity. Best way to track this?)
@@ -322,9 +329,9 @@ int16_t lastX0, lastY0, lastX1, lastY1, lastX2, lastY2, lastX3, lastY3, lastTarg
 
 // Object Initialization ------------------------------------------------------------
 // Sensor object creation
-PMW3360 sensors[2];
-PMW3360_SPI1 sensors_SPI1[1];
-//PMW3360 sensors[4];
+// PMW3360 sensors[3];
+// PMW3360_SPI1 sensors_SPI1[1];
+PMW3360 sensors[4];
 
 // Motor object creation
 AccelStepper stepperX(motorInterfaceType, MOT_STEP_X, MOT_DIR_X);
@@ -466,7 +473,8 @@ void encoderDesignMode() {
   // Clear out sensors in case we moved while in design mode
   sensors[0].readBurst();
   sensors[1].readBurst();
-  sensors_SPI1[0].readBurst();
+  sensors[2].readBurst();
+  sensors[3].readBurst();
 
   // TODO: uncomment to add in manual XY zeroing
   // drawCenteredText("Zero Workspace XY", 1);
@@ -556,12 +564,14 @@ void loop() {
   encoder.update();
 
   // Serial Interface
-  // if (Serial.available()) {
-  //   char ch = Serial.read();
-  //   if (ch == 'd') {
-  //     DesignModeToggle();
-  //   }
-  // }
+  if (Serial.available()) {
+    char ch = Serial.read();
+    if (ch == 'd') {
+      debugMode ^= 1;       // toggle debug on/off
+    } else if (ch == 'p'){
+      plotting ^= 1;        // toggle plotting on/off
+    }
+  }
 
   // Break here until we are ready to cut
   if (state != READY) {
@@ -728,7 +738,7 @@ void loop() {
 // Setup subfunctions -----------------------------------------------------------------------------
 void sensorSetup() {
   // Sensor initialization
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 4; i++) {
     if (sensors[i].begin(sensorPins[i], CPI)) {
       Serial.print("Sensor");
       Serial.print(i);
@@ -740,15 +750,15 @@ void sensorSetup() {
       Serial.println(" initialization failed");
     }
   }
-  if (sensors_SPI1[0].begin(sensorPins[2], CPI)) {
-    Serial.print("Sensor2");
-    Serial.print(" initialization succeeded, with CPI = ");
-    Serial.println(sensors_SPI1[0].getCPI());
-  } else {
-    Serial.print("Sensor");
-    Serial.print("2");
-    Serial.println(" initialization failed");
-  }
+  // if (sensors_SPI1[0].begin(sensorPins[2], CPI)) {
+  //   Serial.print("Sensor2");
+  //   Serial.print(" initialization succeeded, with CPI = ");
+  //   Serial.println(sensors_SPI1[0].getCPI());
+  // } else {
+  //   Serial.print("Sensor");
+  //   Serial.print("2");
+  //   Serial.println(" initialization failed");
+  // }
 }
 
 void motorSetup() {
@@ -1146,12 +1156,12 @@ void doSensing() {
   PMW3360_DATA data[ns];
   // unsigned long timeBurstStart = micros();
   // unsigned long timeBurst[3] = {0, 0, 0};
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < ns; i++) {
     data[i] = sensors[i].readBurst();
     // timeBurst[i] = micros() - timeBurstStart;
     // timeBurstStart = micros();
   }
-  data[2] = sensors_SPI1[0].readBurst();
+  // data[2] = sensors_SPI1[0].readBurst();
   // timeBurst[2] = micros() - timeBurstStart;
   // Serial.printf("tsck = {%i,%i,%i}\n", timeBurst[0], timeBurst[1], timeBurst[2]);
 
@@ -1162,35 +1172,45 @@ void doSensing() {
     // Sensor velocity sensing
     measVel[0][i] = -convTwosComp(data[i].dx)*cVal[0][i]/sensingTime;     // '-' convention is used to flip sensor's z axis
     measVel[1][i] = convTwosComp(data[i].dy)*cVal[1][i]/sensingTime;
+
+    // Integrate linear velocities of each sensorsto get position (for debugging)
+    estPosSen[0][i] = estPosSen[0][i] + measVel[0][i]*sensingTime;
+    estPosSen[1][i] = estPosSen[1][i] + measVel[1][i]*sensingTime;
   }
 
   // Body angle estimation
   estAngVel[0] = (measVel[0][2] - measVel[0][0])/ly;
   estAngVel[1] = (measVel[0][2] - measVel[0][1])/ly;
-  estAngVel[2] = (measVel[1][1] - measVel[1][0])/lx;
-  estAngVel[3] = (measVel[1][1] - measVel[1][2])/lx;
+  estAngVel[2] = (measVel[0][3] - measVel[0][0])/ly;
+  estAngVel[3] = (measVel[0][3] - measVel[0][1])/ly;
+  estAngVel[4] = (measVel[1][1] - measVel[1][0])/lx;
+  estAngVel[5] = (measVel[1][1] - measVel[1][2])/lx;
+  estAngVel[6] = (measVel[1][3] - measVel[1][0])/lx;
+  estAngVel[7] = (measVel[1][3] - measVel[1][2])/lx;
+
   // TODO: filter out bad sensor measurements
   //    - compare angular velocities and see if any are a certain threshold or standard deviation off of average
   //    - compare measVel redings that are colinear (they should be equal)
   //    - determine if any sensors appear repeatedly erroneous for these checks. If so, throw out their readings
+  //      - don't use readings from those sensors in the estVel calculations
+  //      - if there are too many bad sensor readings, pause the cut and inform user to re-zero
   // Simple average of angular velocities
   float sumAngVel = 0.0f;
-  for (int i = 0; i<4; i++) {
+  for (int i = 0; i<8; i++) {
     sumAngVel = sumAngVel + estAngVel[i];
   }
-
-  estAngVel1 = sumAngVel / 4.0f;
-  // Integrate angular velocity to get angle
-  estYaw = estYaw + estAngVel1*sensingTime;
+  estAngVel1 = sumAngVel / 8.0f;
 
   // Body position estimation
   // TODO: simplify with matrix operation for rotation (using for loops)
   estVel[0][0] = measVel[0][0]*cosf(estYaw)-measVel[1][0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-(ly)*sinf(estYaw));
   estVel[0][1] = measVel[0][1]*cosf(estYaw)-measVel[1][1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+(ly)*sinf(estYaw));
   estVel[0][2] = measVel[0][2]*cosf(estYaw)-measVel[1][2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-(ly)*sinf(estYaw));
+  estVel[0][3] = measVel[0][3]*cosf(estYaw)-measVel[1][3]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)+(ly)*sinf(estYaw));
   estVel[1][0] = measVel[0][0]*sinf(estYaw)+measVel[1][0]*cosf(estYaw) + 0.5*estAngVel1*((ly)*cosf(estYaw)+lx*sinf(estYaw));
   estVel[1][1] = measVel[0][1]*sinf(estYaw)+measVel[1][1]*cosf(estYaw) + 0.5*estAngVel1*(-(ly)*cosf(estYaw)+lx*sinf(estYaw));
   estVel[1][2] = measVel[0][2]*sinf(estYaw)+measVel[1][2]*cosf(estYaw) + 0.5*estAngVel1*((ly)*cosf(estYaw)-lx*sinf(estYaw));
+  estVel[1][3] = measVel[0][3]*sinf(estYaw)+measVel[1][3]*cosf(estYaw) + 0.5*estAngVel1*(-(ly)*cosf(estYaw)-lx*sinf(estYaw));
   // Simple average of linear velocities
   float sumVelX = 0.0f;
   float sumVelY = 0.0f;
@@ -1198,8 +1218,14 @@ void doSensing() {
     sumVelX = sumVelX + estVel[0][i];
     sumVelY = sumVelY + estVel[1][i];
   }
-  estVel1[0] = (sumVelX / ns) - estAngVel1*(xSensorOffset*sinf(estYaw) + ySensorOffset*cosf(estYaw));
-  estVel1[1] = (sumVelY / ns) + estAngVel1*(xSensorOffset*cosf(estYaw) - ySensorOffset*sinf(estYaw));
+  // (TODO: figure out deeper cause) Acounting for weird rotation
+  // estVel1[0] = (sumVelX / ns) - estAngVel1*(xSensorOffset*sinf(estYaw) + ySensorOffset*cosf(estYaw));
+  // estVel1[1] = (sumVelY / ns) + estAngVel1*(xSensorOffset*cosf(estYaw) - ySensorOffset*sinf(estYaw));
+  estVel1[0] = sumVelX / ns;
+  estVel1[1] = sumVelY / ns;
+
+  // Integrate angular velocity to get angle
+  estYaw = estYaw + estAngVel1*sensingTime;       // TODO: should this be calculated before or after body pos. estimation?
   // Integrate linear velocities to get position
   estPos[0] = estPos[0] + estVel1[0]*sensingTime;
   estPos[1] = estPos[1] + estVel1[1]*sensingTime;
@@ -1331,14 +1357,22 @@ void workspaceZeroXY() {
 
 void sensorPlotting() {
   // Plot sensor data
+  if(millis() - timeLastPlot >= dtPlot) {
+    timeLastPlot = millis();
 
-  //Serial.printf("dx:%f,dy:%f",measVelX,measVelY);
-  //Serial.printf("dx:%i,dy:%i",data.dx,data.dy);
-  Serial.printf("x:%f,y:%f,theta:%f",estPos[0],estPos[1],estYaw);
-//      Serial.printf("w1:%f,w2:%f,w3:%f,w4:%f,w5:%f,w6:%f,w7:%f,w8:%f",estAngVel[0],estAngVel[1],
-//        estAngVel[2],estAngVel[3],estAngVel[4],estAngVel[5],estAngVel[6],estAngVel[7]);
-  //Serial.printf("x:%f,y:%f",xmm[1],ymm[1]);
-  Serial.println();
+    for (int i = 0; i < 4; i++) {
+      Serial.printf("x_%i:%f,y_%i:%f",i,estPosSen[0][i],i,estPosSen[1][i]);
+      Serial.println();
+    }
+
+    //Serial.printf("dx:%f,dy:%f",measVelX,measVelY);
+    //Serial.printf("dx:%i,dy:%i",data.dx,data.dy);
+    // Serial.printf("x:%f,y:%f,theta:%f",estPos[0],estPos[1],estYaw);
+  //      Serial.printf("w1:%f,w2:%f,w3:%f,w4:%f,w5:%f,w6:%f,w7:%f,w8:%f",estAngVel[0],estAngVel[1],
+  //        estAngVel[2],estAngVel[3],estAngVel[4],estAngVel[5],estAngVel[6],estAngVel[7]);
+    //Serial.printf("x:%f,y:%f",xmm[1],ymm[1]);
+    // Serial.println();
+  }
 }
 
 void debugging() {
@@ -1348,9 +1382,6 @@ void debugging() {
     // Put all Serial print lines here to view
     
     Serial.printf("x:%f,y:%f,theta:%f\n",estPos[0],estPos[1],estYaw * 180.0 / PI);
-    // Serial.printf("S0 | x: %f, y: %f\n", measVel[0][0], measVel[1][0]);
-    // Serial.printf("S1 | x: %f, y: %f\n", measVel[0][1], measVel[1][1]);
-    // Serial.printf("S2 | x: %f, y: %f\n", measVel[0][2], measVel[1][2]);
     // Serial.printf("w0:%f,w0:%f,w0:%f,%w0:%f\n", 1000*estAngVel[0], 1000*estAngVel[1], 1000*estAngVel[2], 1000*estAngVel[3]);
     // Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",estPosX,estPosY,estYaw,goalX,goalY,desPos);
     // Serial.printf("x_raw:%f,y_raw:%f\n",measVel[0][0],measVel[1][0]);
