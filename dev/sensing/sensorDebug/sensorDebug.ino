@@ -66,6 +66,7 @@ float measVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
                       {0.0f,0.0f,0.0f,0.0f}};     // BFF (x,y) velocity of each sensor (mm/us)
 float estPos[2][4] = {{0.0f,0.0f,0.0f,0.0f},
                       {0.0f,0.0f,0.0f,0.0f}}; 
+byte surfaceQuality[4] = {0,0,0,0};
 
 // Calibration variables
 int sensorSelect = -1;
@@ -168,6 +169,7 @@ void doSensing() {
     PMW3360_DATA data[4];
     for (int i = 0; i < 4; i++) {
       data[i] = sensors[i].readBurst();
+      surfaceQuality[i] = data[i].SQUAL;
     }
 
     for (int i = 0; i < 4; i++) {
@@ -192,7 +194,8 @@ void sensorPlotting() {
     timeLastPlot = millis();
 
     for (int i = 0; i < 4; i++) {
-      Serial.printf("x_%i:%f,y_%i:%f",i,estPos[0][i],i,estPos[1][i]);
+      // Serial.printf("x_%i:%f,y_%i:%f",i,estPos[0][i],i,estPos[1][i]);
+      Serial.printf("sq_%i:%d",i,surfaceQuality[i]);
       Serial.println();
     }
     // Serial.printf("x_raw:%f,y_raw:%f",measVel[0][sensorSelect],measVel[1][sensorSelect]);

@@ -223,9 +223,9 @@ float lead = 8;                       // lead screw lead (mm)
 float Conv = 200/lead*uSteps;         // conversion factor (mm -> steps)
 float stepPulseWidth = 20.0;          // min pulse width (from Mark Rober's code)
 float maxCurrent_RMS = 1273.0;         // motor RMS current rating (mA)
-float maxSpeedX = 80.0*Conv;                // max velocity X motor can move at (step/s)
+float maxSpeedX = 200.0*Conv;                // max velocity X motor can move at (step/s)
 float maxSpeedZ = 20.0*Conv;                // max velocity Z motor can move at (step/s)
-float maxAccel = 1600.0*Conv;             // max acceleration (step/s^2)
+float maxAccel = 3000.0*Conv;             // max acceleration (step/s^2)
 float retract = 5;                    // distance to retract (mm)
 float speed_x0 = 20.0 * Conv;             // x zeroing speed (step/s)
 float speed_x1 = 4.0 * Conv;              // x secondary zeroing speed (step/s)
@@ -266,10 +266,6 @@ int limitHitZ = 0;
 int cutStarted = 0;
 int toolRaised = 1;
 
-// Button states
-int readyOrNot = 0;                 // determines whether system is zeroed 
-                                    // (0 = workpiece is unzeroed; 1 = z is zeroed; 2 = xy is zeroed)
-
 // Zeroing variables
 int x0_count = 2;           // x zeroing count variable (start as "false")
 int z0_count = 2;           // z zeroing count variable (start as "false")
@@ -286,6 +282,7 @@ long unsigned sensingTime = 0;        // (us)
 // Measured quantities
 float measVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
                       {0.0f,0.0f,0.0f,0.0f}};     // BFF (x,y) velocity of each sensor (mm/us)
+int surfaceQuality[4] = {0,0,0,0};
 
 // Estimated quantities
 float estVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
@@ -313,6 +310,7 @@ const int num_queries = 2;        // number of points to query for min distance 
 int current_path_idx = 0;
 int current_point_idx = 0;
 bool path_started = false;
+bool valid_sensors = true;
 
 float goalX = 0.0f;               // goal point x coordinate (mm)
 float goalY = 0.0f;               // goal point y coordinate (mm)
@@ -655,7 +653,7 @@ void loop() {
   bool handle_buttons_debounce = (millis() - timeLastDebounce) < debounceDelay;
   if (handle_buttons_pressed) { timeLastDebounce = millis(); }
   bool handle_buttons_ok = handle_buttons_pressed || handle_buttons_debounce;
-  bool gantry_intersects = desPos != NAN;
+  bool gantry_intersects = !isnan(desPos);
   bool goal_behind_router = pathDir[current_path_idx] * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
   bool gantry_angle_ok = angleFrom(goal, next) > (PI / 6);
 
@@ -669,14 +667,12 @@ void loop() {
   //     Serial.printf("\tgantry_intersects: %d\n", gantry_intersects);
   //     Serial.printf("\tgoal_behind_router: %d\n", goal_behind_router);
   //     Serial.printf("\tgantry_angle_ok: %d\n", gantry_angle_ok);
-
   //     logged = true;
   //   }
-
   //   prevChecks[i] = newChecks[i];
   // }
 
-  if (handle_buttons_ok && gantry_intersects && goal_behind_router && gantry_angle_ok) {
+  if (handle_buttons_ok && gantry_intersects && goal_behind_router && gantry_angle_ok && valid_sensors) {
     // Path logging
     if (outputMode) {
       outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
@@ -1169,13 +1165,22 @@ void doSensing() {
 
   // Sensor velocity sensing
   for (int i = 0; i < ns; i++) {
-    // Sensor velocity sensing
-    measVel[0][i] = -convTwosComp(data[i].dx)*cVal[0][i]/sensingTime;     // '-' convention is used to flip sensor's z axis
-    measVel[1][i] = convTwosComp(data[i].dy)*cVal[1][i]/sensingTime;
+    surfaceQuality[i] = data[i].SQUAL;
+    if (surfaceQuality[i] > 20) {
+      // Sensor velocity sensing
+      measVel[0][i] = -convTwosComp(data[i].dx)*cVal[0][i]/sensingTime;     // '-' convention is used to flip sensor's z axis
+      measVel[1][i] = convTwosComp(data[i].dy)*cVal[1][i]/sensingTime;
 
-    // Integrate linear velocities of each sensorsto get position (for debugging)
-    estPosSen[0][i] = estPosSen[0][i] + measVel[0][i]*sensingTime;
-    estPosSen[1][i] = estPosSen[1][i] + measVel[1][i]*sensingTime;
+      // Integrate linear velocities of each sensorsto get position (for debugging)
+      estPosSen[0][i] = estPosSen[0][i] + measVel[0][i]*sensingTime;
+      estPosSen[1][i] = estPosSen[1][i] + measVel[1][i]*sensingTime;
+    } else {
+      // Serial.printf("Sensor %i is bad...\n", i);
+      measVel[0][i] = NAN;
+      measVel[1][i] = NAN;
+      // Serial.println("Measured values set to NaN");
+    }
+
   }
 
   // Body angle estimation
@@ -1196,10 +1201,23 @@ void doSensing() {
   //      - if there are too many bad sensor readings, pause the cut and inform user to re-zero
   // Simple average of angular velocities
   float sumAngVel = 0.0f;
+  int validVals = 0;
   for (int i = 0; i<8; i++) {
-    sumAngVel = sumAngVel + estAngVel[i];
+    if (!isnan(estAngVel[i])) {
+      sumAngVel = sumAngVel + estAngVel[i];
+      validVals++;
+    } else {
+      Serial.println("NaN value!");
+    }
   }
-  estAngVel1 = sumAngVel / 8.0f;
+  if (validVals == 0) {
+    // TODO: make this prompt a re-zeroing
+    Serial.print("Sensors are poo-poo!");
+    encoderDesignMode();
+    return;
+  } else {
+    estAngVel1 = sumAngVel / validVals;
+  }
 
   // Body position estimation
   // TODO: simplify with matrix operation for rotation (using for loops)
@@ -1214,15 +1232,26 @@ void doSensing() {
   // Simple average of linear velocities
   float sumVelX = 0.0f;
   float sumVelY = 0.0f;
+  validVals = 0;
   for (int i = 0; i<ns; i++) {
-    sumVelX = sumVelX + estVel[0][i];
-    sumVelY = sumVelY + estVel[1][i];
+    if (!isnan(estVel[0][i]) && !isnan(estVel[1][i])) {
+      sumVelX = sumVelX + estVel[0][i];
+      sumVelY = sumVelY + estVel[1][i];
+      validVals++;
+    }
   }
-  // (TODO: figure out deeper cause) Acounting for weird rotation
-  // estVel1[0] = (sumVelX / ns) - estAngVel1*(xSensorOffset*sinf(estYaw) + ySensorOffset*cosf(estYaw));
-  // estVel1[1] = (sumVelY / ns) + estAngVel1*(xSensorOffset*cosf(estYaw) - ySensorOffset*sinf(estYaw));
-  estVel1[0] = sumVelX / ns;
-  estVel1[1] = sumVelY / ns;
+  if (validVals == 0) {
+    // TODO: make this prompt a re-zeroing
+    Serial.print("Sensors are poo-poo!");
+    encoderDesignMode();
+    return;
+  } else {
+    // (TODO: figure out deeper cause) Acounting for weird rotation
+    // estVel1[0] = (sumVelX / ns) - estAngVel1*(xSensorOffset*sinf(estYaw) + ySensorOffset*cosf(estYaw));
+    // estVel1[1] = (sumVelY / ns) + estAngVel1*(xSensorOffset*cosf(estYaw) - ySensorOffset*sinf(estYaw));
+    estVel1[0] = sumVelX / ns;
+    estVel1[1] = sumVelY / ns;
+  }
 
   // Integrate angular velocity to get angle
   estYaw = estYaw + estAngVel1*sensingTime;       // TODO: should this be calculated before or after body pos. estimation?
@@ -1281,18 +1310,21 @@ void machineZeroX() {
     stepperX.runSpeed();
   }
 
+  stepperX.setMaxSpeed(maxSpeedX/2);
+  stepperX.setAcceleration(maxAccel/2);
+
   // Move to the center
   stepperX.move(-Conv*((gantryLength/2) - xLimitOffset));
   while (stepperX.distanceToGo() != 0) {
     stepperX.run();
   }
 
-  // Set current position as 0
-  stepperX.setCurrentPosition(0);
-
   // Reset speed and accel settings
   stepperX.setMaxSpeed(maxSpeedX);
   stepperX.setAcceleration(maxAccel);
+
+  // Set current position as 0
+  stepperX.setCurrentPosition(0);
 }
 
 void workspaceZeroZ() {
@@ -1362,6 +1394,8 @@ void sensorPlotting() {
 
     for (int i = 0; i < 4; i++) {
       Serial.printf("x_%i:%f,y_%i:%f",i,estPosSen[0][i],i,estPosSen[1][i]);
+      Serial.println();
+      Serial.printf("sq_%i:%d",i,surfaceQuality[i]);
       Serial.println();
     }
 
