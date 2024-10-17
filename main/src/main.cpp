@@ -29,10 +29,10 @@ typedef enum State {
   POWER_ON,
   MACHINE_X_ZERO,
   WORKSPACE_Z_ZERO,
-  SETTING_THICKNESS,
   THICKNESS_SET,
   SELECTING_DESIGN,
   DESIGN_SELECTED,
+  WORKSPACE_XY_ZERO,
   READY
 } State;
 
@@ -92,7 +92,7 @@ void encoderDesignMode();
 void drawShape();
 void drawCenteredText(const char* text, int size);
 void drawFixedUI();
-void drawUI(Point goal, Point next, uint8_t i);
+void drawUI(float desPosition, Point goal, Point next, uint8_t i);
 void drawDirection();
 
 void calibrate();
@@ -224,7 +224,7 @@ float Conv = 200/lead*uSteps;         // conversion factor (mm -> steps)
 float stepPulseWidth = 20.0;          // min pulse width (from Mark Rober's code)
 float maxCurrent_RMS = 1273.0;         // motor RMS current rating (mA)
 float maxSpeedX = 200.0*Conv;                // max velocity X motor can move at (step/s)
-float maxSpeedZ = 20.0*Conv;                // max velocity Z motor can move at (step/s)
+float maxSpeedZ = 60.0*Conv;                // max velocity Z motor can move at (step/s)
 float maxAccel = 3000.0*Conv;             // max acceleration (step/s^2)
 float retract = 5;                    // distance to retract (mm)
 float speed_x0 = 20.0 * Conv;             // x zeroing speed (step/s)
@@ -386,14 +386,7 @@ void onClickZeroWorkspaceXY(EncoderButton &eb) {
   drawCenteredText("Zeroing Workspace XY...", 1);
   workspaceZeroXY();
 
-  // Reset cutting path
-  path_started = false;
-  current_path_idx = 0;
-  current_point_idx = 0;
-
-  state = READY;
-  // drawFixedUI();
-  encoder.setClickHandler(nullHandler);
+  state = WORKSPACE_XY_ZERO;
 }
 
 void onEncoderUpdateThickness(EncoderButton &eb) {
@@ -420,7 +413,6 @@ void encoderSetThickness() {
   sprintf(text2send, "Turn to set thickness\n%.2f mm", matThickness);
   drawCenteredText(text2send, 1);
 
-  state = SETTING_THICKNESS;
   encoder.setEncoderHandler(onEncoderUpdateThickness);
   encoder.setClickHandler(onClickSetThickness);
 
@@ -466,7 +458,7 @@ void encoderDesignMode() {
   encoder.setClickHandler(nullHandler);
 
   screen.fillScreen(GC9A01A_BLACK);
-  drawDirection();
+  drawFixedUI();
 
   // Clear out sensors in case we moved while in design mode
   sensors[0].readBurst();
@@ -478,6 +470,35 @@ void encoderDesignMode() {
   // drawCenteredText("Zero Workspace XY", 1);
   // encoder.setEncoderHandler(nullHandler);
   // encoder.setClickHandler(onClickZeroWorkspaceXY);
+}
+
+void encoderZeroWorkspaceXY() {
+  drawCenteredText("Zero workspace XY", 1);
+
+  // encoder.setEncoderHandler( );     // TODO: add option to cancel
+  encoder.setClickHandler(onClickZeroWorkspaceXY);
+
+  while (state != WORKSPACE_XY_ZERO) {
+    encoder.update();
+  }
+
+  if (!path_started) {
+    // Reset cutting path
+    path_started = false;
+    current_path_idx = 0;
+    current_point_idx = 0;
+  } else {
+    // Enter here if sensors are being reset
+    // current_point_idx--;          // TODO: think about whether this is necessary
+  }
+
+  state = READY;
+  encoder.setEncoderHandler(nullHandler);
+  encoder.setClickHandler(nullHandler);
+
+  screen.fillScreen(GC9A01A_BLACK);
+  // drawDirection();
+  drawFixedUI();
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -610,16 +631,6 @@ void loop() {
   ///////////////////////////////////
   Point goal = paths[current_path_idx][current_point_idx];
   Point next = paths[current_path_idx][current_point_idx + 1];
-  
-  // TODO: removed this for the opensauce UI. Add back if you want.
-  // if ((millis()-lastDraw) > 15) {
-  //   iter = (iter + 1)%7;
-  //   // unsigned long now = micros();
-  //   drawUI(goal, next, iter);
-  //   // Serial.printf("draw %d took %i us\n", iter, micros()-now);
-  //   lastDraw = millis();
-  // }
-  
 
   // If we have not started the path, and the first point is behind us
   // keep the tool raised and return. We wait here until the first point
@@ -649,13 +660,23 @@ void loop() {
   float desPosClosest = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
 
   // Conditions for cutting
-  bool handle_buttons_pressed = (digitalRead(BUTT_HANDLE_L) && digitalRead(BUTT_HANDLE_R)) == LOW;
+  bool handle_buttons_pressed = (digitalRead(BUTT_HANDLE_L) == LOW) && (digitalRead(BUTT_HANDLE_R) == LOW);
   bool handle_buttons_debounce = (millis() - timeLastDebounce) < debounceDelay;
   if (handle_buttons_pressed) { timeLastDebounce = millis(); }
   bool handle_buttons_ok = handle_buttons_pressed || handle_buttons_debounce;
   bool gantry_intersects = !isnan(desPos);
   bool goal_behind_router = pathDir[current_path_idx] * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
   bool gantry_angle_ok = angleFrom(goal, next) > (PI / 6);
+
+  // TODO: removed this for the opensauce UI. Add back if you want.
+  // if ((millis()-lastDraw) > 15) {
+  //   iter = (iter + 1)%7;
+  //   // unsigned long now = micros();
+  //   motorPosX = stepperX.currentPosition()*1.0f/Conv;
+  //   drawUI(desPos, goal, next, iter);
+  //   // Serial.printf("draw %d took %i us\n", iter, micros()-now);
+  //   lastDraw = millis();
+  // }
 
   // TODO: delete me
   // bool newChecks[4] = {handle_buttons_ok, gantry_intersects, goal_behind_router, gantry_angle_ok};
@@ -708,9 +729,10 @@ void loop() {
           }
           Serial.println("All paths finished");
           encoderDesignMode();
-        } else {
-          drawDirection();
         }
+        // } else {
+        //   drawDirection();
+        // }
       }
     }
   } else {
@@ -1213,7 +1235,7 @@ void doSensing() {
   if (validVals == 0) {
     // TODO: make this prompt a re-zeroing
     Serial.print("Sensors are poo-poo!");
-    encoderDesignMode();
+    encoderZeroWorkspaceXY();
     return;
   } else {
     estAngVel1 = sumAngVel / validVals;
@@ -1243,7 +1265,7 @@ void doSensing() {
   if (validVals == 0) {
     // TODO: make this prompt a re-zeroing
     Serial.print("Sensors are poo-poo!");
-    encoderDesignMode();
+    encoderZeroWorkspaceXY();
     return;
   } else {
     // (TODO: figure out deeper cause) Acounting for weird rotation
@@ -1357,6 +1379,7 @@ void workspaceZeroZ() {
   maxHeight = stepperZ.currentPosition()*1.0f / Conv;
 
   // Return to rest height
+  stepperZ.setMaxSpeed(maxSpeedZ/2);
   stepperZ.moveTo(Conv*restHeight);
   while (stepperZ.distanceToGo() != 0) {
     stepperZ.run();
@@ -1775,33 +1798,41 @@ void drawFixedUI() {
 
   // Draw the arcs on the edge of the screen
   for (int i=0; i<radius; i++) {
-    float xOffset = radius*cosf(PI/6*i/radius);
-    float yOffset = radius*sinf(PI/6*i/radius);
+    float xOffset = radius*cosf((PI/4)*i/radius);
+    float yOffset = radius*sinf((PI/4)*i/radius);
 
     screen.drawPixel(centerX - xOffset, centerY - yOffset, GC9A01A_WHITE);
     screen.drawPixel(centerX - xOffset, centerY + yOffset, GC9A01A_WHITE);
     screen.drawPixel(centerX + xOffset, centerY - yOffset, GC9A01A_WHITE);
     screen.drawPixel(centerX + xOffset, centerY + yOffset, GC9A01A_WHITE);
   }
+  
+  // Draw bounds circle
+  int16_t radiusBounds = screen.width() / 4;
+  screen.drawCircle(centerX, centerY, radiusBounds, GC9A01A_WHITE);
 }
 
-void drawUI(Point goal, Point next, uint8_t i) {
-  int16_t radius = screen.width()*0.95 / 4;
+void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
+  int16_t radiusBounds = screen.width() / 4;
+  int16_t radiusInner = screen.width() / 10;
   int16_t centerX = screen.width() / 2;
   int16_t centerY = screen.width() / 2;
 
   float dTheta = estYaw + PI/2 - atan2f(next.y-goal.y, next.x-goal.x);
 
-  float theta = estYaw - atan2f(goal.y-estPos[1], goal.x-estPos[0]);
-  float dist = myDist(estPos[0], estPos[1], goal.x, goal.y);
+  // float xMap = mapF(desPosition, -gantryLength/2, gantryLength/2, -radiusBounds, radiusBounds);
+  // float yMap = mapF();
+  float theta = estYaw - atan2f(next.y-estPos[1], next.x-estPos[0]);
+  float thetaTool = estYaw - atan2f(next.y-(estPos[1]+motorPosX*sinf(estYaw)), next.x-(estPos[0]+motorPosX*cosf(estYaw)));
+  float dist = myDist(estPos[0], estPos[1], next.x, next.y);
 
   // Serial.printf("yaw: %f\n", degrees(estYaw));
 
-  float offsetRadius = radius*0.8*tanh(dist*0.1);
+  float offsetRadius = (radius - radiusInner)*0.8*tanh(dist*0.1);
 
   switch (i%7) {
     case 0:
-      // Draw the target circle in the center
+      // draw the center target
       screen.drawLine(centerX, centerY-5, centerX, centerY+5, GC9A01A_WHITE);
       screen.drawLine(centerX-5, centerY, centerX+5, centerY, GC9A01A_WHITE);
       break;
@@ -1815,28 +1846,36 @@ void drawUI(Point goal, Point next, uint8_t i) {
       break;
     case 3:
       // draw the new line left
-      lastX0 = centerX + 0.6*radius*cosf(dTheta);
-      lastY0 = centerY + 0.6*radius*sinf(dTheta);
-      lastX1 = centerX + radius*cosf(dTheta);
-      lastY1 = centerY + radius*sinf(dTheta);
+      lastX0 = centerX + 1.4*radiusBounds*cosf(dTheta);
+      lastY0 = centerY + 1.4*radiusBounds*sinf(dTheta);
+      lastX1 = centerX + (radiusBounds+2)*cosf(dTheta);
+      lastY1 = centerY + (radiusBounds+2)*sinf(dTheta);
 
       screen.drawLine(lastX0, lastY0, lastX1, lastY1, GC9A01A_WHITE);
       break;
     case 4:
-      lastX2 = centerX - radius*cosf(dTheta);
-      lastY2 = centerY - radius*sinf(dTheta);
-      lastX3 = centerX - 0.6*radius*cosf(dTheta);
-      lastY3 = centerY - 0.6*radius*sinf(dTheta);
+      // draw the new line right
+      lastX2 = centerX - (radiusBounds+2)*cosf(dTheta);
+      lastY2 = centerY - (radiusBounds+2)*sinf(dTheta);
+      lastX3 = centerX - 1.4*radiusBounds*cosf(dTheta);
+      lastY3 = centerY - 1.4*radiusBounds*sinf(dTheta);
       
       screen.drawLine(lastX2, lastY2, lastX3, lastY3, GC9A01A_WHITE);
       break;
     case 5:
-      // Clear the old target circle
+      // clear the old target circle
       screen.drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GC9A01A_BLACK);
       break;
     case 6:
-      lastTargetCircleX = centerX + offsetRadius*cosf(theta);
-      lastTargetCircleY = centerY + offsetRadius*sinf(theta);
+      // draw new target circle
+      float toolX = radiusBounds*cosf(thetaTool);
+      float toolY = radiusBounds*sinf(thetaTool);
+      lastTargetCircleX = centerX + (offsetRadius)*cosf(theta);
+      lastTargetCircleY = centerY + (offsetRadius)*sinf(theta);
+      // lastTargetCircleX = centerX + ((offsetRadius)*cosf(theta) + toolX)/2;
+      // lastTargetCircleY = centerY + ((offsetRadius)*sinf(theta) + toolY)/2;
+      // lastTargetCircleX = centerX + xMap;
+      // lastTargetCircleY = centerY + radiusInner*sqrt((1-pow(xMap/radiusBounds,2)));
       screen.drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GC9A01A_WHITE);
       break;
   }
