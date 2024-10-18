@@ -2,17 +2,17 @@
 #include <AccelStepper.h>
 #include <TMCStepper.h>
 #include <PMW3360.h>
-#include <PMW3360_SPI1.h>
+// #include <PMW3360_SPI1.h>
 #include <EEPROM.h>
 #include <SPI.h>
 #include <SD.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_GC9A01A.h>
+#include <U8g2lib.h>
+#include <Arduino_GFX_Library.h>
 #include <EncoderButton.h>
-#include <fonts/FreeMonoBold12pt7b.h>
-#include <fonts/FreeMonoBold9pt7b.h>
-#include <fonts/FreeMono12pt7b.h>
-#include <fonts/FreeMono9pt7b.h>
+// #include <fonts/FreeMonoBold12pt7b.h>
+// #include <fonts/FreeMonoBold9pt7b.h>
+// #include <fonts/FreeMono12pt7b.h>
+// #include <fonts/FreeMono9pt7b.h>
 
 /*
 Sensor configuration (USING 3 SENSORS NOW!!):
@@ -140,8 +140,10 @@ int sensorPins[4] = {SS0, SS1, SS2, SS3};
 #define MOT_STEP_Z  33
 
 // LCD Pins
-#define TFT_CS     31
-#define TFT_DC     30
+#define TFT_CS      31
+#define TFT_DC      30
+#define TFT_RST     -1          // not connected to anything rn...
+// #define GFX_BL 28
 
 // Driver pins
 #define SERIAL_PORT_X         Serial4     // HardwareSerial port
@@ -345,8 +347,8 @@ bool cutting = false; // TODO: delete me
 bool prevChecks[4]; // TODO: delete me
 
 EncoderButton encoder(ENCODER_PIN_A, ENCODER_PIN_B, ENCODER_BUTTON_PIN);
-// Adafruit_GC9A01A screen = Adafruit_GC9A01A(TFT_CS, TFT_DC);
-Adafruit_GC9A01A screen = Adafruit_GC9A01A(&SPI1, TFT_DC, TFT_CS);
+Arduino_DataBus *bus = new Arduino_HWSPI(TFT_DC, TFT_CS, &SPI1);
+Arduino_GFX *screen = new Arduino_GC9A01(bus, TFT_RST, 0, true);
 
 void nullHandler(EncoderButton &eb) {
   Serial.println("null handler called");
@@ -457,7 +459,7 @@ void encoderDesignMode() {
   encoder.setEncoderHandler(nullHandler);
   encoder.setClickHandler(nullHandler);
 
-  screen.fillScreen(GC9A01A_BLACK);
+  screen->fillScreen(BLACK);
   drawFixedUI();
 
   // Clear out sensors in case we moved while in design mode
@@ -496,7 +498,7 @@ void encoderZeroWorkspaceXY() {
   encoder.setEncoderHandler(nullHandler);
   encoder.setClickHandler(nullHandler);
 
-  screen.fillScreen(GC9A01A_BLACK);
+  screen->fillScreen(BLACK);
   // drawDirection();
   drawFixedUI();
 }
@@ -512,15 +514,20 @@ void setup() {
   delay(100);         // as opposed to the while(!Serial);
 
   // Initialize the display
-  screen.begin();
-  screen.fillScreen(GC9A01A_BLACK);
+  if (!screen->begin()) {
+    Serial.println("screen->begin() failed!");
+  };
+  // pinMode(GFX_BL, OUTPUT);
+  // digitalWrite(GFX_BL, HIGH);
 
-  radius = screen.width()*0.95 / 4;
-  centerX = screen.width() / 2;
-  centerY = screen.width() / 2;
+  screen->fillScreen(BLACK);
+
+  radius = screen->width()*0.95 / 4;
+  centerX = screen->width() / 2;
+  centerY = screen->width() / 2;
 
   drawCenteredText("Initializing...", 1);
-  // screen.setRotation(1);
+  // screen->setRotation(1);
 
   // Load calibration coeffs
   Serial.println("Loading calibration coefficients:");
@@ -668,15 +675,16 @@ void loop() {
   bool goal_behind_router = pathDir[current_path_idx] * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
   bool gantry_angle_ok = angleFrom(goal, next) > (PI / 6);
 
+  // Draw UI
   // TODO: removed this for the opensauce UI. Add back if you want.
-  // if ((millis()-lastDraw) > 15) {
-  //   iter = (iter + 1)%7;
-  //   // unsigned long now = micros();
-  //   motorPosX = stepperX.currentPosition()*1.0f/Conv;
-  //   drawUI(desPos, goal, next, iter);
-  //   // Serial.printf("draw %d took %i us\n", iter, micros()-now);
-  //   lastDraw = millis();
-  // }
+  if ((millis()-lastDraw) > 15) {
+    iter = (iter + 1)%8;
+    // unsigned long now = micros();
+    motorPosX = stepperX.currentPosition()*1.0f/Conv;
+    drawUI(desPos, goal, next, iter);
+    // Serial.printf("draw %d took %i us\n", iter, micros()-now);
+    lastDraw = millis();
+  }
 
   // TODO: delete me
   // bool newChecks[4] = {handle_buttons_ok, gantry_intersects, goal_behind_router, gantry_angle_ok};
@@ -1610,7 +1618,7 @@ void calibrate(){
     delay(500);
     calPos[axis][0] = 0.0;
 
-    screen.fillScreen(GC9A01A_BLACK);
+    screen->fillScreen(BLACK);
 
     Serial.println("about to sprintf");
     char *msg;
@@ -1631,7 +1639,7 @@ void calibrate(){
       Serial.println(calPos[axis][0]);
     }
     
-    screen.fillScreen(GC9A01A_BLACK);
+    screen->fillScreen(BLACK);
 
     // Serial.println("STOP");
     drawCenteredText("STOP",  1);
@@ -1650,8 +1658,8 @@ void calibrate(){
 }
 
 void drawShape() {
-  int16_t tftWidth = screen.width();
-  int16_t tftHeight = screen.height();
+  int16_t tftWidth = screen->width();
+  int16_t tftHeight = screen->height();
   int16_t centerX = tftWidth / 2;
   int16_t centerY = tftHeight / 2;
   int16_t size = min(tftWidth, tftHeight) / 3;
@@ -1659,19 +1667,19 @@ void drawShape() {
   float scale;
   int16_t minY,maxY,minX,maxX,y_quarter,y_3_quarter,x;
 
-  screen.fillScreen(GC9A01A_BLACK);
+  screen->fillScreen(BLACK);
 
   switch (designMode) {
     case 0:
       // line
-      screen.drawLine(centerX, centerY-size, centerX, centerY+size, GC9A01A_WHITE);
+      screen->drawLine(centerX, centerY-size, centerX, centerY+size, WHITE);
       break;
     case 1:
       // sin
       scale = size / PI;
       for (int y = -size; y <= size; y++) {
         x = (int16_t) (scale*sin(y/scale));
-        screen.drawPixel(centerX+x, centerY+y, GC9A01A_WHITE);
+        screen->drawPixel(centerX+x, centerY+y, WHITE);
       }
       break;
     case 2:
@@ -1684,26 +1692,26 @@ void drawShape() {
       y_quarter = minY + size / 2;
       y_3_quarter = maxY - size / 2;
 
-      screen.drawLine(centerX, minY, maxX, y_quarter, GC9A01A_WHITE);
-      screen.drawLine(maxX, y_quarter, minX, y_3_quarter, GC9A01A_WHITE);
-      screen.drawLine(minX, y_3_quarter, centerX, maxY, GC9A01A_WHITE);
+      screen->drawLine(centerX, minY, maxX, y_quarter, WHITE);
+      screen->drawLine(maxX, y_quarter, minX, y_3_quarter, WHITE);
+      screen->drawLine(minX, y_3_quarter, centerX, maxY, WHITE);
 
       break;
     case 3:
       // double line
-      screen.drawLine(centerX-size/4, centerY-size, centerX-size/4, centerY+size, GC9A01A_WHITE);
-      screen.drawLine(centerX+size/4, centerY-size, centerX+size/4, centerY+size, GC9A01A_WHITE);
+      screen->drawLine(centerX-size/4, centerY-size, centerX-size/4, centerY+size, WHITE);
+      screen->drawLine(centerX+size/4, centerY-size, centerX+size/4, centerY+size, WHITE);
       break;
     case 4:
       // diamond
-      screen.drawLine(centerX-size, centerY, centerX, centerY+size, GC9A01A_WHITE);
-      screen.drawLine(centerX, centerY+size, centerX+size, centerY, GC9A01A_WHITE);
-      screen.drawLine(centerX+size, centerY, centerX, centerY-size, GC9A01A_WHITE);
-      screen.drawLine(centerX, centerY-size, centerX-size, centerY, GC9A01A_WHITE);
+      screen->drawLine(centerX-size, centerY, centerX, centerY+size, WHITE);
+      screen->drawLine(centerX, centerY+size, centerX+size, centerY, WHITE);
+      screen->drawLine(centerX+size, centerY, centerX, centerY-size, WHITE);
+      screen->drawLine(centerX, centerY-size, centerX-size, centerY, WHITE);
       break;
     case 5:
       // circle
-      screen.drawCircle(centerX, centerY, size, GC9A01A_WHITE);
+      screen->drawCircle(centerX, centerY, size, WHITE);
       break;
   }
 }
@@ -1712,16 +1720,16 @@ void drawCenteredText(const char* text, int size) {
   Serial.print("SCREEN: ");
   Serial.println(text);
 
-  screen.fillScreen(GC9A01A_BLACK);
+  screen->fillScreen(BLACK);
 
-  int16_t tftWidth = screen.width();
-  int16_t tftHeight = screen.height();
+  int16_t tftWidth = screen->width();
+  int16_t tftHeight = screen->height();
   int16_t centerX = tftWidth / 2;
   int16_t centerY = tftHeight / 2;
 
-  screen.setFont(&FreeMonoBold9pt7b);
-  screen.setTextSize(size);
-  screen.setTextColor(GC9A01A_WHITE);
+  screen->setFont(u8g2_font_littlemissloudonbold_tr);
+  screen->setTextSize(size);
+  screen->setTextColor(WHITE);
 
   // Split the text into lines based on '\n'
   char *line = strtok(text, "\n");
@@ -1741,23 +1749,23 @@ void drawCenteredText(const char* text, int size) {
   for (int i = 0; i < lineCount; i++) {
     int16_t x1, y1;
     uint16_t w, h;
-    screen.getTextBounds(lines[i], 0, 0, &x1, &y1, &w, &h);
+    screen->getTextBounds(lines[i], 0, 0, &x1, &y1, &w, &h);
 
     // Calculate the top-left corner to start the text so that it gets centered
     int16_t xStart = centerX - w / 2;
 
-    screen.setCursor(xStart, yStart + i * size * 10);
-    screen.println(lines[i]);
+    screen->setCursor(xStart, yStart + i * size * 10);
+    screen->println(lines[i]);
   }
 }
 
 void drawDirection() {
   float width = 30;
-  float height = screen.height() / 3;
+  float height = screen->height() / 3;
   float spacing = 5;
 
-  int16_t centerX = screen.height() / 2;
-  int16_t centerY = screen.height() / 2;
+  int16_t centerX = screen->height() / 2;
+  int16_t centerY = screen->height() / 2;
   
   // Forward triangle
   int16_t x0 = centerX - width;
@@ -1779,104 +1787,125 @@ void drawDirection() {
 
   if (pathDir[current_path_idx] > 0) {
     forwardColor = GC9A01A_WEBWORK_GREEN;
-    reverseColor = GC9A01A_DARKGREY;
+    reverseColor = DARKGREY;
   } else {
-    forwardColor = GC9A01A_DARKGREY;
+    forwardColor = DARKGREY;
     reverseColor = GC9A01A_WEBWORK_GREEN;
   }
 
-  screen.drawTriangle(x0,y0,x1,y1,x2,y2,forwardColor);
-  screen.drawTriangle(x3,y3,x4,y4,x5,y5,reverseColor);
+  screen->drawTriangle(x0,y0,x1,y1,x2,y2,forwardColor);
+  screen->drawTriangle(x3,y3,x4,y4,x5,y5,reverseColor);
+}
+
+float exponentialSkew(float x) {
+  if (x > 0) {
+    return x + (1/exp(x));
+  } else if (x < 0) {
+    return -(x + (1/exp(x)));
+  } else {
+    return 0.0f;
+  }
 }
 
 void drawFixedUI() {
-  screen.fillScreen(GC9A01A_BLACK);
+  screen->fillScreen(BLACK);
 
-  int16_t radius = screen.width()*0.95 / 2;
-  int16_t centerX = screen.width() / 2;
-  int16_t centerY = screen.width() / 2;
+  int16_t radius = screen->width()*0.95 / 2;
+  int16_t centerX = screen->width() / 2;
+  int16_t centerY = screen->width() / 2;
 
   // Draw the arcs on the edge of the screen
   for (int i=0; i<radius; i++) {
     float xOffset = radius*cosf((PI/4)*i/radius);
     float yOffset = radius*sinf((PI/4)*i/radius);
 
-    screen.drawPixel(centerX - xOffset, centerY - yOffset, GC9A01A_WHITE);
-    screen.drawPixel(centerX - xOffset, centerY + yOffset, GC9A01A_WHITE);
-    screen.drawPixel(centerX + xOffset, centerY - yOffset, GC9A01A_WHITE);
-    screen.drawPixel(centerX + xOffset, centerY + yOffset, GC9A01A_WHITE);
+    screen->drawPixel(centerX - xOffset, centerY - yOffset, WHITE);
+    screen->drawPixel(centerX - xOffset, centerY + yOffset, WHITE);
+    screen->drawPixel(centerX + xOffset, centerY - yOffset, WHITE);
+    screen->drawPixel(centerX + xOffset, centerY + yOffset, WHITE);
   }
   
   // Draw bounds circle
-  int16_t radiusBounds = screen.width() / 4;
-  screen.drawCircle(centerX, centerY, radiusBounds, GC9A01A_WHITE);
+  int16_t radiusBounds = screen->width() / 4;
+  screen->drawCircle(centerX, centerY, radiusBounds, WHITE);
 }
 
 void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
-  int16_t radiusBounds = screen.width() / 4;
-  int16_t radiusInner = screen.width() / 10;
-  int16_t centerX = screen.width() / 2;
-  int16_t centerY = screen.width() / 2;
+  int16_t radiusBounds = screen->width() / 4;
+  int16_t radiusInner = screen->width() / 10;
+  int16_t centerX = screen->width() / 2;
+  int16_t centerY = screen->width() / 2;
 
   float dTheta = estYaw + PI/2 - atan2f(next.y-goal.y, next.x-goal.x);
 
   // float xMap = mapF(desPosition, -gantryLength/2, gantryLength/2, -radiusBounds, radiusBounds);
   // float yMap = mapF();
-  float theta = estYaw - atan2f(next.y-estPos[1], next.x-estPos[0]);
-  float thetaTool = estYaw - atan2f(next.y-(estPos[1]+motorPosX*sinf(estYaw)), next.x-(estPos[0]+motorPosX*cosf(estYaw)));
-  float dist = myDist(estPos[0], estPos[1], next.x, next.y);
+  float dx = (next.x-estPos[0])*cosf(-estYaw) - (next.y-estPos[1])*sinf(-estYaw);
+  float dy = (next.x-estPos[0])*sinf(-estYaw) + (next.y-estPos[1])*cosf(-estYaw);
+  float dySkewed = 5*exponentialSkew(dy);
+  // float theta = estYaw - atan2f(dySkewed, next.x-estPos[0]);
+  float theta = atan2f(dySkewed, dx);
+  // float thetaTool = estYaw - atan2f(next.y-(estPos[1]+motorPosX*sinf(estYaw)), next.x-(estPos[0]+motorPosX*cosf(estYaw)));
+  // float dist = myDist(estPos[0], estPos[1], next.x, estPos[1] + dySkewed);
+  float dist = sqrt(pow(dx,2)+pow(dySkewed,2));
 
   // Serial.printf("yaw: %f\n", degrees(estYaw));
 
-  float offsetRadius = (radius - radiusInner)*0.8*tanh(dist*0.1);
+  float offsetRadius = radiusBounds*0.9*tanh(dist*0.05);
+  //float offsetRadius = (radius - radiusInner)*0.8*tanh(dist*0.1);
 
-  switch (i%7) {
+  switch (i%8) {
     case 0:
       // draw the center target
-      screen.drawLine(centerX, centerY-5, centerX, centerY+5, GC9A01A_WHITE);
-      screen.drawLine(centerX-5, centerY, centerX+5, centerY, GC9A01A_WHITE);
+      screen->drawLine(centerX, centerY-5, centerX, centerY+5, WHITE);
+      screen->drawLine(centerX-15, centerY, centerX+15, centerY, WHITE);
       break;
     case 1:
-      // clear the old line left
-      screen.drawLine(lastX0, lastY0, lastX1, lastY1, GC9A01A_BLACK);
+      // draw outer up/down marker
+      screen->drawLine(centerX+radiusBounds, centerY, centerX+radiusBounds-5, centerY, WHITE);
+      screen->drawLine(centerX-radiusBounds, centerY, centerX-radiusBounds+5, centerY, WHITE);
       break;
     case 2:
-      // clear old line right
-      screen.drawLine(lastX2, lastY2, lastX3, lastY3, GC9A01A_BLACK);
+      // clear the old line left
+      screen->drawLine(lastX0, lastY0, lastX1, lastY1, BLACK);
       break;
     case 3:
+      // clear old line right
+      screen->drawLine(lastX2, lastY2, lastX3, lastY3, BLACK);
+      break;
+    case 4:
       // draw the new line left
       lastX0 = centerX + 1.4*radiusBounds*cosf(dTheta);
       lastY0 = centerY + 1.4*radiusBounds*sinf(dTheta);
       lastX1 = centerX + (radiusBounds+2)*cosf(dTheta);
       lastY1 = centerY + (radiusBounds+2)*sinf(dTheta);
 
-      screen.drawLine(lastX0, lastY0, lastX1, lastY1, GC9A01A_WHITE);
+      screen->drawLine(lastX0, lastY0, lastX1, lastY1, WHITE);
       break;
-    case 4:
+    case 5:
       // draw the new line right
       lastX2 = centerX - (radiusBounds+2)*cosf(dTheta);
       lastY2 = centerY - (radiusBounds+2)*sinf(dTheta);
       lastX3 = centerX - 1.4*radiusBounds*cosf(dTheta);
       lastY3 = centerY - 1.4*radiusBounds*sinf(dTheta);
       
-      screen.drawLine(lastX2, lastY2, lastX3, lastY3, GC9A01A_WHITE);
-      break;
-    case 5:
-      // clear the old target circle
-      screen.drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GC9A01A_BLACK);
+      screen->drawLine(lastX2, lastY2, lastX3, lastY3, WHITE);
       break;
     case 6:
+      // clear the old target circle
+      screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, BLACK);
+      break;
+    case 7:
       // draw new target circle
-      float toolX = radiusBounds*cosf(thetaTool);
-      float toolY = radiusBounds*sinf(thetaTool);
+      // float toolX = radiusBounds*cosf(thetaTool);
+      // float toolY = radiusBounds*sinf(thetaTool);
       lastTargetCircleX = centerX + (offsetRadius)*cosf(theta);
-      lastTargetCircleY = centerY + (offsetRadius)*sinf(theta);
+      lastTargetCircleY = centerY - (offsetRadius)*sinf(theta);     // TODO: this shouldn't be negative, just a hack
       // lastTargetCircleX = centerX + ((offsetRadius)*cosf(theta) + toolX)/2;
       // lastTargetCircleY = centerY + ((offsetRadius)*sinf(theta) + toolY)/2;
       // lastTargetCircleX = centerX + xMap;
       // lastTargetCircleY = centerY + radiusInner*sqrt((1-pow(xMap/radiusBounds,2)));
-      screen.drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GC9A01A_WHITE);
+      screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, WHITE);
       break;
   }
 }

@@ -3,9 +3,9 @@
 #include <EncoderButton.h>
 
 // Define the pins for the encoder and button
-#define ENCODER_PIN_A   39
-#define ENCODER_PIN_B   40
-#define BUTTON_PIN      41
+#define ENCODER_PIN_A   21
+#define ENCODER_PIN_B   22
+#define BUTTON_PIN      4
 
 // Define the pins for the display
 #define TFT_CS     31
@@ -13,7 +13,7 @@
 #define TFT_DC     30
 
 // Initialize the display
-Adafruit_GC9A01A tft = Adafruit_GC9A01A(TFT_CS, TFT_DC);
+Adafruit_GC9A01A tft = Adafruit_GC9A01A(&SPI1, TFT_CS, TFT_DC);
 
 // Initialize the encoder button
 EncoderButton eb1(ENCODER_PIN_A, ENCODER_PIN_B, BUTTON_PIN);
