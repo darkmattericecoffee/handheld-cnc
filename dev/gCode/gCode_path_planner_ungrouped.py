@@ -3,9 +3,11 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.patches import FancyArrowPatch
+from matplotlib.legend_handler import HandlerPatch
 from sklearn.cluster import KMeans
 
-angle_thresh = 45
+angle_thresh = 90					# range of angles that the router can cut
 
 # TODO: make this actually parce gcode + nc files...
 def read_gcode_csv(file_path):
@@ -97,7 +99,7 @@ def convert_angles_to_radians(angles_deg):
 	return np.radians(angles_deg)
 
 def group_segments(segments_df):
-	angle_range = 90     # this range is 2x the range of one side of y-axis
+	# angle_range = 90     # this range is 2x the range of one side of y-axis
 
 	# start with angle 0
 	group_angle = 0
@@ -115,6 +117,8 @@ def group_segments(segments_df):
 
 		cluster_centers = kmeans.cluster_centers_
 		cluster_centers_deg = np.degrees(np.arctan2(cluster_centers[:, 1], cluster_centers[:, 0])) % 360
+		kmeans_df['cluster_angle'] = kmeans_df['cluster_label'].map(
+			dict(enumerate(cluster_centers_deg)))
 
 		buckets_valid = 1
 
@@ -130,7 +134,7 @@ def group_segments(segments_df):
 			angular_range = min((max_angle - min_angle), (min_angle + 360 - max_angle))
 
 			# Check if the angular range exceeds the boundary
-			if angular_range > angle_range:
+			if angular_range > angle_thresh:
 				k = k + 1
 				buckets_valid = 0
 				break
@@ -158,34 +162,75 @@ def plot_segments(gcode_df, filtered_segments):
 	plt.grid(True)
 	plt.show()
 
+class ArrowHandler(HandlerPatch):
+	"""Custom handler to draw arrows in legend"""
+	def __init__(self, angle_deg, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.angle_deg = angle_deg
+		
+	def create_artists(self, legend, orig_handle,
+					  xdescent, ydescent, width, height, fontsize, trans):
+		angle_rad = np.radians(self.angle_deg)
+		
+		# Calculate arrow start and end points
+		arrow_length = width * 0.7
+		dx = arrow_length * np.cos(angle_rad)
+		dy = arrow_length * np.sin(angle_rad)
+		
+		# Center the arrow
+		center_x = width/2 - xdescent
+		center_y = height/2 - ydescent
+		
+		arrow = FancyArrowPatch(
+			(center_x - dx/2, center_y - dy/2),
+			(center_x + dx/2, center_y + dy/2),
+			arrowstyle='->',
+			color=orig_handle.get_color(),
+			mutation_scale=15
+		)
+		
+		return [arrow]
 
 def plot_segment_by_group(segments_df):
 	plt.figure(figsize=(10, 6))
 
 	unique_clusters = np.unique(segments_df['cluster_label'])
-	cmap = plt.get_cmap('tab10', len(unique_clusters))  # 'tab10' gives up to 10 distinct colors
-	idx = 0
+	cmap = plt.get_cmap('tab10', len(unique_clusters))
+	handles = []
+	labels = []
+	handler_map = {}
 	
-	for cluster_label in unique_clusters:
+	for idx, cluster_label in enumerate(unique_clusters):
 		cluster_segments_df = segments_df[segments_df['cluster_label'] == cluster_label]
 		c = cmap(idx)
 
-		# TODO: label and color each cluster
 		for i, segment in cluster_segments_df.iterrows():
 			x = [segment.p0[0], segment.p1[0]]
 			y = [segment.p0[1], segment.p1[1]]
+			line = plt.plot(x, y, color=c)[0]
+			
 			if i == cluster_segments_df.index[0]:
-				plt.plot(x, y, color=c, label=f'Cluster {cluster_label}')
-			else:
-				plt.plot(x, y, color=c)
-		idx = idx + 1
-
+				handles.append(line)
+				labels.append(f'Cluster {cluster_label}')
+				# Create handler for this cluster
+				angle = cluster_segments_df.cluster_angle.iloc[0]
+				handler_map[line] = ArrowHandler(angle)
 
 	plt.xlabel("X-axis")
 	plt.ylabel("Y-axis")
 	plt.title("Plot of Segments by Angle")
 	plt.grid(True)
-	plt.legend()
+	
+	# Create legend with custom handler
+	plt.legend(handles, labels,
+			  handler_map=handler_map,
+			  loc='center left', 
+			  bbox_to_anchor=(1, 0.5))
+	
+	# Adjust layout to prevent legend from being cut off
+	plt.tight_layout()
+	plt.subplots_adjust(right=0.85)
+	
 	plt.show()
 
 
