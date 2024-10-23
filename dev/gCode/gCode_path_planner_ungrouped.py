@@ -143,7 +143,7 @@ def group_segments(segments_df):
 
 # Plotting
 def plot_segments(gcode_df, filtered_segments):
-	plt.figure(figsize=(10, 6))
+	plt.figure(figsize=(12, 6))
 
 	for segment in filtered_segments:
 		segment_points = gcode_df.iloc[segment]
@@ -208,12 +208,12 @@ def plot_segment_by_group(segments_df):
 			x = [segment.p0[0], segment.p1[0]]
 			y = [segment.p0[1], segment.p1[1]]
 			line = plt.plot(x, y, color=c)[0]
-			
+
 			if i == cluster_segments_df.index[0]:
 				handles.append(line)
-				labels.append(f'Cluster {cluster_label}')
+				angle = segment.cluster_angle
+				labels.append(f'Cluster {cluster_label} at {angle:.1f}°')
 				# Create handler for this cluster
-				angle = cluster_segments_df.cluster_angle.iloc[0]
 				handler_map[line] = ArrowHandler(angle)
 
 	plt.xlabel("X-axis")
@@ -229,7 +229,7 @@ def plot_segment_by_group(segments_df):
 	
 	# Adjust layout to prevent legend from being cut off
 	plt.tight_layout()
-	plt.subplots_adjust(right=0.85)
+	plt.subplots_adjust(right=0.8)
 	
 	plt.show()
 
