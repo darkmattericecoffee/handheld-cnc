@@ -20,4 +20,4 @@ External
 - [Assembly Instructions](https://drive.google.com/drive/folders/1fIALrTWUbJRqTl93RGrUaR8dMfO7AI_g?usp=sharing)
 
 ## Disclaimer
-This project is a work-in-progress. Development is rapidly occuring, so design files and firmware may change.
+This project is a work-in-progress. Development is rapidly occurring, so design files and firmware may change.

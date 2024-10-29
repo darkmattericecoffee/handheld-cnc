@@ -1,4 +1,4 @@
-# Manufactuing BOM
+# Manufacturing BOM
 
 ## Main Assembly -
 ### 3D Printed Parts (PLA)
@@ -15,7 +15,7 @@
 - (4x) springMount_both-plates.stl
 - (1x) suckMountBody.stl
 - (1x) suckMountLid_01.stl (for use with Nylon bristles)
-- (1x) suckMountLid_hairy.stl (expirimental printed bristles)
+- (1x) suckMountLid_hairy.stl (experimental printed bristles)
 - (1x) UIFrameLeft.stl
 - (1x) UIFrameRight.stl
 - (1x) zCarriage.stl
