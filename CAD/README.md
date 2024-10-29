@@ -10,16 +10,8 @@ Aluminum Sheet Metal (6061)
 	- Note: this can be made in wood or acrylic too (1/8" should be fine) since it's not structural
 	- Note: also, this UI scheme will also likely soon be deprecated, so this file will also likely be too.
 
-Laser Cut Clear Acrylic
-(1x) boardFrame.dxf - 1/8"
-	- Note: this can be cut out of wood too
-(1x) xStrip.dxf - 1/8"
-(1x) yStrip.dxf - 1/8"
-	- Note: these are for the UI which still hasn't been used yet. Pretty optional.
-
 3D Printed Parts
-	- Note: everything was printed in PLA but PET or Nylon or something stronger would probably be better.
-	- Note: I think everything should be able to be printed with no (or minimal) support. Orient intentfully! (They might already be oriented correctly)
+	- Note: everything was printed in PLA.
 (1x) dremelMount.stl
 (1x) dremelSinch.stl
 (1x) frameLeft.stl
@@ -40,5 +32,3 @@ Laser Cut Wood (or Acylic)
 	- This is the calibration rail for the X component of the sensor
 (1x) calRailY.dxf
 	- This is the calibration rail for the Y component of the sensor
-(1x) orient_frame.ai
-	- This is used to check the calibration and rigid body kinematics of all four sensors
