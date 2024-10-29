@@ -9,10 +9,12 @@ All of the source to build a Handheld CNC Router - the firmware, CAD files for 3
 *Disclaimer:* This project is still a work-in-progress. Development is rapidly occuring, so design files and firmware may change.
 
 ### Firmware
-The main firmware is written for [PlatformIO](https://docs.platformio.org/en/latest/core/quickstart.html) (as opposed to Arduino IDE) for better project organization and explicit library management.
+The brains of this machine is a Teensy 4.1 microcontroller running the Arduino frameowrk. It's all written for [PlatformIO](https://docs.platformio.org/en/latest/core/quickstart.html) (as opposed to Arduino IDE) for better project organization and explicit library management.
+
+Simple dev test scripts just use the Arduino IDE
 
 ### Hardware
-Most 
+Most of the parts for Compass are 3D printed, except for a couple laser cut aluminum sheet metal parts. The .stl files for 3D printing are in the cad folder. 
 
 ### Electronics
 
