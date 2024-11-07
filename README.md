@@ -3,7 +3,7 @@ Compass is a DIY handheld CNC router designed to make CNC machining more accessi
 
 Unlike traditional CNC machines that move a cutting tool within a fixed workspace, Compass relies on users to guide the device around the workpiece directly. It automatically adjusts the cutting tool to stay on the programmed design path, enabling a significantly smaller device footprint while still handling large-scale cuts.
 
-This is all accomplished using optical flow mouse sensors to track the position of the device, as well as a lead screw driven gantry to adjust the tool. Everything is driven by a Teensy 4.1 microcontroller.
+This is all accomplished using optical flow mouse sensors to track the position of the device, as well as a lead screw driven gantry to adjust the tool. The brains are a Teensy 4.1 microcontroller.
 
 ## Getting Started
 This repo contains all of the source to build a Handheld CNC Router: the firmware, CAD files for 3D printing/manufacturing, BOM, and cable diagrams.
