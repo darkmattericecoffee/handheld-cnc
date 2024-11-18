@@ -98,6 +98,54 @@ def process_raw_gcode(gcode_df):
 def convert_angles_to_radians(angles_deg):
 	return np.radians(angles_deg)
 
+def plot_kmeans(plot_df, cluster_centers):
+	plt.figure(figsize=(8, 8))
+
+	# For each cluster with negative y center, apply modulo 180
+	for cluster_label in range(len(cluster_centers)):
+		if cluster_centers[cluster_label, 1] < 0:
+			mask = plot_df['cluster_label'] == cluster_label
+			# Apply modulo 180 to the angles
+			plot_df.loc[mask, 'angle_d'] = plot_df.loc[mask, 'angle_d'] % 180
+			# Recalculate x and y coordinates
+			plot_df.loc[mask, 'x'] = np.cos(convert_angles_to_radians(plot_df.loc[mask, 'angle_d']))
+			plot_df.loc[mask, 'y'] = np.sin(convert_angles_to_radians(plot_df.loc[mask, 'angle_d']))
+	
+	# Plot points colored by cluster using adjusted coordinates
+	color_map = plt.get_cmap('tab10')
+	scatter = plt.scatter(plot_df['x'], plot_df['y'], 
+											c=color_map(plot_df['cluster_label']), 
+											alpha=0.03, 
+											s=100)
+	
+	# Plot adjusted cluster centers
+	adjusted_centers = cluster_centers.copy()
+	for i in range(len(cluster_centers)):
+		if cluster_centers[i, 1] < 0:
+			angle = np.degrees(np.arctan2(cluster_centers[i, 1], cluster_centers[i, 0])) % 180
+			adjusted_centers[i] = [np.cos(np.radians(angle)), np.sin(np.radians(angle))]
+	
+	plt.scatter(adjusted_centers[:, 0], adjusted_centers[:, 1], 
+							c='red', marker='x', s=200, linewidths=3, 
+							label='Cluster Centers')
+	
+	# Add circle for reference
+	circle = plt.Circle((0, 0), 1, fill=False, linestyle='--', color='gray')
+	plt.gca().add_artist(circle)
+	
+	# Equal aspect ratio to maintain circular appearance
+	plt.axis('equal')
+	plt.grid(True)
+	plt.xlabel('cos(angle)')
+	plt.ylabel('sin(angle)')
+	plt.title(f'K-means Clustering Results (k={len(cluster_centers)})')
+	plt.legend()
+	
+	# Add colorbar
+	# plt.colorbar(scatter, label='Cluster Label')
+	
+	plt.show()
+
 def group_segments(segments_df):
 	# angle_range = 90     # this range is 2x the range of one side of y-axis
 
@@ -139,56 +187,14 @@ def group_segments(segments_df):
 				buckets_valid = 0
 				break
 
-	plt.figure(figsize=(8, 8))
-	
-	# Create plotting coordinates with adjusted angles for clusters with negative y
-	plot_df = kmeans_df.copy()
-	
-	# For each cluster with negative y center, apply modulo 180
-	for cluster_label in range(k):
-			if cluster_centers[cluster_label, 1] < 0:
-					mask = plot_df['cluster_label'] == cluster_label
-					# Apply modulo 180 to the angles
-					plot_df.loc[mask, 'angle_d'] = plot_df.loc[mask, 'angle_d'] % 180
-					# Recalculate x and y coordinates
-					plot_df.loc[mask, 'x'] = np.cos(convert_angles_to_radians(plot_df.loc[mask, 'angle_d']))
-					plot_df.loc[mask, 'y'] = np.sin(convert_angles_to_radians(plot_df.loc[mask, 'angle_d']))
-	
-	# Plot points colored by cluster using adjusted coordinates
-	color_map = plt.get_cmap('tab10')
-	scatter = plt.scatter(plot_df['x'], plot_df['y'], 
-											c=color_map(plot_df['cluster_label']), 
-											alpha=0.03, 
-											s=100)
-	
-	# Plot adjusted cluster centers
-	adjusted_centers = cluster_centers.copy()
-	for i in range(len(cluster_centers)):
-			if cluster_centers[i, 1] < 0:
-					angle = np.degrees(np.arctan2(cluster_centers[i, 1], cluster_centers[i, 0])) % 180
-					adjusted_centers[i] = [np.cos(np.radians(angle)), np.sin(np.radians(angle))]
-	
-	plt.scatter(adjusted_centers[:, 0], adjusted_centers[:, 1], 
-							c='red', marker='x', s=200, linewidths=3, 
-							label='Cluster Centers')
-	
-	# Add circle for reference
-	circle = plt.Circle((0, 0), 1, fill=False, linestyle='--', color='gray')
-	plt.gca().add_artist(circle)
-	
-	# Equal aspect ratio to maintain circular appearance
-	plt.axis('equal')
-	plt.grid(True)
-	plt.xlabel('cos(angle)')
-	plt.ylabel('sin(angle)')
-	plt.title(f'K-means Clustering Results (k={k})')
-	plt.legend()
-	
-	# Add colorbar
-	# plt.colorbar(scatter, label='Cluster Label')
-	
-	plt.show()
+	# TODO: split up clusters further into path, defined by line segments that touch each other. Df has properties:
+	#		- p0
+	#		- p1
+	#		- 
 
+	# Create plotting coordinates with adjusted angles for clusters with negative y
+	plot_kmeans(kmeans_df.copy(), cluster_centers)
+	
 	return kmeans_df
 
 # Plotting
