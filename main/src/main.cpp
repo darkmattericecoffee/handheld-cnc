@@ -5,7 +5,7 @@
 // #include <PMW3360_SPI1.h>
 #include <EEPROM.h>
 #include <SPI.h>
-#include <SD.h>
+#include <SdFat.h>
 #include <U8g2lib.h>
 #include <Arduino_GFX_Library.h>
 #include <EncoderButton.h>
@@ -84,6 +84,9 @@ void workspaceZeroXY();
 void sensorPlotting();
 void debugging();
 void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting);
+bool initializeLogFile();
+void outputSD(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting);
+void closeSDFile();
 void parseNC(const char* filename);
 void makePath();
 void encoderSetThickness();
@@ -153,7 +156,7 @@ int sensorPins[4] = {SS0, SS1, SS2, SS3};
 #define MAX_PATHS  4
 #define MAX_POINTS 1000
 
-#define NUM_DESIGNS 6
+#define NUM_DESIGNS 9
 
 // Webwork green is 0x88FF88 or RGB (136,255,136)
 // The adafruit color mapping is a bit weird, and outlined here
@@ -170,7 +173,9 @@ int sensorPins[4] = {SS0, SS1, SS2, SS3};
 #define GC9A01A_WEBWORK_GREEN 0x8FF1
 
 // SD pins
-const int chipSelect = BUILTIN_SDCARD;
+// const int chipSelect = BUILTIN_SDCARD;
+SdFat sd;
+FsFile dataFile;
 
 // Constants ------------------------------------------------------------------------
 // EEPROM addresses
@@ -198,7 +203,7 @@ const float circleDiameter = 800.0;       // Diameter of the circle
 
 // Material properties
 float matThickness = 0.0;                   // thickness of material
-float maxThickness = 10.0;                // upper bound of thickness knob (mm)
+float maxThickness = 15.0;                // upper bound of thickness knob (mm)
 float restHeight = 2.0;                   // rest height of tool before cutting
 
 // Timing constants
@@ -206,6 +211,7 @@ long unsigned debounceDelay = 50;       // the debounce time; increase if the ou
 long unsigned dtDebug = 500;            // (ms)
 long unsigned dtPlot = 50;              // (ms)
 long unsigned dtOutput = 20;            // (ms)
+long unsigned dtOutputSD = 10;            // (ms)
 
 // Sensor properties
 const int ns = 4;                   // number of sensors
@@ -276,10 +282,12 @@ int z0_count = 2;           // z zeroing count variable (start as "false")
 int firstPoint = 1;
 long unsigned timeLastPoll = 0;
 long unsigned timeLastOutput = 0;
+long unsigned timeLastOutputSD = 0;
 long unsigned timeLastDebug = 0;      // (ms)
 long unsigned timeLastPlot = 0;       // (ms)
 long unsigned timeLastDebounce = 0;   // (ms)
 long unsigned sensingTime = 0;        // (us)
+long unsigned timeLastFlush = 0;          // (ms)
 
 // Measured quantities
 float measVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
@@ -439,6 +447,8 @@ void onClickMakePath(EncoderButton &eb) {
 void encoderDesignMode() {
   drawShape();
 
+  closeSDFile();        // make sure SD file from previous test is closed
+
   state = SELECTING_DESIGN;
   encoder.setEncoderHandler(onEncoderUpdateDesignMode);
   encoder.setClickHandler(onClickMakePath);
@@ -564,7 +574,7 @@ void setup() {
   driverSetup();
   
   Serial.print("Initializing SD card...");
-  if (!SD.begin(chipSelect)) {
+  if (!sd.begin(SdioConfig(FIFO_SDIO))) {
     Serial.println("Initialization failed!");
     return;
   }
@@ -651,6 +661,7 @@ void loop() {
     if (outputMode) {
       outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
     }
+    outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
 
     stepperX.moveTo(Conv*desPos);
 
@@ -706,6 +717,7 @@ void loop() {
     if (outputMode) {
       outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
     }
+    outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
 
     // if (!cutting) {
     //   Serial.println("Cutting");
@@ -748,6 +760,7 @@ void loop() {
     if (outputMode) {
       outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
     }
+    outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
 
     // if (cutting) {
     //   Serial.println("Cutting Stopped");
@@ -975,7 +988,44 @@ void squareGenerator() {
   num_points = MAX_POINTS;
 }
 
-void squareGeneratorFancy() {
+void squareGeneratorSine() {
+  float angle = 45;
+  float angle_rad = angle * (M_PI / 180.0);
+  float segment_length = 100.0;
+  float engrave_depth = matThickness / 4;
+  pathDir[0] = 1;
+  pathDir[1] = -1;
+  pathDir[2] = 1;
+
+  // Generate design engraving
+  for (int i = 0; i < MAX_POINTS; ++i) {
+    float y = (segment_length) * (float)i / (MAX_POINTS - 1);
+    float x = sinAmp * sinf((TWO_PI/sinPeriod)*y);
+    paths[0][i] = Point{x, y, -engrave_depth};
+  }
+
+  // Calculate the x and y increments based on the angle
+  float y_increment = segment_length / (MAX_POINTS - 1);
+  float x_increment = y_increment / tan(angle_rad);
+
+  // Generate diamond path to cut
+  for (int p = 0; p < 2; p++) {
+    for (int i = 0; i < MAX_POINTS; i++) {
+      int xIndex = (i >= MAX_POINTS / 2) ? (MAX_POINTS - 1 - i) : i;
+      int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
+      if (p == 0) {       // TODO: this if statement was a quick fix to get a working multi-path design
+        paths[2][i] = Point{x: pathDir[p] * xIndex * x_increment, y: yIndex * y_increment, z: -matThickness};
+      } else {
+        paths[1][i] = Point{x: pathDir[p] * xIndex * x_increment, y: yIndex * y_increment, z: -matThickness};
+      }
+    }
+  }
+
+  num_paths = 3;
+  num_points = MAX_POINTS;
+}
+
+void squareGeneratorWave() {
   float angle = 45;
   float angle_rad = angle * (M_PI / 180.0);
   float segment_length = 100.0;
@@ -1488,9 +1538,83 @@ void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPo
   }
 }
 
+// Create new log file for each test
+bool initializeLogFile() {
+  // Close any existing file first
+  if (dataFile) {
+    dataFile.close();
+  }
+  
+  // Create a new file with an incremental name
+  char filename[20];
+  int fileNumber = 0;
+  
+  do {
+    sprintf(filename, "LOG%03d.txt", fileNumber++);
+  } while (sd.exists(filename) && fileNumber < 1000);
+  
+  dataFile = sd.open(filename, FILE_WRITE);
+  if (!dataFile) {
+    Serial.println("Could not create log file!");
+    return false;
+  }
+  
+  // Write CSV header
+  // dataFile.println("estX,estY,estYaw,goalX,goalY,toolX,toolY,desX,desY,cutting,toolPos");
+  dataFile.flush();
+  
+  Serial.printf("Logging to file: %s\n", filename);
+  return true;
+}
+
+void outputSD(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting) {
+  if(millis() - timeLastOutputSD >= dtOutputSD) {
+    timeLastOutputSD = millis();
+
+    float toolX = estX + toolPos*cosf(estYaw);
+    float toolY = estY + toolPos*sinf(estYaw);
+
+    float desX = estX + desPos*cosf(estYaw);
+    float desY = estY + desPos*sinf(estYaw);
+
+    if (dataFile) {
+      // Write data in CSV format
+      dataFile.printf(
+        "%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f\n",
+        estX,
+        estY,
+        estYaw,
+        goal.x,
+        goal.y,
+        toolX,
+        toolY,
+        desX,
+        desY,
+        cutting,
+        toolPos
+      );
+      
+      // Flush periodically to ensure data is written
+      if (millis() - timeLastFlush >= 1000) {  // Flush every second
+        dataFile.flush();
+        timeLastFlush = millis();
+      }
+    }
+  }
+}
+
+void closeSDFile() {
+  if (dataFile) {
+    dataFile.flush();  // Ensure all data is written
+    dataFile.close();
+  }
+
+  Serial.println("SD card has been closed.");
+}
+
 void parseNC(const char* filename) {
   // NC gCode parsing function
-  File myFile = SD.open(filename);
+  FsFile myFile = sd.open(filename);
   if (!myFile) {
     Serial.println("Failed to open file for reading");
     return;
@@ -1567,20 +1691,62 @@ void makePath() {
       Serial.println("Double line path generated!");
       break;
     case 4:
-      squareGeneratorFancy();
-      Serial.println("Fancy square path generated!");
+      squareGeneratorSine();
+      Serial.println("Sine square path generated!");
       break;
     case 5:
       circleGenerator();
       Serial.println("Circle path generated!");
       break;
+    case 6:
+    // TODO: make this function create a wave
+      squareGeneratorWave();
+      Serial.println("Wave square path generated!");
+      break;
+    case 7:
+      squareGeneratorWave();
+      // TODO: make this function create a ______
+      Serial.println("____ square path generated!");
+      break;
+    case 8:
+      // TODO: make this function create a hexagon
+      squareGeneratorWave();
+      Serial.println("Hexagon square path generated!");
+      break;
   }
 
+  // Serial log file
+  if (outputMode) {
+    for (int i=0; i < num_paths; i++) {
+      for (int j = 0; j < num_points; j++) {
+        // TODO: do for any size pathArray
+        Serial.printf(
+          "PATH:%d,%f,%f,%f\n",
+          i,
+          paths[i][j].x,
+          paths[i][j].y,
+          paths[i][j].z
+        );
+      }
+    }
+  }
+
+  // SD card log file
+  if (!initializeLogFile()) {
+    // TODO: handle file creation error
+    return;
+  }
   for (int i=0; i < num_paths; i++) {
     for (int j = 0; j < num_points; j++) {
-        // TODO: do for any size pathArray
-        Serial.printf("PATH:%d,%f,%f,%f\n", i, paths[i][j].x, paths[i][j].y, paths[i][j].z);
-      }
+      // TODO: do for any size pathArray
+      dataFile.printf(
+        "PATH:%d,%f,%f,%f\n",
+        i,
+        paths[i][j].x,
+        paths[i][j].y,
+        paths[i][j].z
+      );
+    }
   }
 }
 
@@ -1670,6 +1836,7 @@ void drawShape() {
   screen->fillScreen(BLACK);
 
   switch (designMode) {
+    // TODO: draw an accurate representation of the design here
     case 0:
       // line
       screen->drawLine(centerX, centerY-size, centerX, centerY+size, WHITE);
@@ -1704,6 +1871,7 @@ void drawShape() {
       break;
     case 4:
       // diamond
+      drawCenteredText("0",2);
       screen->drawLine(centerX-size, centerY, centerX, centerY+size, WHITE);
       screen->drawLine(centerX, centerY+size, centerX+size, centerY, WHITE);
       screen->drawLine(centerX+size, centerY, centerX, centerY-size, WHITE);
@@ -1712,6 +1880,31 @@ void drawShape() {
     case 5:
       // circle
       screen->drawCircle(centerX, centerY, size, WHITE);
+      break;
+    case 6:
+      // diamond 1
+      drawCenteredText("1",2);
+      screen->drawLine(centerX-size, centerY, centerX, centerY+size, WHITE);
+      screen->drawLine(centerX, centerY+size, centerX+size, centerY, WHITE);
+      screen->drawLine(centerX+size, centerY, centerX, centerY-size, WHITE);
+      screen->drawLine(centerX, centerY-size, centerX-size, centerY, WHITE);
+      break;
+    case 7:
+      // diamond 2
+      drawCenteredText("2",2);
+      screen->drawLine(centerX-size, centerY, centerX, centerY+size, WHITE);
+      screen->drawLine(centerX, centerY+size, centerX+size, centerY, WHITE);
+      screen->drawLine(centerX+size, centerY, centerX, centerY-size, WHITE);
+      screen->drawLine(centerX, centerY-size, centerX-size, centerY, WHITE);
+      break;
+    case 8:
+      // hexagon
+      screen->drawLine(centerX, centerY+size, centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
+      screen->drawLine(centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
+      screen->drawLine(centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX, centerY-size, WHITE);
+      screen->drawLine(centerX, centerY-size, centerX-size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
+      screen->drawLine(centerX-size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX-size*cos(M_PI/6), centerY+size*sin(M_PI/6), WHITE);
+      screen->drawLine(centerX-size*cos(M_PI/6), centerY+size*sin(M_PI/6), centerX, centerY+size, WHITE);
       break;
   }
 }
