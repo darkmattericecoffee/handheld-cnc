@@ -165,7 +165,7 @@ void drawFixedUI() {
 }
 
 void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
-int16_t radiusBounds = screen->width() / 4;
+	int16_t radiusBounds = screen->width() / 4;
 	int16_t radiusInner = screen->width() / 10;
 	int16_t centerX = screen->width() / 2;
 	int16_t centerY = screen->width() / 2;
@@ -280,4 +280,15 @@ void drawDirection() {
 
 	screen->drawTriangle(x0,y0,x1,y1,x2,y2,forwardColor);
 	screen->drawTriangle(x3,y3,x4,y4,x5,y5,reverseColor);
+}
+
+void updateUI(float desPosition, Point goal, Point next) {
+	if ((millis()-lastDraw) > 15) {
+		iter = (iter + 1)%8;
+		// unsigned long now = micros();
+		// motorPosX = stepperX.currentPosition()*1.0f/Conv;
+		drawUI(desPosition, goal, next, iter);
+		// Serial.printf("draw %d took %i us\n", iter, micros()-now);
+		lastDraw = millis();
+	}
 }

@@ -31,13 +31,13 @@ int current_point_idx = 0;
 float estPos[2] = {0.0f, 0.0f};
 float estYaw = 0.0f;
 float measVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
-											 {0.0f,0.0f,0.0f,0.0f}};
+						{0.0f,0.0f,0.0f,0.0f}};
 
 // Calibration data
 float cVal[2][4] = {{0.0f,0.0f,0.0f,0.0f},
-										{0.0f,0.0f,0.0f,0.0f}};
+					{0.0f,0.0f,0.0f,0.0f}};
 float selfCal[2][3] = {{1.0f,0.997606f,0.989168f},
-											 {1.0f,1.004717f,1.000850f}};
+						{1.0f,1.004717f,1.000850f}};
 
 // Display variables
 int16_t radius = 0;
@@ -45,10 +45,10 @@ int16_t centerX = 0;
 int16_t centerY = 0;
 
 // Mode flags
-int plotting = 0;
-int debugMode = 0;
-int outputMode = 0;
-int designMode = 0;
+int plotting = 0;             // plot values  (1 = yes; 0 = no)
+int debugMode = 0;            // print values (1 = yes; 0 = no)
+int outputMode = 0;           // output data to serial
+int designMode = 0;           // choose the design 
 
 // Material properties
 float matThickness = 0.0;

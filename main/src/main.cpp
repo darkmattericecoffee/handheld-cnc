@@ -66,7 +66,7 @@ void handleCutting() {
 	}
 
 	// If we get here start the path
-	// TODO: change w.r.t. naming convention
+	// TODO: change w.r.t. naming convention (i.e. cluster, pass, path, point)
 	path_started = true;
 
 	// Desired position if we intersect
@@ -151,26 +151,16 @@ void handleCutting() {
 	}
 
 	// Update UI
-	if ((millis()-lastDraw) > 15) {
-		iter = (iter + 1)%8;
-		// unsigned long now = micros();
-		// motorPosX = stepperX.currentPosition()*1.0f/Conv;
-		drawUI(desPos, goal, next, iter);
-		// Serial.printf("draw %d took %i us\n", iter, micros()-now);
-		lastDraw = millis();
-	}
+	updateUI(desPos, goal, next);
 }
 
 void setup() {
 	Serial.begin(115200);  
 
-	if (outputMode) {
-		delay(100);
-	}
+	if (outputMode) { while(!Serial); }
+	delay(100);
 
-	if (!screen->begin()) {
-		Serial.println("screen->begin() failed!");
-	}
+	if (!screen->begin()) { Serial.println("screen->begin() failed!"); }
 
 	screen->fillScreen(BLACK);
 
@@ -197,11 +187,13 @@ void setup() {
 		}
 	}
 
+	// Initialize buttons
 	pinMode(LIMIT_MACH_X0, INPUT);
 	pinMode(LIMIT_MACH_Z0, INPUT);
 	pinMode(BUTT_HANDLE_L, INPUT);
 	pinMode(BUTT_HANDLE_R, INPUT);
 
+	// Setup systems
 	sensorSetup();
 	motorSetup(); 
 	driverSetup();
