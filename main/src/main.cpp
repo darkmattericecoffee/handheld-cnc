@@ -59,7 +59,7 @@ void handleCutting() {
 		if (outputMode) {
 			outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
 		}
-		outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
+		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
 		
 		stepperX.moveTo(Conv*desPos);
 		return;
@@ -108,7 +108,7 @@ void handleCutting() {
 		if (outputMode) {
 			outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
 		}
-		outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
+		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
 
 		// We are good to cut
 		stepperZ.moveTo(Conv*desZ);
@@ -143,7 +143,7 @@ void handleCutting() {
 		if (outputMode) {
 			outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
 		}
-		outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
+		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
 		
 		// Stop cutting
 		stepperZ.moveTo(Conv*restHeight);

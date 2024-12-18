@@ -63,41 +63,40 @@ void drawShape() {
 			break;
 		case 4:
 			// diamond
-			drawCenteredText("0",2);
 			screen->drawLine(centerX-size, centerY, centerX, centerY+size, WHITE);
 			screen->drawLine(centerX, centerY+size, centerX+size, centerY, WHITE);
 			screen->drawLine(centerX+size, centerY, centerX, centerY-size, WHITE);
 			screen->drawLine(centerX, centerY-size, centerX-size, centerY, WHITE);
 			break;
 		case 5:
-			// circle
-			screen->drawCircle(centerX, centerY, size, WHITE);
+			// square w/ squiggly
+			screen->drawLine(centerX-size, centerY, centerX, centerY+size, WHITE);
+			screen->drawLine(centerX, centerY+size, centerX+size, centerY, WHITE);
+			screen->drawLine(centerX+size, centerY, centerX, centerY-size, WHITE);
+			screen->drawLine(centerX, centerY-size, centerX-size, centerY, WHITE);
+			scale = size / PI;
+			for (int y = -size; y <= size; y++) {
+				x = (int16_t) (scale*sin(y/scale));
+				screen->drawPixel(centerX+x, centerY+y, WHITE);
+			}
 			break;
 		case 6:
-			// diamond 1
-			drawCenteredText("1",2);
+			// square with Make
+			drawCenteredText("M:",2);
 			screen->drawLine(centerX-size, centerY, centerX, centerY+size, WHITE);
 			screen->drawLine(centerX, centerY+size, centerX+size, centerY, WHITE);
 			screen->drawLine(centerX+size, centerY, centerX, centerY-size, WHITE);
 			screen->drawLine(centerX, centerY-size, centerX-size, centerY, WHITE);
 			break;
-		case 7:
-			// diamond 2
-			drawCenteredText("2",2);
-			screen->drawLine(centerX-size, centerY, centerX, centerY+size, WHITE);
-			screen->drawLine(centerX, centerY+size, centerX+size, centerY, WHITE);
-			screen->drawLine(centerX+size, centerY, centerX, centerY-size, WHITE);
-			screen->drawLine(centerX, centerY-size, centerX-size, centerY, WHITE);
-			break;
-		case 8:
-			// hexagon
-			screen->drawLine(centerX, centerY+size, centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
-			screen->drawLine(centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
-			screen->drawLine(centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX, centerY-size, WHITE);
-			screen->drawLine(centerX, centerY-size, centerX-size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
-			screen->drawLine(centerX-size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX-size*cos(M_PI/6), centerY+size*sin(M_PI/6), WHITE);
-			screen->drawLine(centerX-size*cos(M_PI/6), centerY+size*sin(M_PI/6), centerX, centerY+size, WHITE);
-			break;
+		// case 8:
+		// 	// hexagon
+		// 	screen->drawLine(centerX, centerY+size, centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
+		// 	screen->drawLine(centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
+		// 	screen->drawLine(centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX, centerY-size, WHITE);
+		// 	screen->drawLine(centerX, centerY-size, centerX-size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
+		// 	screen->drawLine(centerX-size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX-size*cos(M_PI/6), centerY+size*sin(M_PI/6), WHITE);
+		// 	screen->drawLine(centerX-size*cos(M_PI/6), centerY+size*sin(M_PI/6), centerX, centerY+size, WHITE);
+		// 	break;
 	}
 }
 

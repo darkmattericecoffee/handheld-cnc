@@ -35,9 +35,9 @@
 #define SERIAL_PORT_Z     	Serial8
 
 // Constants
-#define MAX_PATHS  			4
+#define MAX_PATHS  			10
 #define MAX_POINTS 			1000
-#define NUM_DESIGNS 		9
+#define NUM_DESIGNS 		7
 #define GC9A01A_WEBWORK_GREEN 0x8FF1
 #define motorInterfaceType 	1
 

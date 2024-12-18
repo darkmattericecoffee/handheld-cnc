@@ -133,7 +133,7 @@ void circleGenerator() {
 	num_points = MAX_POINTS;
 }
 
-void squareGenerator() {
+void diamondGenerator() {
 	float angle = 60;
 	float angle_rad = angle * (M_PI / 180.0);
 	float segment_length = 100.0;
@@ -210,6 +210,101 @@ void squareGeneratorWave() {
 	squareGeneratorSine();
 }
 
+void squareGeneratorMake() {
+	float x = 0.0f;
+	float y = 0.0f;
+	float start_y = 0.0f;
+	float angle = 45;
+	float angle_rad = angle * (M_PI / 180.0);
+	float segment_length = 100.0;
+	float engrave_depth = matThickness / 4;
+	float make_ratio = 0.3;
+	float colon_ratio = 0.6;
+	float make_length = make_ratio * segment_length;
+	float colon_length = colon_ratio * make_length;
+	pathDir[0] = 1;				// left M vertical line
+	pathDir[1] = -1;			// left M slanted line
+	pathDir[2] = 1;				// right M slanted line
+	pathDir[3] = -1;			// right M vertical line
+	pathDir[4] = 1;				// colon
+	pathDir[5] = -1;			// left half of square
+	pathDir[6] = 1;				// right half of square
+
+	// Generate left M vertical
+	start_y = (segment_length/2) - (make_length/2);
+	for (int i = 0; i < MAX_POINTS; ++i) {
+		y = start_y + (make_length) * (float)i / (MAX_POINTS - 1);
+		x = -make_length/2;
+		paths[0][i] = Point{x, y, -engrave_depth};
+	}
+
+	// Generate left M slanted
+	start_y = (segment_length/2) + (make_length/2);
+	for (int i = 0; i < MAX_POINTS; ++i) {
+		y = start_y - (make_length) * (float)i / (MAX_POINTS - 1);
+		x = -make_length/2 + (make_length * 3/8) * (float)i / (MAX_POINTS - 1);
+		paths[1][i] = Point{x, y, -engrave_depth};
+	}
+
+	// Generate right M slanted
+	start_y = (segment_length/2) - (make_length/2);
+	for (int i = 0; i < MAX_POINTS; ++i) {
+		y = start_y + (make_length) * (float)i / (MAX_POINTS - 1);
+		x = -make_length/2 + (make_length * 3/8) + (make_length * 3/8) * (float)i / (MAX_POINTS - 1);
+		paths[2][i] = Point{x, y, -engrave_depth};
+	}
+
+	// Generate right M vertical
+	start_y = (segment_length/2) + (make_length/2);
+	for (int i = 0; i < MAX_POINTS; ++i) {
+		y = start_y - (make_length) * (float)i / (MAX_POINTS - 1);
+		x = make_length*1/4;
+		paths[3][i] = Point{x, y, -engrave_depth};
+	}
+
+	// Generate colon
+	start_y = (segment_length/2) - (colon_length/2);
+	float dot_ratio = 0.2;
+	float dot_length = dot_ratio * colon_length;
+	for (int i = 0; i < MAX_POINTS; ++i) {
+		y = start_y + (colon_length) * (float)i / (MAX_POINTS - 1);
+		x = make_length/2;
+		if (y - start_y <= dot_length || y - start_y > colon_length - dot_length) {
+			paths[4][i] = Point{x, y, -engrave_depth};
+		} else {
+			paths[4][i] = Point{x, y, restHeight};
+		}
+	}
+
+	// Calculate the x and y increments based on the angle
+	float y_increment = segment_length / (MAX_POINTS - 1);
+	float x_increment = y_increment / tan(angle_rad);
+
+	// Generate diamond path to cut
+	for (int p = 0; p < 2; p++) {
+		for (int i = 0; i < MAX_POINTS; i++) {
+			int xIndex = (i >= MAX_POINTS / 2) ? (MAX_POINTS - 1 - i) : i;
+			int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
+			if (p == 0) {
+				paths[6][i] = Point{
+					x: pathDir[p] * xIndex * x_increment,
+					y: yIndex * y_increment,
+					z: -matThickness
+				};
+			} else {
+				paths[5][i] = Point{
+					x: pathDir[p] * xIndex * x_increment,
+					y: yIndex * y_increment,
+					z: -matThickness
+				};
+			}
+		}
+	}
+
+	num_paths = 7;
+	num_points = MAX_POINTS;
+}
+
 void parseNC(const char* filename) {
 	FsFile myFile = sd.open(filename);
 	if (!myFile) {
@@ -283,17 +378,19 @@ void makePath() {
 			Serial.println("Double line path generated!");
 			break;
 		case 4:
-			squareGeneratorSine();
+			diamondGenerator();
 			Serial.println("Sine square path generated!");
 			break;
 		case 5:
-			circleGenerator();
+			squareGeneratorSine();
 			Serial.println("Circle path generated!");
 			break;
 		case 6:
-			squareGeneratorWave();
+			squareGeneratorMake();
 			Serial.println("Wave square path generated!");
 			break;
+
+		// UNUSED
 		case 7:
 			squareGeneratorWave();
 			Serial.println("____ square path generated!");
