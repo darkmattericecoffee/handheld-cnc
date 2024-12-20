@@ -76,13 +76,13 @@ void handleCutting() {
 	float desPosClosest = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
 
 	// Conditions for cutting
-	// bool handle_buttons_pressed = (digitalRead(BUTT_HANDLE_L) == LOW) && (digitalRead(BUTT_HANDLE_R) == LOW);
-	// bool handle_buttons_debounce = (millis() - timeLastDebounce) < debounceDelay;
-	// if (handle_buttons_pressed) { timeLastDebounce = millis(); }
-	// bool handle_buttons_ok = handle_buttons_pressed || handle_buttons_debounce;
-	bool handle_buttons_ok = (digitalRead(BUTT_HANDLE_L) == LOW && digitalRead(BUTT_HANDLE_R) == LOW) || 
-						   ((millis() - timeLastDebounce) < debounceDelay);
-	if (handle_buttons_ok) timeLastDebounce = millis();
+	bool handle_buttons_pressed = (digitalRead(BUTT_HANDLE_L) == LOW) && (digitalRead(BUTT_HANDLE_R) == LOW);
+	bool handle_buttons_debounce = (millis() - timeLastDebounce) < debounceDelay;
+	if (handle_buttons_pressed) { timeLastDebounce = millis(); }
+	bool handle_buttons_ok = handle_buttons_pressed || handle_buttons_debounce;
+	// bool handle_buttons_ok = (digitalRead(BUTT_HANDLE_L) == LOW && digitalRead(BUTT_HANDLE_R) == LOW) || 
+	// 					   ((millis() - timeLastDebounce) < debounceDelay);
+	// if (handle_buttons_ok) timeLastDebounce = millis();
 
 	bool gantry_intersects = !isnan(desPos);
 	bool goal_behind_router = pathDir[current_path_idx] * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
