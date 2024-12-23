@@ -41,6 +41,21 @@ void debugging() {
 	if(millis() - timeLastDebug >= dtDebug) {
 		timeLastDebug = millis();
 
+		Serial.println("=== Timing Information (microseconds) ===");
+		Serial.print("Total Loop Time: ");
+		Serial.println(totalLoopTime);
+		Serial.print("Sensing Time: ");
+		Serial.println(sensingTime_debug);
+		Serial.print("Stepper Time: ");
+		Serial.println(stepperTime);
+		Serial.print("Serial Time: ");
+		Serial.println(serialTime);
+		Serial.print("Safety Check Time: ");
+		Serial.println(safetyTime);
+		Serial.print("Cutting Time: ");
+		Serial.println(cuttingTime);
+		Serial.println("=====================================");
+
 		// Print debug data
 		Serial.printf("x:%f,y:%f,theta:%f\n", estPos[0], estPos[1], estYaw * 180.0 / PI);
 

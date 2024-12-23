@@ -54,6 +54,13 @@ int designMode = 0;           // choose the design
 float matThickness = 0.0;
 
 // Timing variables
+long unsigned totalLoopTime = 0;
+long unsigned sensingTime_debug = 0;
+long unsigned stepperTime = 0;
+long unsigned serialTime = 0;
+long unsigned safetyTime = 0;
+long unsigned cuttingTime = 0;
+long unsigned timeLoopStart = 0;
 long unsigned timeLastDebounce = 0;
 long unsigned lastDraw = 0;
 long unsigned timeLastPoll = 0;

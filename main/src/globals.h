@@ -61,6 +61,13 @@ extern int designMode;
 extern float matThickness;
 
 // Timing variables
+extern long unsigned totalLoopTime;
+extern long unsigned sensingTime_debug;
+extern long unsigned stepperTime;
+extern long unsigned serialTime;
+extern long unsigned safetyTime;
+extern long unsigned cuttingTime;
+extern long unsigned timeLoopStart;
 extern long unsigned timeLastDebounce;
 extern long unsigned lastDraw;
 extern long unsigned timeLastPoll;

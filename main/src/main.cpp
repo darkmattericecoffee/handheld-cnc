@@ -62,6 +62,9 @@ void handleCutting() {
 		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
 		
 		stepperX.moveTo(Conv*desPos);
+
+		// Update UI
+		updateUI(desPos, goal, next);
 		return;
 	}
 
@@ -211,33 +214,52 @@ void setup() {
 }
 
 void loop() {
+	timeLoopStart = micros();
+
 	// Sensing
-	if(micros() - timeLastPoll >= dt) {
-		sensingTime = micros() - timeLastPoll;
-		doSensing();
-	}
+	unsigned long startSensingTime = micros();
+    if(micros() - timeLastPoll >= dt) {
+        sensingTime = micros() - timeLastPoll;
+        doSensing();
+    }
+	sensingTime_debug = micros() - startSensingTime;
 
 	// Run steppers
+	unsigned long startStepperTime = micros();
 	stepperX.run();
 	stepperZ.run();
 	encoder.update();
+	stepperTime = micros() - startStepperTime;
 
+	// Serial handling
+	unsigned long startSerialTime = micros();
 	handleSerial();
+	serialTime = micros() - startSerialTime;
 
 	// --Break here until we are ready to cut--
 	if (state != READY) {
+		totalLoopTime = micros() - timeLoopStart;
 		return;
 	}
 
 	// Safety stuff
+	unsigned long startSafetyTime = micros();
 	if (!performSafetyChecks()) {
+		safetyTime = micros() - startSafetyTime;
+		totalLoopTime = micros() - timeLoopStart;
 		return;
 	}
+	safetyTime = micros() - startSafetyTime;
+
+	// Cutting
+	unsigned long startCuttingTime = micros();
+	handleCutting();
+	cuttingTime = micros() - startCuttingTime;
+
+	totalLoopTime = micros() - timeLoopStart;
 
 	// Debugging
 	if (debugMode) {
 		debugging();
 	}
-
-	handleCutting();
 }
