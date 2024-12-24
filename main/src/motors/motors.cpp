@@ -91,7 +91,7 @@ void machineZeroX() {
 	}
 
 	stepperX.setMaxSpeed(maxSpeedX/2);
-	stepperX.setAcceleration(maxAccel/2);
+	stepperX.setAcceleration(maxAccelX/2);
 
 	stepperX.move(-Conv*((gantryLength/2) - xLimitOffset));
 	while (stepperX.distanceToGo() != 0) {
@@ -99,7 +99,7 @@ void machineZeroX() {
 	}
 
 	stepperX.setMaxSpeed(maxSpeedX);
-	stepperX.setAcceleration(maxAccel);
+	stepperX.setAcceleration(maxAccelX);
 	stepperX.setCurrentPosition(0);
 }
 
@@ -131,6 +131,7 @@ void workspaceZeroZ() {
 	}
 
 	stepperZ.setMaxSpeed(maxSpeedZ);
+	stepperZ.setAcceleration(maxAccelZ);
 }
 
 void workspaceZeroXY() {

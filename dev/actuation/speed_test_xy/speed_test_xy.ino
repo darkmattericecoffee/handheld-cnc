@@ -41,8 +41,8 @@ const float lead = 8;							// lead screw lead (mm)
 const float Conv = 200*uSteps/lead;				// conversion factor (mm -> steps)
 const float stepPulseWidth = 20.0;				// min pulse width (from Mark Rober's code)
 const float maxCurrent_RMS = 1273.0;			// motor RMS current rating (mA)
-const float maxSpeedX = 200.0*Conv;				// max velocity X motor can move at (step/s)
-const float maxSpeedZ = 100.0*Conv;				// max velocity Z motor can move at (step/s)
+const float maxSpeedX = 180.0*Conv;				// max velocity X motor can move at (step/s)
+const float maxSpeedZ = 180.0*Conv;				// max velocity Z motor can move at (step/s)
 const float maxAccelX = 3000.0*Conv;				// max acceleration (mm/s^2 -> step/s^2)
 const float maxAccelZ = 3000.0*Conv;        // max acceleration (mm/s^2 -> step/s^2)
 const float retract = 5;						// distance to retract (mm)
@@ -80,7 +80,10 @@ float currentAccel = maxAccelZ/2;
 bool testing_x = true;
 bool emergency_stop = false;
 unsigned long lastSpeedUpdate = 0;
-const unsigned long speedUpdateInterval = 1;  // ms
+unsigned long lastMotorUpdate = 0;
+const unsigned long speedUpdateInterval = 1;      // ms
+const unsigned long motorUpdateInterval = 200;      // us
+int moveDir = 1;
 
 // Initialize hardware objects
 AccelStepper stepperX(motorInterfaceType, MOT_STEP_X, MOT_DIR_X);
@@ -88,6 +91,20 @@ AccelStepper stepperZ(motorInterfaceType, MOT_STEP_Z, MOT_DIR_Z);
 TMC2209Stepper driverX(&SERIAL_PORT_X, R_SENSE, DRIVER_ADDRESS);
 TMC2209Stepper driverZ(&SERIAL_PORT_Z, R_SENSE, DRIVER_ADDRESS);
 EncoderButton encoder(ENCODER_PIN_A, ENCODER_PIN_B, ENCODER_BUTTON_PIN);
+
+void onEncoderUpdateSpeed(EncoderButton &eb) {
+	float tempSpeed = currentSpeed + eb.increment()*speedIncrement;
+
+	if (tempSpeed <= maxSpeedX) {
+		currentSpeed = tempSpeed;
+	}
+
+  Serial.printf("Speed = %f mm/s\n", currentSpeed/Conv);
+	
+	// char text2send[50];
+	// sprintf(text2send, "Turn to set thickness\n%.2f mm", matThickness);
+	// drawCenteredText(text2send, 1);
+}
 
 void setup() {
 	Serial.begin(115200);
@@ -127,12 +144,23 @@ void loop() {
 	if (!emergency_stop && currentSpeed != 0) {
 		unsigned long currentTime = millis();
 		if (currentTime - lastSpeedUpdate >= speedUpdateInterval) {
-			updateMotorPosition();
+			updateMotorPosition(currentSpeed);
 			lastSpeedUpdate = currentTime;
 		}
+    currentTime = micros();
+    if (currentTime - lastMotorUpdate >= motorUpdateInterval) {
+      stepperX.run();
+      stepperZ.run();
+      lastMotorUpdate = currentTime;
+    }
 	}
 
-  
+	if (digitalRead(LIMIT_MACH_Z0) == LOW || digitalRead(LIMIT_MACH_X0) == LOW) {
+		stopStepperZ();
+		stopStepperX();
+		Serial.println("Limit hit...");
+	}
+
 }
 
 void motorSetup() {
@@ -259,7 +287,7 @@ void handleCommand(char cmd) {
 			currentSpeed = 0;
 			Serial.println("Testing X axis");
 			break;
-		case 'y':
+		case 'z':
 			testing_x = false;
 			currentSpeed = 0;
 			Serial.println("Testing Z axis");
@@ -301,20 +329,6 @@ void nullHandler(EncoderButton &eb) {
 	return;
 }
 
-void onEncoderUpdateSpeed(EncoderButton &eb) {
-	float tempSpeed = currentSpeed + eb.increment()*speedIncrement;
-
-	if (tempSpeed <= maxSpeedX) {
-		currentSpeed = tempSpeed;
-	}
-
-  Serial.printf("Speed = %f mm/s\n", currentSpeed/Conv);
-	
-	// char text2send[50];
-	// sprintf(text2send, "Turn to set thickness\n%.2f mm", matThickness);
-	// drawCenteredText(text2send, 1);
-}
-
 void incrementSpeed() {
 	if (testing_x && currentSpeed < maxSpeedX) {
 		currentSpeed += speedIncrement;
@@ -333,23 +347,49 @@ void decrementSpeed() {
 	}
 }
 
-void updateMotorPosition() {
+void updateMotorPosition(float desSpeed) {
+  Serial.printf("Current speed = %f mm/s\n", desSpeed/Conv);
+	if (testing_x) {
+    stepperX.setMaxSpeed(currentSpeed);
+		currentPos = stepperX.currentPosition()/Conv;
+    if (moveDir > 0) {
+      stepperX.moveTo(((gantryLength/2) - xBuffer)*Conv);
+    } else if (moveDir < 0) {
+      stepperX.moveTo(0);
+    }
+    if (stepperX.distanceToGo() == 0) {
+      moveDir = -moveDir;
+    }
+	} else {
+    stepperZ.setMaxSpeed(currentSpeed);
+		currentPos = stepperZ.currentPosition()/Conv;
+    if (moveDir > 0) {
+      stepperZ.moveTo(((zLength/2) - xBuffer)*Conv);
+    } else if (moveDir < 0) {
+      stepperZ.moveTo(0);
+    }
+    if (stepperZ.distanceToGo() == 0) {
+      moveDir = -moveDir;
+    }
+	}
+}
+
+void updateMotorPositionSpeed(float desSpeed) {
+  Serial.printf("Current speed = %f mm/s\n", desSpeed/Conv);
 	if (testing_x) {
 		currentPos = stepperX.currentPosition()/Conv;
 		if (currentPos <= xBuffer) {
-			stepperX.setSpeed(currentSpeed);
-		} else if (currentPos >= gantryLength - xBuffer) {
-			stepperX.setSpeed(-currentSpeed);
+			stepperX.setSpeed(desSpeed);
+		} else if (currentPos >= (gantryLength/2) - xBuffer) {
+			stepperX.setSpeed(-desSpeed);
 		}
-		stepperX.runSpeed();
 	} else {
 		currentPos = stepperZ.currentPosition()/Conv;
-		if (currentPos <= zLimitOffset) {
-			stepperZ.setSpeed(currentSpeed);
-		} else if (currentPos >= zLength - zLimitOffset) {
-			stepperZ.setSpeed(-currentSpeed);
+		if (currentPos <= 0) {
+			stepperZ.setSpeed(desSpeed);
+		} else if (currentPos >= (zLength/2) - xBuffer) {
+			stepperZ.setSpeed(-desSpeed);
 		}
-		stepperZ.runSpeed();
 	}
 }
 
