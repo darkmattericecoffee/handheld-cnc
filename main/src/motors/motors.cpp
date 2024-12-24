@@ -16,13 +16,13 @@ void motorSetup() {
 
 	// Set motor properties
 	stepperX.setMinPulseWidth(stepPulseWidth);
-	stepperX.setMaxSpeed(speed_x0);
-	stepperX.setAcceleration(maxAccel);
+	stepperX.setMaxSpeed(zeroSpeed_0);
+	stepperX.setAcceleration(zeroAccel);
 	stepperX.setCurrentPosition(0);
 	
 	stepperZ.setMinPulseWidth(stepPulseWidth);
-	stepperZ.setMaxSpeed(speed_x0);
-	stepperZ.setAcceleration(maxAccel);
+	stepperZ.setMaxSpeed(zeroSpeed_0);
+	stepperZ.setAcceleration(zeroAccel);
 	stepperZ.setCurrentPosition(0);
 }
 
@@ -53,7 +53,7 @@ void driverSetup() {
 	
 	driverZ.pwm_autoscale(true);
 	driverZ.en_spreadCycle(false);
-	driverX.TPWMTHRS(0x753);
+	driverZ.TPWMTHRS(0x753);
 }
 
 void enableStepperZ() {
@@ -75,7 +75,7 @@ void stopStepperZ() {
 }
 
 void machineZeroX() {
-	stepperX.setSpeed(speed_x0);
+	stepperX.setSpeed(zeroSpeed_0);
 	while (digitalRead(LIMIT_MACH_X0) == HIGH) {
 		stepperX.runSpeed();
 	}
@@ -85,7 +85,7 @@ void machineZeroX() {
 		stepperX.run();
 	}
 
-	stepperX.setSpeed(speed_x1);
+	stepperX.setSpeed(zeroSpeed_1);
 	while (digitalRead(LIMIT_MACH_X0) == HIGH) {
 		stepperX.runSpeed();
 	}
@@ -107,7 +107,7 @@ void workspaceZeroZ() {
 	enableStepperZ();
 	stepperZ.setCurrentPosition(0);
 
-	stepperZ.setSpeed(speed_x0);
+	stepperZ.setSpeed(zeroSpeed_0);
 	while (digitalRead(LIMIT_MACH_Z0) == HIGH) {
 		stepperZ.runSpeed();
 	}
@@ -117,7 +117,7 @@ void workspaceZeroZ() {
 		stepperZ.run();
 	}
 
-	stepperZ.setSpeed(speed_x1);
+	stepperZ.setSpeed(zeroSpeed_1);
 	while (digitalRead(LIMIT_MACH_Z0) == HIGH) {
 		stepperZ.runSpeed();
 	}

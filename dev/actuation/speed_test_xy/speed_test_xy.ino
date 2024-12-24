@@ -1,9 +1,12 @@
 #include <AccelStepper.h>
 #include <TMCStepper.h>
+#include <EncoderButton.h>
 
 // Pin definitions
 #define LIMIT_MACH_X0       6
 #define LIMIT_MACH_Z0       5
+// #define LIMIT_MACH_X0       5
+// #define LIMIT_MACH_Z0       6
 #define BUTT_HANDLE_L       2
 #define BUTT_HANDLE_R       3
 #define ENCODER_PIN_A       21
@@ -35,17 +38,17 @@
 // Motor properties
 const int uSteps = 4;							// microstep configuration
 const float lead = 8;							// lead screw lead (mm)
-const float Conv = 200/lead*uSteps;				// conversion factor (mm -> steps)
+const float Conv = 200*uSteps/lead;				// conversion factor (mm -> steps)
 const float stepPulseWidth = 20.0;				// min pulse width (from Mark Rober's code)
 const float maxCurrent_RMS = 1273.0;			// motor RMS current rating (mA)
 const float maxSpeedX = 200.0*Conv;				// max velocity X motor can move at (step/s)
-const float maxSpeedZ = 60.0*Conv;				// max velocity Z motor can move at (step/s)
+const float maxSpeedZ = 100.0*Conv;				// max velocity Z motor can move at (step/s)
 const float maxAccelX = 3000.0*Conv;				// max acceleration (mm/s^2 -> step/s^2)
-const float maxAccelZ = 1000.0*Conv;        // max acceleration (mm/s^2 -> step/s^2)
+const float maxAccelZ = 3000.0*Conv;        // max acceleration (mm/s^2 -> step/s^2)
 const float retract = 5;						// distance to retract (mm)
 const float zeroSpeed_0 = 20.0 * Conv;				// x zeroing speed (step/s)
 const float zeroSpeed_1 = 4.0 * Conv;				// x secondary zeroing speed (step/s)
-const float accel_x0 = 200.0 * Conv;			// x zeroing acceleration (step/s^2)
+const float zeroAccel = 200.0 * Conv;			// x zeroing acceleration (step/s^2)
 
 // Material properties
 const float maxThickness = 15.0;				// upper bound of thickness knob (mm)
@@ -72,18 +75,19 @@ const long unsigned dt = 900;					// length of sensor timestep (us)(freq = 1,000
 // Test parameters
 float currentPos = 0.0;               // (mm)
 float currentSpeed = 0;               // (steps/s)
-float speedIncrement = 10.0 * Conv;   // (steps/s)
+float speedIncrement = 1.0 * Conv;   // (steps/s)
 float currentAccel = maxAccelZ/2;
 bool testing_x = true;
 bool emergency_stop = false;
 unsigned long lastSpeedUpdate = 0;
-const unsigned long speedUpdateInterval = 100;  // ms
+const unsigned long speedUpdateInterval = 1;  // ms
 
 // Initialize hardware objects
 AccelStepper stepperX(motorInterfaceType, MOT_STEP_X, MOT_DIR_X);
 AccelStepper stepperZ(motorInterfaceType, MOT_STEP_Z, MOT_DIR_Z);
 TMC2209Stepper driverX(&SERIAL_PORT_X, R_SENSE, DRIVER_ADDRESS);
 TMC2209Stepper driverZ(&SERIAL_PORT_Z, R_SENSE, DRIVER_ADDRESS);
+EncoderButton encoder(ENCODER_PIN_A, ENCODER_PIN_B, ENCODER_BUTTON_PIN);
 
 void setup() {
 	Serial.begin(115200);
@@ -97,13 +101,19 @@ void setup() {
 	// Zero both axes
 	machineZeroX();
 	machineZeroZ();
+
+  // encoder.setClickHandler(onClickZeroMachineX);
+	// encoder.setTripleClickHandler(onClickGoToSetThickness);
+	// onClickResetState(encoder);
+  encoder.setEncoderHandler(onEncoderUpdateSpeed);
 	
 	Serial.println("Motor Test Ready");
-	Serial.println("Commands:");
+	Serial.println("Use these commands:");
 	Serial.println("s: Start/Stop test");
 	Serial.println("x/y: Toggle axis");
 	Serial.println("+/-: Adjust speed");
 	Serial.println("e: Emergency stop");
+
 }
 
 void loop() {
@@ -111,6 +121,8 @@ void loop() {
 		char cmd = Serial.read();
 		handleCommand(cmd);
 	}
+
+  encoder.update();
 	
 	if (!emergency_stop && currentSpeed != 0) {
 		unsigned long currentTime = millis();
@@ -119,6 +131,8 @@ void loop() {
 			lastSpeedUpdate = currentTime;
 		}
 	}
+
+  
 }
 
 void motorSetup() {
@@ -136,12 +150,12 @@ void motorSetup() {
 	// Set motor properties
 	stepperX.setMinPulseWidth(stepPulseWidth);
 	stepperX.setMaxSpeed(zeroSpeed_0);
-	stepperX.setAcceleration(maxAccelX);
+	stepperX.setAcceleration(zeroAccel);
 	stepperX.setCurrentPosition(0);
 	
 	stepperZ.setMinPulseWidth(stepPulseWidth);
 	stepperZ.setMaxSpeed(zeroSpeed_0);
-	stepperZ.setAcceleration(maxAccelX);
+	stepperZ.setAcceleration(zeroAccel);
 	stepperZ.setCurrentPosition(0);
 }
 
@@ -166,17 +180,13 @@ void driverSetup() {
 		driverZ.microsteps(0);
 	}
 
-  driverX.TCOOLTHRS(0xFFFFF);  // 20bit max
-	driverX.SGTHRS(STALL_SENSITIVITY_X);  // Stall detection threshold [0..255]
 	driverX.pwm_autoscale(true);
 	driverX.en_spreadCycle(false);
 	driverX.TPWMTHRS(0x753);
-	
-  driverZ.TCOOLTHRS(0xFFFFF);
-	driverZ.SGTHRS(STALL_SENSITIVITY_Z);
+
 	driverZ.pwm_autoscale(true);
 	driverZ.en_spreadCycle(false);
-	driverX.TPWMTHRS(0x753);
+	driverZ.TPWMTHRS(0x753);
 }
 
 void enableStepperZ() {
@@ -218,28 +228,6 @@ void machineZeroX() {
 	stepperX.setCurrentPosition(0);
 }
 
-void workspaceZeroZ() {
-	enableStepperZ();
-	stepperZ.setCurrentPosition(0);
-
-	stepperZ.setSpeed(zeroSpeed_0);
-	while (digitalRead(LIMIT_MACH_Z0) == HIGH) { stepperZ.runSpeed(); }
-
-	stepperZ.move(-Conv*retract);
-	while (stepperZ.distanceToGo() != 0) { stepperZ.run(); }
-
-	stepperZ.setSpeed(zeroSpeed_1);
-	while (digitalRead(LIMIT_MACH_Z0) == HIGH) { stepperZ.runSpeed(); }
-
-	float maxHeight = stepperZ.currentPosition()*1.0f / Conv;
-
-	stepperZ.setMaxSpeed(maxSpeedZ/2);
-	stepperZ.moveTo(Conv*restHeight);
-	while (stepperZ.distanceToGo() != 0) { stepperZ.run(); }
-
-	stepperZ.setMaxSpeed(maxSpeedZ);
-}
-
 void machineZeroZ() {
   stepperZ.setSpeed(zeroSpeed_0);
 	while (digitalRead(LIMIT_MACH_Z0) == HIGH) { stepperZ.runSpeed(); }
@@ -254,7 +242,7 @@ void machineZeroZ() {
 	stepperZ.setAcceleration(maxAccelZ/2);
 
 	stepperZ.move(-Conv*((zLength/2) - zLimitOffset));
-	while (stepperZ.distanceToGo() != 0) { stepperZ.run(); }
+	while (stepperZ.distanceToGo() != 0) { stepperZ.run(); }    // ***skipping steps here***
 
 	stepperZ.setMaxSpeed(maxSpeedX);
 	stepperZ.setAcceleration(maxAccelZ);
@@ -292,12 +280,12 @@ void toggleTest() {
 	if (currentSpeed == 0) {
 		if (testing_x) {
 			stepperX.setMaxSpeed(maxSpeedX);
-			stepperX.setAcceleration(currentAccel);
-			currentSpeed = speedIncrement;
+			stepperX.setAcceleration(maxAccelX);
+			currentSpeed = zeroSpeed_0;
 		} else {
 			stepperZ.setMaxSpeed(maxSpeedZ);
-			stepperZ.setAcceleration(currentAccel);
-			currentSpeed = speedIncrement;
+			stepperZ.setAcceleration(maxAccelZ);
+			currentSpeed = zeroSpeed_0;
 		}
 		emergency_stop = false;
 		Serial.println("Test started");
@@ -306,6 +294,25 @@ void toggleTest() {
 		stopMotors();
 		Serial.println("Test stopped");
 	}
+}
+
+void nullHandler(EncoderButton &eb) {
+	Serial.println("null handler called");
+	return;
+}
+
+void onEncoderUpdateSpeed(EncoderButton &eb) {
+	float tempSpeed = currentSpeed + eb.increment()*speedIncrement;
+
+	if (tempSpeed <= maxSpeedX) {
+		currentSpeed = tempSpeed;
+	}
+
+  Serial.printf("Speed = %f mm/s\n", currentSpeed/Conv);
+	
+	// char text2send[50];
+	// sprintf(text2send, "Turn to set thickness\n%.2f mm", matThickness);
+	// drawCenteredText(text2send, 1);
 }
 
 void incrementSpeed() {

@@ -50,16 +50,16 @@ const float ly = 140.0f;						// y length of rectangular sensor configuration (m
 // Motor properties
 const int uSteps = 4;							// microstep configuration
 const float lead = 8;							// lead screw lead (mm)
-const float Conv = 200/lead*uSteps;				// conversion factor (mm -> steps)
+const float Conv = (200*uSteps)/lead;			// conversion factor (mm -> steps)
 const float stepPulseWidth = 20.0;				// min pulse width (from Mark Rober's code)
 const float maxCurrent_RMS = 1273.0;			// motor RMS current rating (mA)
 const float maxSpeedX = 200.0*Conv;				// max velocity X motor can move at (step/s)
 const float maxSpeedZ = 60.0*Conv;				// max velocity Z motor can move at (step/s)
 const float maxAccel = 3000.0*Conv;				// max acceleration (step/s^2)
 const float retract = 5;						// distance to retract (mm)
-const float speed_x0 = 20.0 * Conv;				// x zeroing speed (step/s)
-const float speed_x1 = 4.0 * Conv;				// x secondary zeroing speed (step/s)
-const float accel_x0 = 200.0 * Conv;			// x zeroing acceleration (step/s^2)
+const float zeroSpeed_0 = 20.0 * Conv;			// x zeroing speed (step/s)
+const float zeroSpeed_1 = 4.0 * Conv;			// x secondary zeroing speed (step/s)
+const float zeroAccel = 200.0 * Conv;			// x zeroing acceleration (step/s^2)
 
 // Material properties
 const float maxThickness = 15.0;				// upper bound of thickness knob (mm)
