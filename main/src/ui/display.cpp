@@ -269,7 +269,7 @@ void drawDirection() {
 
 	uint16_t forwardColor, reverseColor;
 
-	if (pathDir[current_path_idx] > 0) {
+	if (paths[current_path_idx].direction > 0) {
 		forwardColor = GC9A01A_WEBWORK_GREEN;
 		reverseColor = DARKGREY;
 	} else {

@@ -44,15 +44,47 @@ bool performSafetyChecks() {
 	return true;
 }
 
+void advance(Point goal, Point next) {
+	if (paths[current_path_idx].feature == NORMAL) {
+		// Move through point indeces as needed
+		if (paths[current_path_idx].direction * signedDist(estPos[0], estPos[1], next.x, next.y, estYaw) > 0) {
+			// If next point is behind router, it becomes the new goal.
+			current_point_idx++;
+
+			// If we're at the end of the points, stop cutting so we can start the next path
+			if (current_point_idx == num_points-1) {
+				Serial.println("Current path finished");
+				stepperZ.moveTo(Conv*restHeight);
+				path_started = false;
+				current_point_idx = 0;
+				current_path_idx++;
+
+				// If we're done all paths then go back to design mode.
+				if (current_path_idx == num_paths) {
+					// Make sure tool is raised after path is finished
+					while (stepperZ.distanceToGo() != 0) {
+						stepperZ.run();
+					}
+					Serial.println("All paths finished");
+					encoderDesignMode();
+				}
+			}
+		}
+	} else {
+		// HOLES!!!
+		
+	}
+}
+
 void handleCutting() {
 	// Start of cutting Logic
-	Point goal = paths[current_path_idx][current_point_idx];
-	Point next = paths[current_path_idx][current_point_idx + 1];
+	Point goal = paths[current_path_idx].points[current_point_idx];
+	Point next = paths[current_path_idx].points[current_point_idx + 1];
 
 	// If we have not started the path, and the first point is behind us
 	// keep the tool raised and return. We wait here until the first point
 	// is in front of us and ready to be cut
-	if (!path_started && pathDir[current_path_idx] * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0) {
+	if (!path_started && paths[current_path_idx].direction * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0) {
 		// Move tool closest to intersect with cutting path
 		float desPos = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
 		
@@ -88,7 +120,7 @@ void handleCutting() {
 	// if (handle_buttons_ok) timeLastDebounce = millis();
 
 	bool gantry_intersects = !isnan(desPos);
-	bool goal_behind_router = pathDir[current_path_idx] * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
+	bool goal_behind_router = paths[current_path_idx].direction * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
 	bool gantry_angle_ok = angleFrom(goal, next) > (PI / 6);
 
 	// TODO: delete me
@@ -117,30 +149,8 @@ void handleCutting() {
 		stepperZ.moveTo(Conv*desZ);
 		stepperX.moveTo(Conv*desPos);
 
-		// Move through point indeces as needed
-		if (pathDir[current_path_idx] * signedDist(estPos[0], estPos[1], next.x, next.y, estYaw) > 0) {
-			// If next point is behind router, it becomes the new goal.
-			current_point_idx++;
-
-			// If we're at the end of the points, stop cutting so we can start the next path
-			if (current_point_idx == num_points-1) {
-				Serial.println("Current path finished");
-				stepperZ.moveTo(Conv*restHeight);
-				path_started = false;
-				current_point_idx = 0;
-				current_path_idx++;
-
-				// If we're done all paths then go back to design mode.
-				if (current_path_idx == num_paths) {
-					// Make sure tool is raised after path is finished
-					while (stepperZ.distanceToGo() != 0) {
-						stepperZ.run();
-					}
-					Serial.println("All paths finished");
-					encoderDesignMode();
-				}
-			}
-		}
+		// Evaluate whether to move on to next point
+		advance(goal, next);
 	} else {
 		// Path logging
 		if (outputMode) {

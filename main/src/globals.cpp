@@ -20,8 +20,9 @@ bool path_started = false;
 bool valid_sensors = true;
 
 // Path data
-Point paths[MAX_PATHS][MAX_POINTS];
-int pathDir[MAX_PATHS] = {1,1,1,1,1,1,1,1,1,1};
+Path paths[MAX_PATHS];
+// Point paths[MAX_PATHS][MAX_POINTS];
+// int pathDir[MAX_PATHS] = {1,1,1,1,1,1,1,1,1,1};
 int num_paths = 0;
 int num_points = 0;
 int current_path_idx = 0;

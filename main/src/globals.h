@@ -30,8 +30,9 @@ extern bool valid_sensors;
 extern float motorPosX;
 
 // Path data
-extern Point paths[MAX_PATHS][MAX_POINTS];
-extern int pathDir[MAX_PATHS];
+extern Path paths[MAX_PATHS];
+// extern Point paths[MAX_PATHS][MAX_POINTS];
+// extern int pathDir[MAX_PATHS];
 extern int num_paths;
 extern int num_points;
 extern int current_path_idx;

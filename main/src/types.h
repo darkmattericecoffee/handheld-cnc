@@ -1,6 +1,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include "config.h"
+
 // State values
 typedef enum State {
 	POWER_ON,
@@ -13,11 +15,27 @@ typedef enum State {
 	READY
 } State;
 
+// Feature type
+typedef enum Feature {
+	// TODO: add types for travel, contour, pocket, etc.
+	NORMAL,
+	HOLE
+} Feature;
+
 // Coordinate
 typedef struct Point {
 	float x;
 	float y;
 	float z;
 } Point;
+
+// Path
+typedef struct Path {
+	// TODO: add other properties such as angle, numPoints, etc. (more info in notebook)
+	Point points[MAX_POINTS];
+	int direction = 1;
+	Feature feature = NORMAL;
+	// int numPoints;
+} Path;
 
 #endif

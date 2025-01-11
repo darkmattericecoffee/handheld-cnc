@@ -151,9 +151,9 @@ void logPath() {
 				Serial.printf(
 					"PATH:%d,%f,%f,%f\n",
 					i,
-					paths[i][j].x,
-					paths[i][j].y,
-					paths[i][j].z
+					paths[i].points[j].x,
+					paths[i].points[j].y,
+					paths[i].points[j].z
 				);
 			}
 		}
@@ -169,9 +169,9 @@ void logPath() {
 			dataFile.printf(
 				"PATH:%d,%f,%f,%f\n",
 				i,
-				paths[i][j].x,
-				paths[i][j].y,
-				paths[i][j].z
+				paths[i].points[j].x,
+				paths[i].points[j].y,
+				paths[i].points[j].z
 			);
 		}
 	}
