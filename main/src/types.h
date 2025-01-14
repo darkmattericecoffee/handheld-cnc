@@ -9,17 +9,24 @@ typedef enum State {
 	MACHINE_X_ZERO,
 	WORKSPACE_Z_ZERO,
 	THICKNESS_SET,
+	TYPE_SELECTED,
 	SELECTING_DESIGN,
 	DESIGN_SELECTED,
 	WORKSPACE_XY_ZERO,
 	READY
 } State;
 
+// Type of design
+typedef enum DesignType {
+	PRESET,
+	FROM_FILE
+ } DesignType;
+
 // Feature type
 typedef enum Feature {
 	// TODO: add types for travel, contour, pocket, etc.
 	NORMAL,
-	HOLE
+	HOLE,
 } Feature;
 
 // Coordinate
@@ -35,7 +42,7 @@ typedef struct Path {
 	Point points[MAX_POINTS];
 	int direction = 1;
 	Feature feature = NORMAL;
-	// int numPoints;
+	int numPoints;
 } Path;
 
 #endif

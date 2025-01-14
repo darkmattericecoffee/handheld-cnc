@@ -8,6 +8,10 @@ void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPo
 void debugging();
 
 // SD card functions
+void updateFileList();
+String getParentPath(const char* path);
+void handleFileSelection();
+void parseGCodeFile(const String& sFilename);
 bool initializeLogFile();
 void outputSD(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting);
 void closeSDFile();

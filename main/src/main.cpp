@@ -29,7 +29,7 @@ bool performSafetyChecks() {
 			stepperZ.run();
 		}
 		Serial.println("X limit reached");
-		encoderDesignMode();
+		encoderDesignType();
 		return false;
 	}
 
@@ -37,7 +37,7 @@ bool performSafetyChecks() {
 		stopStepperZ();
 		stopStepperX();
 		Serial.println("Z limit reached");
-		encoderDesignMode();
+		encoderDesignType();
 		return false;
 	}
 
@@ -66,7 +66,7 @@ void advance(Point goal, Point next) {
 						stepperZ.run();
 					}
 					Serial.println("All paths finished");
-					encoderDesignMode();
+					encoderDesignType();
 				}
 			}
 		}

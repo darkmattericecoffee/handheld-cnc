@@ -20,7 +20,6 @@ extern PMW3360 sensors[4];
 extern EncoderButton encoder;
 extern Arduino_GFX *screen;
 extern SdFat sd;
-extern FsFile dataFile;
 
 // State variables
 extern State state;
@@ -28,6 +27,7 @@ extern bool cutting;
 extern bool path_started;
 extern bool valid_sensors;
 extern float motorPosX;
+extern DesignType designType;
 
 // Path data
 extern Path paths[MAX_PATHS];
@@ -37,6 +37,14 @@ extern int num_paths;
 extern int num_points;
 extern int current_path_idx;
 extern int current_point_idx;
+
+// SD stuff
+extern FsFile logFile;
+extern FsFile root;
+extern FsFile currentDir;
+extern int current_file_idx;
+extern int totalFiles;
+extern String fileList[MAX_FILES];
 
 // Position tracking
 extern float estPos[2];
@@ -56,7 +64,7 @@ extern int16_t centerY;
 extern int plotting;
 extern int debugMode;
 extern int outputMode;
-extern int designMode;
+extern int presetDesign;
 
 // Material properties
 extern float matThickness;

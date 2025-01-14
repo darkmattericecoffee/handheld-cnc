@@ -38,6 +38,7 @@
 #define MAX_PATHS  			10
 #define MAX_POINTS 			1000
 #define NUM_DESIGNS 		7
+#define MAX_FILES			100
 #define GC9A01A_WEBWORK_GREEN 0x8FF1
 #define motorInterfaceType 	1
 

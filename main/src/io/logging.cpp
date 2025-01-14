@@ -3,12 +3,148 @@
 #include "../globals.h"
 #include <Arduino.h>
 
+#define LINE_BUFFER_SIZE 100
+
 // Timing variables
 static long unsigned timeLastOutput = 0;
 static long unsigned timeLastOutputSD = 0;
 static long unsigned timeLastDebug = 0;
 static long unsigned timeLastFlush = 0;
 
+// Read -----------------------------------------------------
+String getParentPath(const char* path) {
+	String pathStr = String(path);
+	int lastSlash = pathStr.lastIndexOf('/');
+	
+	if (lastSlash <= 0) {
+		return "/";
+	}
+	
+	return pathStr.substring(0, lastSlash);
+}
+
+void handleFileSelection() {
+	if (current_file_idx >= 0 && current_file_idx < totalFiles) {
+		String selectedFile = fileList[current_file_idx];
+		
+		// Check if it's a directory
+		if (selectedFile.endsWith("/")) {
+			// Remove trailing slash
+			selectedFile = selectedFile.substring(0, selectedFile.length() - 1);
+
+			char currentDirName[256];
+			currentDir.getName(currentDirName, sizeof(currentDirName));
+			
+			// Handle special case for parent directory
+			if (selectedFile == "..") {
+				// Handle going up one directory
+				currentDir.close();
+				currentDir = sd.open(getParentPath(currentDirName));
+			} else {
+				// Handle entering a subdirectory
+				currentDir.close();
+				String newPath = String(currentDirName) + "/" + selectedFile;
+				currentDir = sd.open(newPath);
+			}
+			
+			current_file_idx = 0;
+			updateFileList();
+		} else {
+			// Handle file selection
+			// TODO: send file to parse gCode function
+			parseGCodeFile(selectedFile);
+
+			state = DESIGN_SELECTED;
+			
+			delay(2000);
+		}
+	}
+}
+
+void parseGCodeFile(const String& sFilename) {
+	const char* filename = sFilename.c_str();
+
+	FsFile file;
+	if (!file.open(filename, O_READ)) {
+		return;
+	}
+
+	int currentPathIndex = -1;
+	char line[LINE_BUFFER_SIZE];
+	Path* currentPath = &paths[0];
+	bool activeFeature = false;
+	Point lastPoint = {0};
+
+	while (file.fgets(line, sizeof(line))) {
+		bool hasNewCoordinate = false;
+
+		// Check for new path command
+		if (strncmp(line, "M800", 4) == 0) {
+			if (currentPathIndex < MAX_PATHS) {
+				activeFeature = true;
+				currentPathIndex++;
+				currentPath = &paths[currentPathIndex];
+				currentPath->direction = 1;  // Default values
+				currentPath->feature = NORMAL;
+				// currentPath->angle = 0.0f;			// TODO!
+				currentPath->numPoints = 0;
+				lastPoint = {0};
+				
+				// Parse the M800 parameters
+				char* ptr = line;
+				while (*ptr) {
+					if (*ptr == 'D') currentPath->direction = atoi(ptr + 1);
+					if (*ptr == 'F') currentPath->feature = (Feature)atoi(ptr + 1);
+					// if (*ptr == 'A') currentPath->angle = atof(ptr + 1);
+					ptr++;
+				}
+			}
+			continue;
+		} else if (strncmp(line, "G1", 2) || strncmp(line, "G98", 3) || strncmp(line, "X", 1) || strncmp(line, "Y", 1) || strncmp(line, "Z", 1)) {
+			activeFeature = false;
+			continue;
+		}
+
+		// Skip all the nonsense
+		if (!activeFeature) continue;
+
+		// Look for G moves
+		if (strncmp(line, "G1", 2) == 0 || strncmp(line, "G98", 3) == 0) {
+			Point newPoint = lastPoint;
+			char* ptr = line;
+			
+			// Parse X, Y, Z coordinates from line
+			while (*ptr) {
+				if (*ptr == 'X') {
+					newPoint.x = atof(ptr + 1);
+					hasNewCoordinate = true;
+				}
+				if (*ptr == 'Y') {
+					newPoint.y = atof(ptr + 1);
+					hasNewCoordinate = true;
+				}
+				if (*ptr == 'Z') {
+					newPoint.z = atof(ptr + 1);
+					hasNewCoordinate = true;
+				}
+				// TODO: For holes - parse feedrate (F) and retract height (R)
+				ptr++;
+			}
+
+			// Add point to current path if there's space
+			if (hasNewCoordinate && currentPath->numPoints < MAX_POINTS) {
+				currentPath->points[currentPath->numPoints] = newPoint;
+				currentPath->numPoints++;
+			}
+
+			lastPoint = newPoint;
+		}
+	}
+
+	file.close();
+}
+
+// Write ------------------------------------------------------
 void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting) {
 	if(millis() - timeLastOutput >= dtOutput) {
 		timeLastOutput = millis();
@@ -74,8 +210,8 @@ void debugging() {
 
 bool initializeLogFile() {
 	// Close any existing file first
-	if (dataFile) {
-		dataFile.close();
+	if (logFile) {
+		logFile.close();
 	}
 	
 	// Create a new file with an incremental name
@@ -87,13 +223,13 @@ bool initializeLogFile() {
 		sprintf(filename, "LOG%03d.txt", fileNumber++);
 	} while (sd.exists(filename) && fileNumber < 1000);
 	
-	dataFile = sd.open(filename, FILE_WRITE);
-	if (!dataFile) {
+	logFile = sd.open(filename, FILE_WRITE);
+	if (!logFile) {
 		Serial.println("Could not create log file!");
 		return false;
 	}
 	
-	dataFile.flush();
+	logFile.flush();
 	Serial.printf("Logging to file: %s\n", filename);
 	return true;
 }
@@ -108,9 +244,9 @@ void outputSD(float estX, float estY, float estYaw, Point goal, float toolPos, f
 		float desX = estX + desPos*cosf(estYaw);
 		float desY = estY + desPos*sinf(estYaw);
 
-		if (dataFile) {
+		if (logFile) {
 			// Write data in CSV format
-			dataFile.printf(
+			logFile.printf(
 				"%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f\n",
 				estX,
 				estY,
@@ -127,7 +263,7 @@ void outputSD(float estX, float estY, float estYaw, Point goal, float toolPos, f
 			
 			// Periodic flush to ensure data is written
 			if (millis() - timeLastFlush >= 1000) {
-				dataFile.flush();
+				logFile.flush();
 				timeLastFlush = millis();
 			}
 		}
@@ -135,9 +271,9 @@ void outputSD(float estX, float estY, float estYaw, Point goal, float toolPos, f
 }
 
 void closeSDFile() {
-	if (dataFile) {
-		dataFile.flush();
-		dataFile.close();
+	if (logFile) {
+		logFile.flush();
+		logFile.close();
 	}
 
 	Serial.println("SD card file has been closed.");
@@ -166,7 +302,7 @@ void logPath() {
 
 	for (int i = 0; i < num_paths; i++) {
 		for (int j = 0; j < num_points; j++) {
-			dataFile.printf(
+			logFile.printf(
 				"PATH:%d,%f,%f,%f\n",
 				i,
 				paths[i].points[j].x,

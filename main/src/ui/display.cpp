@@ -15,6 +15,41 @@ float exponentialSkew(float x) {
 	return 0.0f;
 }
 
+void drawTypeMenu() {
+	const char* options[] = {"Preset", "From File"};
+	const int numOptions = 2;
+
+	screen->fillScreen(BLACK);
+
+	// Set text properties
+	screen->setTextSize(2);
+	screen->setTextColor(WHITE);
+	
+	// Calculate vertical spacing
+	int16_t yStart = screen->height() / 3;
+	int16_t ySpacing = 30;
+	
+	// Draw each option
+	for (int i = 0; i < numOptions; i++) {
+		// Highlight selected option
+		if (i == designType) {
+			screen->setTextColor(YELLOW);
+		} else {
+			screen->setTextColor(WHITE);
+		}
+		
+		// Center text horizontally
+		int16_t x1, y1;
+		uint16_t w, h;
+		screen->getTextBounds(options[i], 0, 0, &x1, &y1, &w, &h);
+		int16_t x = (screen->width() - w) / 2;
+		
+		// Draw option text
+		screen->setCursor(x, yStart + (i * ySpacing));
+		screen->print(options[i]);
+	}
+}
+
 void drawShape() {
 	int16_t tftWidth = screen->width();
 	int16_t tftHeight = screen->height();
@@ -27,7 +62,7 @@ void drawShape() {
 
 	screen->fillScreen(BLACK);
 
-	switch (designMode) {
+	switch (presetDesign) {
 		// TODO: draw an accurate representation of the design here
 		case 0:
 			// line
@@ -98,6 +133,85 @@ void drawShape() {
 		// 	screen->drawLine(centerX-size*cos(M_PI/6), centerY+size*sin(M_PI/6), centerX, centerY+size, WHITE);
 		// 	break;
 	}
+}
+
+void listFiles() {
+	screen->fillScreen(BLACK);
+	screen->setTextSize(2);
+	
+	// Calculate which files to show to keep selection centered
+	int startIndex = max(0, current_file_idx - centerLine);
+	
+	// Adjust start index if we're near the end of the list
+	if (startIndex + displayLines > totalFiles) {
+		startIndex = max(0, totalFiles - displayLines);
+	}
+	
+	// Draw each visible line
+	for (int i = 0; i < displayLines; i++) {
+		int fileIndex = startIndex + i;
+		if (fileIndex >= totalFiles) break;
+		
+		// Calculate Y position
+		int y = i * 20;  // Assuming 20 pixels per line with text size 2
+		screen->setCursor(0, y);
+		
+		// Set color based on selection
+		if (fileIndex == current_file_idx) {
+			screen->setTextColor(YELLOW);
+			screen->print("> ");
+		} else {
+			screen->setTextColor(WHITE);
+			screen->print("  ");
+		}
+		
+		// Print file/folder name
+		screen->println(fileList[fileIndex]);
+	}
+}
+
+void updateFileList() {
+	totalFiles = 0;
+	
+	// Clear previous list
+	for (int i = 0; i < MAX_FILES; i++) {
+		fileList[i] = "";
+	}
+	
+	// Add parent directory entry if not in root
+	char currentDirName[256];
+	currentDir.getName(currentDirName, sizeof(currentDirName));
+	if (strcmp(currentDirName, "/") != 0) {
+		fileList[totalFiles++] = "../";
+	}
+	
+	// First pass: add directories
+	currentDir.rewindDirectory();
+	while (FsFile entry = currentDir.openNextFile()) {
+		if (totalFiles >= MAX_FILES) break;
+		
+		if (entry.isDirectory()) {
+			char nameBuf[256];
+			entry.getName(nameBuf, sizeof(nameBuf));
+			fileList[totalFiles++] = String(nameBuf) + "/";
+		}
+		entry.close();
+	}
+	
+	// Second pass: add files
+	currentDir.rewindDirectory();
+	while (FsFile entry = currentDir.openNextFile()) {
+		if (totalFiles >= MAX_FILES) break;
+		
+		if (!entry.isDirectory()) {
+			char nameBuf[256];
+			entry.getName(nameBuf, sizeof(nameBuf));
+			fileList[totalFiles++] = String(nameBuf);
+		}
+		entry.close();
+	}
+	
+	currentDir.rewindDirectory();
 }
 
 void drawCenteredText(const char* text, int size) {

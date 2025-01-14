@@ -10,7 +10,7 @@ void diamondGenerator();
 void squareGeneratorSine();
 void squareGeneratorWave();
 void squareGeneratorMake();
-void makePath();
+void makePresetPath();
 void parseNC(const char* filename);
 
 // Path properties

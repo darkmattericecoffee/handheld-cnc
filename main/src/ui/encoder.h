@@ -19,12 +19,13 @@ void onEncoderUpdateThickness(EncoderButton &eb);
 void onClickSetThickness(EncoderButton &eb);
 
 // Design mode handlers
-void onEncoderUpdateDesignMode(EncoderButton &eb);
+void onEncoderUpdateDesign(EncoderButton &eb);
 void onClickMakePath(EncoderButton &eb);
 
 // Mode switching functions
 void encoderSetThickness();
-void encoderDesignMode();
+void encoderDesignType();
+void encoderDesignSelect();
 void encoderZeroWorkspaceXY();
 
 #endif
