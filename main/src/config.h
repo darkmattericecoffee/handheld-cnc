@@ -67,7 +67,7 @@ const float maxThickness = 15.0;				// upper bound of thickness knob (mm)
 const float restHeight = 2.0;					// rest height of tool before cutting (mm)
 
 // Gantry geometry
-const float gantryLength = 106.0;				// usable length of x-gantry (mm)
+const float gantryLength = 100.0;				// usable length of x-gantry (mm)
 const float xLimitOffset = 2.54;				// distance from wall of stepper when zeroed (mm)
 const float xBuffer = 3.0;						// safety buffer between tool body and walls (mm)
 const float xSensorOffset = -2.32;				

@@ -4,11 +4,113 @@
 #include "../io/logging.h"
 #include <Arduino.h>
 
+#define LINE_BUFFER_SIZE 100
+
 // Path properties
 const float sinAmp = 5.0;
 const float sinPeriod = 50.0;
 const float pathMax_y = 100.0;
 const float circleDiameter = 800.0;
+
+void parseGCodeFile(const char* filename) {
+	FILE* file = fopen(filename, "r");
+	if (!file) return;
+
+	int currentPathIndex = -1;
+	char line[LINE_BUFFER_SIZE];
+	Path* currentPath = &paths[0];
+
+	while (fgets(line, sizeof(line), file)) {
+		// Check for new path command
+		if (strncmp(line, "M800", 4) == 0) {
+			if (currentPathIndex < MAX_PATHS) {
+				currentPathIndex++;
+				currentPath = &paths[currentPathIndex];
+				currentPath->direction = 1;  // Default values
+				currentPath->feature = NORMAL;
+				// currentPath->angle = 0.0f;			// TODO!
+				currentPath->numPoints = 0;
+				
+				// Parse the M800 parameters
+				char* ptr = line;
+				while (*ptr) {
+					if (*ptr == 'D') currentPath->direction = atoi(ptr + 1);
+					if (*ptr == 'F') currentPath->feature = (Feature)atoi(ptr + 1);
+					// if (*ptr == 'A') currentPath->angle = atof(ptr + 1);
+					ptr++;
+				}
+			}
+			continue;
+		} else if (!strncmp(line, "G1", 2) || !strncmp(line, "G98", 3) || !strncmp(line, "X", 1) || !strncmp(line, "Y", 1) || !strncmp(line, "Z", 1)) {
+			continue;
+		}
+
+		// Skip all the nonsense pre-amble
+		if (currentPathIndex < 0) continue;
+
+		if (currentPath->feature == NORMAL) {
+			// Look for G1 moves (linear motion)
+			if (strncmp(line, "G1", 2) == 0) {
+				Point newPoint = {0};
+				char* ptr = line;
+				
+				// Parse X, Y, Z coordinates
+				while (*ptr) {
+					if (*ptr == 'X') newPoint.x = atof(ptr + 1);
+					if (*ptr == 'Y') newPoint.y = atof(ptr + 1);
+					if (*ptr == 'Z') newPoint.z = atof(ptr + 1);
+					ptr++;
+				}
+
+				// Add point to current path if there's space
+				if (currentPath->numPoints < MAX_POINTS) {
+					currentPath->points[currentPath->numPoints] = newPoint;
+					currentPath->numPoints++;
+				}
+			} else {
+				
+			}
+		} else if (currentPath->feature == HOLE) {
+			// Deal with hole features
+			Point newPoint = {0};
+			char* ptr = line;
+			float holeDepth = 0.0f;
+			// Initial hole cycle line
+			if (strncmp(line, "G98 G81", 7) == 0) {
+				// Parse X, Y, Z coordinates
+				while (*ptr) {
+					if (*ptr == 'X') newPoint.x = atof(ptr + 1);
+					if (*ptr == 'Y') newPoint.y = atof(ptr + 1);
+					if (*ptr == 'Z') holeDepth = atof(ptr + 1);
+					newPoint.z = holeDepth;
+					// TODO: parse feedrate (F)
+					// TODO: parse retract heigh (R)
+					ptr++;
+				}
+
+				// Add point to current path if there's space
+				if (currentPath->numPoints < MAX_POINTS) {
+					currentPath->points[currentPath->numPoints] = newPoint;
+					currentPath->numPoints++;
+				}
+			} else {
+				while (*ptr) {
+					if (*ptr == 'X') newPoint.x = atof(ptr + 1);
+					if (*ptr == 'Y') newPoint.y = atof(ptr + 1);
+					newPoint.z = holeDepth;
+				}
+
+				// Add point to current path if there's space
+				if (currentPath->numPoints < MAX_POINTS) {
+					currentPath->points[currentPath->numPoints] = newPoint;
+					currentPath->numPoints++;
+				}
+			}
+		}
+	}
+
+	fclose(file);
+}
 
 void lineGenerator() {
 	// Generate line path to cut
