@@ -21,12 +21,10 @@ DesignType designType = PRESET;
 
 // Path data
 Path paths[MAX_PATHS];
-// Point paths[MAX_PATHS][MAX_POINTS];
-// int pathDir[MAX_PATHS] = {1,1,1,1,1,1,1,1,1,1};
 int num_paths = 0;
-int num_points = 0;
 int current_path_idx = 0;
 int current_point_idx = 0;
+float minZ = 0.0f;
 
 // SD Stuff
 FsFile logFile;
@@ -53,11 +51,12 @@ int16_t radius = 0;
 int16_t centerX = 0;
 int16_t centerY = 0;
 
-// Mode flags
-int plotting = 0;             // plot values  (1 = yes; 0 = no)
-int debugMode = 0;            // print values (1 = yes; 0 = no)
-int outputMode = 0;           // output data to serial
-int presetDesign = 0;           // choose the design 
+// Mode select
+bool plottingOn = false;			// plot values  (1 = yes; 0 = no)
+bool debuggingOn = true;			// print values (1 = yes; 0 = no)
+bool stopwatchOn = false;
+bool outputOn = false;				// output data to serial
+int designPreset = 0;				// choose the design 
 
 // Material properties
 float matThickness = 0.0;

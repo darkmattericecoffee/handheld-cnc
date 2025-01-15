@@ -145,7 +145,7 @@ void doSensing() {
 	estPos[1] = estPos[1] + estVel1[1]*sensingTime;
 
 	// Sensor plotting
-	if (plotting) {
+	if (plottingOn) {
 		sensorPlotting();
 	}
 }

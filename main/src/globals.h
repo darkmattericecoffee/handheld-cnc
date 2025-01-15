@@ -31,12 +31,10 @@ extern DesignType designType;
 
 // Path data
 extern Path paths[MAX_PATHS];
-// extern Point paths[MAX_PATHS][MAX_POINTS];
-// extern int pathDir[MAX_PATHS];
 extern int num_paths;
-extern int num_points;
 extern int current_path_idx;
 extern int current_point_idx;
+extern float minZ;
 
 // SD stuff
 extern FsFile logFile;
@@ -61,10 +59,11 @@ extern int16_t centerX;
 extern int16_t centerY;
 
 // Mode flags
-extern int plotting;
-extern int debugMode;
-extern int outputMode;
-extern int presetDesign;
+extern bool plottingOn;
+extern bool debuggingOn;
+extern bool stopwatchOn;
+extern bool outputOn;
+extern int designPreset;
 
 // Material properties
 extern float matThickness;

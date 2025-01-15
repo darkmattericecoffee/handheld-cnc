@@ -21,7 +21,7 @@ void lineGenerator() {
 	}
 
 	num_paths = 1;
-	num_points = MAX_POINTS;
+	paths[0].numPoints = MAX_POINTS;
 }
 
 void sinGenerator() {
@@ -37,7 +37,7 @@ void sinGenerator() {
 	}
 
 	num_paths = 1;
-	num_points = MAX_POINTS;
+	paths[0].numPoints = MAX_POINTS;
 }
 
 void zigZagGenerator() {
@@ -58,7 +58,7 @@ void zigZagGenerator() {
 	}
 	
 	num_paths = 1;
-	num_points = MAX_POINTS;
+	paths[0].numPoints = MAX_POINTS;
 }
 
 void doubleLineGenerator() {
@@ -83,7 +83,9 @@ void doubleLineGenerator() {
 	paths[1].direction = -1;
 
 	num_paths = 2;
-	num_points = MAX_POINTS;
+	for (int i = 0; i < num_paths; i++){
+		paths[i].numPoints = MAX_POINTS;
+	}
 }
 
 void circleGenerator() {
@@ -130,7 +132,9 @@ void circleGenerator() {
 	}
 
 	num_paths = 4;
-	num_points = MAX_POINTS;
+	for (int i = 0; i < num_paths; i++){
+		paths[i].numPoints = MAX_POINTS;
+	}
 }
 
 void diamondGenerator() {
@@ -156,7 +160,9 @@ void diamondGenerator() {
 	}
 
 	num_paths = 2;
-	num_points = MAX_POINTS;
+	for (int i = 0; i < num_paths; i++){
+		paths[i].numPoints = MAX_POINTS;
+	}
 }
 
 void squareGeneratorSine() {
@@ -201,7 +207,9 @@ void squareGeneratorSine() {
 	}
 
 	num_paths = 3;
-	num_points = MAX_POINTS;
+	for (int i = 0; i < num_paths; i++){
+		paths[i].numPoints = MAX_POINTS;
+	}
 }
 
 void squareGeneratorWave() {
@@ -302,7 +310,9 @@ void squareGeneratorMake() {
 	}
 
 	num_paths = 7;
-	num_points = MAX_POINTS;
+	for (int i = 0; i < num_paths; i++){
+		paths[i].numPoints = MAX_POINTS;
+	}
 }
 
 void parseNC(const char* filename) {
@@ -361,7 +371,7 @@ void parseNC(const char* filename) {
 }
 
 void makePresetPath() {
-	switch (presetDesign) {
+	switch (designPreset) {
 		case 0:
 			lineGenerator();
 			Serial.println("Line path generated!");

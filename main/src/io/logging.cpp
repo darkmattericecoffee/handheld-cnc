@@ -9,6 +9,7 @@
 static long unsigned timeLastOutput = 0;
 static long unsigned timeLastOutputSD = 0;
 static long unsigned timeLastDebug = 0;
+static long unsigned timeLastClocked = 0;
 static long unsigned timeLastFlush = 0;
 
 // Read -----------------------------------------------------
@@ -61,6 +62,20 @@ void handleFileSelection() {
 	}
 }
 
+bool validGCode(const char* gLine) {
+	int numCommands = 6;
+	const char* validCommands[numCommands] = {"G0", "G1", "G98", "X", "Y", "Z"};
+	int commandSizes[numCommands] = {2,2,3,1,1,1};
+
+	for (int i = 0; i < numCommands; i++) {
+		if (strncmp(gLine, validCommands[i], commandSizes[i]) == 0) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void parseGCodeFile(const String& sFilename) {
 	const char* filename = sFilename.c_str();
 
@@ -74,6 +89,7 @@ void parseGCodeFile(const String& sFilename) {
 	Path* currentPath = &paths[0];
 	bool activeFeature = false;
 	Point lastPoint = {0};
+	num_paths = 0;
 
 	while (file.fgets(line, sizeof(line))) {
 		bool hasNewCoordinate = false;
@@ -89,6 +105,7 @@ void parseGCodeFile(const String& sFilename) {
 				// currentPath->angle = 0.0f;			// TODO!
 				currentPath->numPoints = 0;
 				lastPoint = {0};
+				minZ = 0.0f;
 				
 				// Parse the M800 parameters
 				char* ptr = line;
@@ -98,18 +115,17 @@ void parseGCodeFile(const String& sFilename) {
 					// if (*ptr == 'A') currentPath->angle = atof(ptr + 1);
 					ptr++;
 				}
+				num_paths++;
+				Serial.println("New Path!");
 			}
-			continue;
-		} else if (strncmp(line, "G1", 2) || strncmp(line, "G98", 3) || strncmp(line, "X", 1) || strncmp(line, "Y", 1) || strncmp(line, "Z", 1)) {
-			activeFeature = false;
 			continue;
 		}
 
 		// Skip all the nonsense
-		if (!activeFeature) continue;
+		// if (!activeFeature) continue;
 
 		// Look for G moves
-		if (strncmp(line, "G1", 2) == 0 || strncmp(line, "G98", 3) == 0) {
+		if (validGCode(line)) {
 			Point newPoint = lastPoint;
 			char* ptr = line;
 			
@@ -126,6 +142,9 @@ void parseGCodeFile(const String& sFilename) {
 				if (*ptr == 'Z') {
 					newPoint.z = atof(ptr + 1);
 					hasNewCoordinate = true;
+					if (newPoint.z < minZ) {
+						minZ = newPoint.z;
+					}
 				}
 				// TODO: For holes - parse feedrate (F) and retract height (R)
 				ptr++;
@@ -135,6 +154,7 @@ void parseGCodeFile(const String& sFilename) {
 			if (hasNewCoordinate && currentPath->numPoints < MAX_POINTS) {
 				currentPath->points[currentPath->numPoints] = newPoint;
 				currentPath->numPoints++;
+				Serial.printf("Point: X(%f), Y(%f), Z(%f)\n", newPoint.x, newPoint.y, newPoint.z);
 			}
 
 			lastPoint = newPoint;
@@ -173,9 +193,30 @@ void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPo
 	}
 }
 
-void debugging() {
+void debugging(Point point1, Point point2) {
 	if(millis() - timeLastDebug >= dtDebug) {
 		timeLastDebug = millis();
+
+		// Print debug data
+		Serial.printf("x:%f,y:%f,theta:%f\n", estPos[0], estPos[1], estYaw * 180.0 / PI);
+		Serial.printf("goal.x:%f,goal.y:%f,next.x:%f,next.y:%f\n", point1.x, point1.y, point2.x, point2.y);
+
+		// Additional debug info can be uncommented as needed:
+		/*
+		Serial.printf("w0:%f,w0:%f,w0:%f,%w0:%f\n", 1000*estAngVel[0], 1000*estAngVel[1], 
+					 1000*estAngVel[2], 1000*estAngVel[3]);
+		Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",
+					 estPosX,estPosY,estYaw,goalX,goalY,desPos);
+		Serial.printf("x_raw:%f,y_raw:%f\n",measVel[0][0],measVel[1][0]);
+		Serial.printf("curr_pnt_idx:%i,curr_path_idx:%i\n",current_point_idx, current_path_idx);
+		Serial.printf("Sensing time = %i\n", sensingTime);
+		*/
+	}
+}
+
+void stopwatch() {
+	if(millis() - timeLastClocked >= dtStopwatch) {
+		timeLastClocked = millis();
 
 		Serial.println("=== Timing Information (microseconds) ===");
 		Serial.print("Total Loop Time: ");
@@ -191,20 +232,6 @@ void debugging() {
 		Serial.print("Cutting Time: ");
 		Serial.println(cuttingTime);
 		Serial.println("=====================================");
-
-		// Print debug data
-		Serial.printf("x:%f,y:%f,theta:%f\n", estPos[0], estPos[1], estYaw * 180.0 / PI);
-
-		// Additional debug info can be uncommented as needed:
-		/*
-		Serial.printf("w0:%f,w0:%f,w0:%f,%w0:%f\n", 1000*estAngVel[0], 1000*estAngVel[1], 
-					 1000*estAngVel[2], 1000*estAngVel[3]);
-		Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",
-					 estPosX,estPosY,estYaw,goalX,goalY,desPos);
-		Serial.printf("x_raw:%f,y_raw:%f\n",measVel[0][0],measVel[1][0]);
-		Serial.printf("curr_pnt_idx:%i,curr_path_idx:%i\n",current_point_idx, current_path_idx);
-		Serial.printf("Sensing time = %i\n", sensingTime);
-		*/
 	}
 }
 
@@ -220,7 +247,7 @@ bool initializeLogFile() {
 	
 	// Find next available file number
 	do {
-		sprintf(filename, "LOG%03d.txt", fileNumber++);
+		sprintf(filename, "logFiles/LOG%03d.txt", fileNumber++);
 	} while (sd.exists(filename) && fileNumber < 1000);
 	
 	logFile = sd.open(filename, FILE_WRITE);
@@ -281,9 +308,9 @@ void closeSDFile() {
 
 void logPath() {
 	// Log path data to serial if enabled
-	if (outputMode) {
+	if (outputOn) {
 		for (int i = 0; i < num_paths; i++) {
-			for (int j = 0; j < num_points; j++) {
+			for (int j = 0; j < paths[current_path_idx].numPoints; j++) {
 				Serial.printf(
 					"PATH:%d,%f,%f,%f\n",
 					i,
@@ -301,7 +328,7 @@ void logPath() {
 	}
 
 	for (int i = 0; i < num_paths; i++) {
-		for (int j = 0; j < num_points; j++) {
+		for (int j = 0; j < paths[current_path_idx].numPoints; j++) {
 			logFile.printf(
 				"PATH:%d,%f,%f,%f\n",
 				i,

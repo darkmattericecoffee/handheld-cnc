@@ -79,6 +79,7 @@ const float zLimitOffset = 2.13;				// distance from wall when zeroed (mm)
 // Timing constants
 const long unsigned debounceDelay = 50;			// the debounce time; increase if the output flickers
 const long unsigned dtDebug = 500;				// (ms)
+const long unsigned dtStopwatch = 500;				// time interval for loop timing (ms)
 const long unsigned dtPlot = 50;				// (ms)
 const long unsigned dtOutput = 20;				// (ms)
 const long unsigned dtOutputSD = 10;			// (ms)

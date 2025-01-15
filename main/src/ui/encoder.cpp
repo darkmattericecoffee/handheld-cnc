@@ -85,7 +85,7 @@ void onEncoderSwitchType(EncoderButton &eb) {
 
 void onEncoderUpdateDesign(EncoderButton &eb) {
 	if (designType == PRESET) {
-		presetDesign = (NUM_DESIGNS + presetDesign + eb.increment()) % NUM_DESIGNS;
+		designPreset = (NUM_DESIGNS + designPreset + eb.increment()) % NUM_DESIGNS;
 		drawShape();
 	} else {
 		current_file_idx = (totalFiles + current_file_idx + eb.increment()) % totalFiles;

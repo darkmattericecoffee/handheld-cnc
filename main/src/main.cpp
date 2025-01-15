@@ -10,13 +10,15 @@
 #include "math/geometry.h"
 #include "io/logging.h"
 
+bool prevChecks[4] = {false};
+
 void handleSerial() {
 	if (Serial.available()) {
 		char ch = Serial.read();
 		if (ch == 'd') {
-			debugMode ^= 1;
+			debuggingOn ^= 1;
 		} else if (ch == 'p') {
-			plotting ^= 1;
+			plottingOn ^= 1;
 		}
 	}
 }
@@ -44,15 +46,16 @@ bool performSafetyChecks() {
 	return true;
 }
 
-void advance(Point goal, Point next) {
+void advance(Point goal, Point next, bool autoAdvance=false) {
 	if (paths[current_path_idx].feature == NORMAL) {
 		// Move through point indeces as needed
-		if (paths[current_path_idx].direction * signedDist(estPos[0], estPos[1], next.x, next.y, estYaw) > 0) {
+		if (paths[current_path_idx].direction * signedDist(estPos[0],estPos[1],next.x,next.y,estYaw) > 0 || autoAdvance) {
 			// If next point is behind router, it becomes the new goal.
 			current_point_idx++;
+			// if (autoAdvance) Serial.println("Auto-advanced!");
 
 			// If we're at the end of the points, stop cutting so we can start the next path
-			if (current_point_idx == num_points-1) {
+			if (current_point_idx == paths[current_path_idx].numPoints-1) {
 				Serial.println("Current path finished");
 				stepperZ.moveTo(Conv*restHeight);
 				path_started = false;
@@ -81,6 +84,12 @@ void handleCutting() {
 	Point goal = paths[current_path_idx].points[current_point_idx];
 	Point next = paths[current_path_idx].points[current_point_idx + 1];
 
+	// TODO: handle this case better
+	if (goal.x == next.x && goal.y == next.y) {
+		advance(goal, next, true);
+		return;
+	}
+
 	// If we have not started the path, and the first point is behind us
 	// keep the tool raised and return. We wait here until the first point
 	// is in front of us and ready to be cut
@@ -88,7 +97,7 @@ void handleCutting() {
 		// Move tool closest to intersect with cutting path
 		float desPos = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
 		
-		if (outputMode) {
+		if (outputOn) {
 			outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
 		}
 		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
@@ -106,7 +115,7 @@ void handleCutting() {
 
 	// Desired position if we intersect
 	float desPos = desPosIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
-	float desZ = goal.z;
+	float desZ = (matThickness == 0 && designType == FROM_FILE) ? (goal.z - minZ) : goal.z;			// if matThickness is set to 0 (drawing), then don't pierce!
 	// Desired position if we do not intersect
 	float desPosClosest = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
 
@@ -124,23 +133,23 @@ void handleCutting() {
 	bool gantry_angle_ok = angleFrom(goal, next) > (PI / 6);
 
 	// TODO: delete me
-  // bool newChecks[4] = {handle_buttons_ok, gantry_intersects, goal_behind_router, gantry_angle_ok};
-  // bool logged = false;
-  // for (int i=0; i<4; i++) {
-  //   if (prevChecks[i] != newChecks[i] && !logged) {
-  //     Serial.println("Checks have changed:");
-  //     Serial.printf("\thandle_buttons_ok: %d\n", handle_buttons_ok);
-  //     Serial.printf("\tgantry_intersects: %d\n", gantry_intersects);
-  //     Serial.printf("\tgoal_behind_router: %d\n", goal_behind_router);
-  //     Serial.printf("\tgantry_angle_ok: %d\n", gantry_angle_ok);
-  //     logged = true;
-  //   }
-  //   prevChecks[i] = newChecks[i];
-  // }
+	bool newChecks[4] = {handle_buttons_ok, gantry_intersects, goal_behind_router, gantry_angle_ok};
+	bool logged = false;
+	for (int i=0; i<4; i++) {
+		if (prevChecks[i] != newChecks[i] && !logged) {
+		Serial.println("Checks have changed:");
+		Serial.printf("\thandle_buttons_ok: %d\n", handle_buttons_ok);
+		Serial.printf("\tgantry_intersects: %d\n", gantry_intersects);
+		Serial.printf("\tgoal_behind_router: %d\n", goal_behind_router);
+		Serial.printf("\tgantry_angle_ok: %d\n", gantry_angle_ok);
+		logged = true;
+		}
+		prevChecks[i] = newChecks[i];
+	}
 
 	if (handle_buttons_ok && gantry_intersects && goal_behind_router && gantry_angle_ok && valid_sensors) {
 		// Path logging
-		if (outputMode) {
+		if (outputOn) {
 			outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
 		}
 		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
@@ -153,7 +162,7 @@ void handleCutting() {
 		advance(goal, next);
 	} else {
 		// Path logging
-		if (outputMode) {
+		if (outputOn) {
 			outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
 		}
 		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
@@ -165,12 +174,17 @@ void handleCutting() {
 
 	// Update UI
 	updateUI(desPos, goal, next);
+
+	// Debugging
+	if (debuggingOn) {
+		debugging(goal, next);
+	}
 }
 
 void setup() {
 	Serial.begin(115200);  
 
-	if (outputMode) { while(!Serial); }
+	if (outputOn) { while(!Serial); }
 	delay(100);
 
 	if (!screen->begin()) { Serial.println("screen->begin() failed!"); }
@@ -269,7 +283,7 @@ void loop() {
 	totalLoopTime = micros() - timeLoopStart;
 
 	// Debugging
-	if (debugMode) {
-		debugging();
+	if (stopwatchOn) {
+		stopwatch();
 	}
 }

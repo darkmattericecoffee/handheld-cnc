@@ -84,6 +84,7 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
 
 	// Check for parallel lines (denominator is zero)
 	if (den == 0) {
+		// Serial.println("parallel");
 		return NAN;
 	}
 
@@ -91,6 +92,7 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
 	
 	// Check if the intersection point is on the gantry
 	if (t < 0 || t > 1) {
+		// Serial.println("not on gantry");
 		return NAN;
 	}
 	

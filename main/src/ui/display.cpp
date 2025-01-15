@@ -62,7 +62,7 @@ void drawShape() {
 
 	screen->fillScreen(BLACK);
 
-	switch (presetDesign) {
+	switch (designPreset) {
 		// TODO: draw an accurate representation of the design here
 		case 0:
 			// line
@@ -138,6 +138,12 @@ void drawShape() {
 void listFiles() {
 	screen->fillScreen(BLACK);
 	screen->setTextSize(2);
+
+	int16_t tftHeight = screen->height();
+
+	// Calculate vertical centering
+    int totalHeight = displayLines * 20;  				// Total height of all lines (7 lines * 20px)
+    int startY = (tftHeight - totalHeight) / 2;  		// Center vertically on screen
 	
 	// Calculate which files to show to keep selection centered
 	int startIndex = max(0, current_file_idx - centerLine);
@@ -153,7 +159,7 @@ void listFiles() {
 		if (fileIndex >= totalFiles) break;
 		
 		// Calculate Y position
-		int y = i * 20;  // Assuming 20 pixels per line with text size 2
+		int y = startY + i * 20;  // Assuming 20 pixels per line with text size 2
 		screen->setCursor(0, y);
 		
 		// Set color based on selection
