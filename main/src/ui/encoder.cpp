@@ -61,6 +61,10 @@ void onClickMakePath(EncoderButton &eb) {
 		state = DESIGN_SELECTED;
 	} else {
 		handleFileSelection();
+		if (state != DESIGN_SELECTED) {
+			updateFileList();
+			listFiles();
+		}
 	}
 }
 
@@ -141,6 +145,7 @@ void encoderDesignSelect() {
 
 	while (state != DESIGN_SELECTED) {
 		encoder.update();
+		listFiles();
 	}
 
 	// Hack for opensauce, auto-zero XY

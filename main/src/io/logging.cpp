@@ -49,15 +49,13 @@ void handleFileSelection() {
 			}
 			
 			current_file_idx = 0;
-			updateFileList();
 		} else {
 			// Handle file selection
-			// TODO: send file to parse gCode function
 			parseGCodeFile(selectedFile);
 
 			state = DESIGN_SELECTED;
 			
-			delay(2000);
+			delay(100);
 		}
 	}
 }

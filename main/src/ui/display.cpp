@@ -6,6 +6,12 @@
 static int16_t lastX0, lastY0, lastX1, lastY1, lastX2, lastY2, lastX3, lastY3;
 static int16_t lastTargetCircleX, lastTargetCircleY;
 
+unsigned long lastScrollTime = 0;
+int scrollPosition = 0;
+const int SCROLL_DELAY = 500;    // Time before scrolling starts (ms)
+const int SCROLL_SPEED = 150;    // Time between each scroll step (ms)
+const int CHARS_TO_DISPLAY = 12; // Max characters that fit on screen with text size 2
+
 float exponentialSkew(float x) {
 	if (x > 0) {
 		return x + (1/exp(x));
@@ -152,6 +158,13 @@ void listFiles() {
 	if (startIndex + displayLines > totalFiles) {
 		startIndex = max(0, totalFiles - displayLines);
 	}
+
+	// Handle scrolling for selected item
+    unsigned long currentTime = millis();
+    if (currentTime - lastScrollTime > SCROLL_SPEED) {
+        lastScrollTime = currentTime;
+        scrollPosition++;
+    }
 	
 	// Draw each visible line
 	for (int i = 0; i < displayLines; i++) {
@@ -161,19 +174,43 @@ void listFiles() {
 		// Calculate Y position
 		int y = startY + i * 20;  // Assuming 20 pixels per line with text size 2
 		screen->setCursor(0, y);
+
+		String displayText = fileList[fileIndex];
 		
 		// Set color based on selection
 		if (fileIndex == current_file_idx) {
 			screen->setTextColor(YELLOW);
 			screen->print("> ");
+
+			// Handle scrolling for long filename
+            if (displayText.length() > CHARS_TO_DISPLAY) {
+                // Add spaces at the end before repeating
+                displayText = displayText + "    " + displayText;
+                int totalScroll = displayText.length();
+                int currentPos = scrollPosition % totalScroll;
+                displayText = displayText.substring(currentPos, currentPos + CHARS_TO_DISPLAY);
+            }
 		} else {
 			screen->setTextColor(WHITE);
 			screen->print("  ");
+
+			// Truncate non-selected long filenames
+            if (displayText.length() > CHARS_TO_DISPLAY) {
+                displayText = displayText.substring(0, CHARS_TO_DISPLAY - 3) + "...";
+            }
 		}
 		
 		// Print file/folder name
-		screen->println(fileList[fileIndex]);
+		screen->println(displayText);
 	}
+
+	// Reset scroll position when selection changes
+    static int lastIndex = -1;
+    if (lastIndex != current_file_idx) {
+        scrollPosition = 0;
+        lastScrollTime = currentTime + SCROLL_DELAY; // Add delay before scrolling starts
+        lastIndex = current_file_idx;
+    }
 }
 
 void updateFileList() {
