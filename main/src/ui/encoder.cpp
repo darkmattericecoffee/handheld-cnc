@@ -145,7 +145,7 @@ void encoderDesignSelect() {
 
 	while (state != DESIGN_SELECTED) {
 		encoder.update();
-		listFiles();
+		if (designType == FROM_FILE) listFiles();
 	}
 
 	// Hack for opensauce, auto-zero XY

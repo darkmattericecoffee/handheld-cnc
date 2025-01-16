@@ -13,6 +13,17 @@ static long unsigned timeLastClocked = 0;
 static long unsigned timeLastFlush = 0;
 
 // Read -----------------------------------------------------
+void handleSerial() {
+	if (Serial.available()) {
+		char ch = Serial.read();
+		if (ch == 'd') {
+			debuggingOn ^= 1;
+		} else if (ch == 'p') {
+			plottingOn ^= 1;
+		}
+	}
+}
+
 String getParentPath(const char* path) {
 	String pathStr = String(path);
 	int lastSlash = pathStr.lastIndexOf('/');

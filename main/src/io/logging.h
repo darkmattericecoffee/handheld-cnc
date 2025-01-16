@@ -4,6 +4,7 @@
 #include "../types.h"
 
 // Serial logging functions
+void handleSerial();
 void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting);
 
 // Debugging functions
