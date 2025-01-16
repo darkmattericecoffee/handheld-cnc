@@ -174,22 +174,22 @@ void parseGCodeFile(const String& sFilename) {
 }
 
 // Write ------------------------------------------------------
-void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting) {
+void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos, bool cutting) {
 	if(millis() - timeLastOutput >= dtOutput) {
 		timeLastOutput = millis();
 
 		// Calculate tool and desired positions
-		float toolX = estX + toolPos*cosf(estYaw);
-		float toolY = estY + toolPos*sinf(estYaw);
+		float toolX = rPose.x + toolPos*cosf(rPose.yaw);
+		float toolY = rPose.y + toolPos*sinf(rPose.yaw);
 
-		float desX = estX + desPos*cosf(estYaw);
-		float desY = estY + desPos*sinf(estYaw);
+		float desX = rPose.x + desPos*cosf(rPose.yaw);
+		float desY = rPose.y + desPos*sinf(rPose.yaw);
 
 		Serial.printf(
 			"POS:%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f\n",
-			estX,
-			estY,
-			estYaw,
+			rPose.x,
+			rPose.y,
+			rPose.yaw,
 			goal.x,
 			goal.y,
 			toolX,
@@ -207,7 +207,7 @@ void debugging(Point point1, Point point2) {
 		timeLastDebug = millis();
 
 		// Print debug data
-		Serial.printf("x:%f,y:%f,theta:%f\n", estPos[0], estPos[1], estYaw * 180.0 / PI);
+		Serial.printf("x:%f,y:%f,theta:%f\n", pose.x, pose.y, pose.yaw * 180.0 / PI);
 		Serial.printf("goal.x:%f,goal.y:%f,next.x:%f,next.y:%f\n", point1.x, point1.y, point2.x, point2.y);
 
 		// Additional debug info can be uncommented as needed:
@@ -215,7 +215,7 @@ void debugging(Point point1, Point point2) {
 		Serial.printf("w0:%f,w0:%f,w0:%f,%w0:%f\n", 1000*estAngVel[0], 1000*estAngVel[1], 
 					 1000*estAngVel[2], 1000*estAngVel[3]);
 		Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",
-					 estPosX,estPosY,estYaw,goalX,goalY,desPos);
+					 estPosX,estPosY,pose.yaw,goalX,goalY,desPos);
 		Serial.printf("x_raw:%f,y_raw:%f\n",measVel[0][0],measVel[1][0]);
 		Serial.printf("curr_pnt_idx:%i,curr_path_idx:%i\n",current_point_idx, current_path_idx);
 		Serial.printf("Sensing time = %i\n", sensingTime);
@@ -270,23 +270,23 @@ bool initializeLogFile() {
 	return true;
 }
 
-void outputSD(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting) {
+void outputSD(RouterPose rPose, Point goal, float toolPos, float desPos, bool cutting) {
 	if(millis() - timeLastOutputSD >= dtOutputSD) {
 		timeLastOutputSD = millis();
 
-		float toolX = estX + toolPos*cosf(estYaw);
-		float toolY = estY + toolPos*sinf(estYaw);
+		float toolX = rPose.x + toolPos*cosf(rPose.yaw);
+		float toolY = rPose.y + toolPos*sinf(rPose.yaw);
 
-		float desX = estX + desPos*cosf(estYaw);
-		float desY = estY + desPos*sinf(estYaw);
+		float desX = rPose.x + desPos*cosf(rPose.yaw);
+		float desY = rPose.y + desPos*sinf(rPose.yaw);
 
 		if (logFile) {
 			// Write data in CSV format
 			logFile.printf(
 				"%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f\n",
-				estX,
-				estY,
-				estYaw,
+				rPose.x,
+				rPose.y,
+				rPose.yaw,
 				goal.x,
 				goal.y,
 				toolX,

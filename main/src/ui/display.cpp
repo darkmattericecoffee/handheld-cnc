@@ -326,20 +326,20 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 	int16_t centerX = screen->width() / 2;
 	int16_t centerY = screen->width() / 2;
 
-	float dTheta = estYaw + PI/2 - atan2f(next.y-goal.y, next.x-goal.x);
+	float dTheta = pose.yaw + PI/2 - atan2f(next.y-goal.y, next.x-goal.x);
 
 	// float xMap = mapF(desPosition, -gantryLength/2, gantryLength/2, -radiusBounds, radiusBounds);
 	// float yMap = mapF();
-	float dx = (next.x-estPos[0])*cosf(-estYaw) - (next.y-estPos[1])*sinf(-estYaw);
-	float dy = (next.x-estPos[0])*sinf(-estYaw) + (next.y-estPos[1])*cosf(-estYaw);
+	float dx = (next.x-pose.x)*cosf(-pose.yaw) - (next.y-pose.y)*sinf(-pose.yaw);
+	float dy = (next.x-pose.x)*sinf(-pose.yaw) + (next.y-pose.y)*cosf(-pose.yaw);
 	float dySkewed = 5*exponentialSkew(dy);
-	// float theta = estYaw - atan2f(dySkewed, next.x-estPos[0]);
+	// float theta = pose.yaw - atan2f(dySkewed, next.x-pose.x);
 	float theta = atan2f(dySkewed, dx);
-	// float thetaTool = estYaw - atan2f(next.y-(estPos[1]+motorPosX*sinf(estYaw)), next.x-(estPos[0]+motorPosX*cosf(estYaw)));
-	// float dist = myDist(estPos[0], estPos[1], next.x, estPos[1] + dySkewed);
+	// float thetaTool = pose.yaw - atan2f(next.y-(pose.y+motorPosX*sinf(pose.yaw)), next.x-(pose.x+motorPosX*cosf(pose.yaw)));
+	// float dist = myDist(pose.x, pose.y, next.x, pose.y + dySkewed);
 	float dist = sqrt(pow(dx,2)+pow(dySkewed,2));
 
-	// Serial.printf("yaw: %f\n", degrees(estYaw));
+	// Serial.printf("yaw: %f\n", degrees(pose.yaw));
 
 	float offsetRadius = radiusBounds*0.9*tanh(dist*0.05);
 	//float offsetRadius = (radius - radiusInner)*0.8*tanh(dist*0.1);

@@ -66,6 +66,7 @@ const float zeroAccel = 200.0 * Conv;			// zeroing acceleration (step/s^2)
 // Material properties
 const float maxThickness = 15.0;				// upper bound of thickness knob (mm)
 const float restHeight = 2.0;					// rest height of tool before cutting (mm)
+const float holeTolerance = 1;					// tolerance for hole positioning (mm)
 
 // Gantry geometry
 const float gantryLength = 100.0;				// usable length of x-gantry (mm)

@@ -35,7 +35,7 @@ bool performSafetyChecks() {
 void advance(Point goal, Point next, bool autoAdvance=false) {
 	if (paths[current_path_idx].feature == NORMAL) {
 		// Move through point indeces as needed
-		if (paths[current_path_idx].direction * signedDist(estPos[0],estPos[1],next.x,next.y,estYaw) > 0 || autoAdvance) {
+		if (paths[current_path_idx].direction * signedDist(pose,next) > 0 || autoAdvance) {
 			// If next point is behind router, it becomes the new goal.
 			current_point_idx++;
 			// if (autoAdvance) Serial.println("Auto-advanced!");
@@ -79,12 +79,12 @@ void handleCutting() {
 	// If we have not started the path, and the first point is behind us
 	// keep the tool raised and return. We wait here until the first point
 	// is in front of us and ready to be cut
-	if (!path_started && paths[current_path_idx].direction * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0) {
+	if (!path_started && paths[current_path_idx].direction * signedDist(pose, goal) > 0) {
 		// Move tool closest to intersect with cutting path
-		float desPos = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
+		float desPos = desPosClosestToIntersect(pose, goal, next);
 		
 		if (outputOn) {
-			outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
+			outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
 		}
 		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
 		
@@ -100,10 +100,10 @@ void handleCutting() {
 	path_started = true;
 
 	// Desired position if we intersect
-	float desPos = desPosIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
+	float desPos = desPosIntersect(pose, goal, next);
 	float desZ = (matThickness == 0 && designType == FROM_FILE) ? (goal.z - minZ) : goal.z;			// if matThickness is set to 0 (drawing), then don't pierce!
 	// Desired position if we do not intersect
-	float desPosClosest = desPosClosestToIntersect(estPos[0], estPos[1], estYaw, goal.x, goal.y, next.x, next.y);
+	float desPosClosest = desPosClosestToIntersect(pose, goal, next);
 
 	// Conditions for cutting
 	bool handle_buttons_pressed = (digitalRead(BUTT_HANDLE_L) == LOW) && (digitalRead(BUTT_HANDLE_R) == LOW);
@@ -115,7 +115,7 @@ void handleCutting() {
 	// if (handle_buttons_ok) timeLastDebounce = millis();
 
 	bool gantry_intersects = !isnan(desPos);
-	bool goal_behind_router = paths[current_path_idx].direction * signedDist(estPos[0], estPos[1], goal.x, goal.y, estYaw) > 0;
+	bool goal_behind_router = paths[current_path_idx].direction * signedDist(pose, goal) > 0;
 	bool gantry_angle_ok = angleFrom(goal, next) > (PI / 6);
 
 	// TODO: delete me
@@ -136,7 +136,7 @@ void handleCutting() {
 	if (handle_buttons_ok && gantry_intersects && goal_behind_router && gantry_angle_ok && valid_sensors) {
 		// Path logging
 		if (outputOn) {
-			outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
+			outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
 		}
 		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
 
@@ -149,7 +149,7 @@ void handleCutting() {
 	} else {
 		// Path logging
 		if (outputOn) {
-			outputSerial(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
+			outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
 		}
 		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
 		

@@ -29,6 +29,14 @@ typedef enum Feature {
 	HOLE,
 } Feature;
 
+// Router pose
+typedef struct RouterPose {
+	float x;			// x position
+	float y;			// y position
+	float yaw;			// orientation
+	// Future additions like velocity, acceleration, etc.
+} RouterPose;
+
 // Coordinate
 typedef struct Point {
 	float x;

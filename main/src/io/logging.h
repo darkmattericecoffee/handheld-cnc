@@ -5,7 +5,7 @@
 
 // Serial logging functions
 void handleSerial();
-void outputSerial(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting);
+void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos, bool cutting);
 
 // Debugging functions
 void debugging(Point point1, Point point2);
@@ -18,7 +18,7 @@ void handleFileSelection();
 bool validGCode(const char* gLine);
 void parseGCodeFile(const String& sFilename);
 bool initializeLogFile();
-void outputSD(float estX, float estY, float estYaw, Point goal, float toolPos, float desPos, bool cutting);
+void outputSD(RouterPose rPose, Point goal, float toolPos, float desPos, bool cutting);
 void closeSDFile();
 void logPath();
 

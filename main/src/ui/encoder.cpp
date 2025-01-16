@@ -68,6 +68,12 @@ void onClickMakePath(EncoderButton &eb) {
 	}
 }
 
+void onClickExecutePath(EncoderButton &eb) {
+	if (paths[current_path_idx].feature == HOLE) {
+		plungeReady = true;
+	}
+}
+
 // ENCODER HANDLERS ----------------------------------------
 void onEncoderUpdateThickness(EncoderButton &eb) {
 	float incrScalar = 0.1;
@@ -186,7 +192,7 @@ void encoderZeroWorkspaceXY() {
 
 	state = READY;
 	encoder.setEncoderHandler(nullHandler);
-	encoder.setClickHandler(nullHandler);
+	encoder.setClickHandler(onClickExecutePath);
 
 	screen->fillScreen(BLACK);
 	drawFixedUI();

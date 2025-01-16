@@ -22,6 +22,9 @@ void onClickSetThickness(EncoderButton &eb);
 void onEncoderUpdateDesign(EncoderButton &eb);
 void onClickMakePath(EncoderButton &eb);
 
+// Path execution handlers
+void onClickExecutePath(EncoderButton &eb);
+
 // Mode switching functions
 void encoderSetThickness();
 void encoderDesignType();

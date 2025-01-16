@@ -28,6 +28,7 @@ extern bool path_started;
 extern bool valid_sensors;
 extern float motorPosX;
 extern DesignType designType;
+extern bool plungeReady;
 
 // Path data
 extern Path paths[MAX_PATHS];
@@ -45,8 +46,7 @@ extern int totalFiles;
 extern String fileList[MAX_FILES];
 
 // Position tracking
-extern float estPos[2];
-extern float estYaw;
+extern RouterPose pose;
 extern float measVel[2][4];
 
 // Calibration data

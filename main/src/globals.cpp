@@ -18,6 +18,7 @@ bool cutting = false;
 bool path_started = false;
 bool valid_sensors = true;
 DesignType designType = PRESET;
+bool plungeReady = false;
 
 // Path data
 Path paths[MAX_PATHS];
@@ -35,8 +36,7 @@ int totalFiles = 0;
 String fileList[MAX_FILES];
 
 // Position tracking
-float estPos[2] = {0.0f, 0.0f};
-float estYaw = 0.0f;
+RouterPose pose = {0.0f};
 float measVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
 						{0.0f,0.0f,0.0f,0.0f}};
 

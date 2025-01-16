@@ -38,18 +38,18 @@ float mapF(long x, float in_min, float in_max, float out_min, float out_max) {
 	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-float signedDist(float xr, float yr, float xg, float yg, float th) {
+float signedDist(RouterPose rPose, Point g) {
 	// Calculate the signed distance between goal point and line of gantry
 	// Note: if the distance is:
 	//    < 0 - the point is in front of the gantry (it is yet to be passed)
 	//    > 0 - the point is behind the gantry (it has been passed)
-	float m = tan(th);
-	float b = yr - m * xr;
+	float m = tan(rPose.yaw);
+	float b = rPose.y - m * rPose.x;
 	float A = m;
 	float B = -1;
 	float C = b;
 
-	return (A * xg + B * yg + C) / sqrt(pow(A, 2) + pow(B, 2));
+	return (A * g.x + B * g.y + C) / sqrt(pow(A, 2) + pow(B, 2));
 }
 
 float angleFrom(Point a, Point b) {
@@ -61,26 +61,25 @@ float angleFrom(Point a, Point b) {
 	// original orientation, which would actually be 90 degrees from +x. However,
 	// we actually care about the angle of the gantry, which will be 0 degrees from +x
 	// when the yaw is 0, so this works ok.
-	extern float estYaw;  // Declared in globals.h
-	float th2 = principalAngleRad(estYaw);
+	float th2 = principalAngleRad(pose.yaw);
 
 	return abs(th1 - th2);
 }
 
-float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4) {
+float desPosIntersect(RouterPose rPose, Point point3, Point point4) {
 	// Returns the desired stepperX position such that the cutting tool intersects 
-	// the infinite line from (x3,y3) to (x4,y4).
+	// the infinite line from point3 to point4.
 	// If the gantry does not intersect the line, this returns NAN.
-	// (xc,yc) is the current position of the router, and th is the yaw.
+	// rPose is the current pose of the router.
 	
 	// Calculate gantry endpoints
-	float x1 = xc - (cosf(th) * gantryLength / 2);
-	float y1 = yc - (sinf(th) * gantryLength / 2);
-	float x2 = xc + (cosf(th) * gantryLength / 2);
-	float y2 = yc + (sinf(th) * gantryLength / 2);
+	float x1 = rPose.x - (cosf(rPose.yaw) * gantryLength / 2);
+	float y1 = rPose.y - (sinf(rPose.yaw) * gantryLength / 2);
+	float x2 = rPose.x + (cosf(rPose.yaw) * gantryLength / 2);
+	float y2 = rPose.y + (sinf(rPose.yaw) * gantryLength / 2);
 	
 	// Calculate intersection using line-line intersection formula
-	float den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+	float den = (x1 - x2) * (point3.y - point4.y) - (y1 - y2) * (point3.x - point4.x);
 
 	// Check for parallel lines (denominator is zero)
 	if (den == 0) {
@@ -88,7 +87,7 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
 		return NAN;
 	}
 
-	float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+	float t = ((x1 - point3.x) * (point3.y - point4.y) - (y1 - point3.y) * (point3.x - point4.x)) / den;
 	
 	// Check if the intersection point is on the gantry
 	if (t < 0 || t > 1) {
@@ -101,42 +100,42 @@ float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4
 	float y = y1 + t * (y2 - y1);
 
 	// Convert to gantry coordinates
-	float dx = x - xc;
-	float dy = y - yc;
+	float dx = x - rPose.x;
+	float dy = y - rPose.y;
 
-	return dx * cosf(th) + dy * sinf(th);
+	return dx * cosf(rPose.yaw) + dy * sinf(rPose.yaw);
 }
 
-float desPosClosestToIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4) {
+float desPosClosestToIntersect(RouterPose rPose, Point point3, Point point4) {
 	// Returns the desired stepperX position such that the cutting tool intersects 
-	// the infinite line from (x3,y3) to (x4,y4).
+	// the infinite line from point3 to point4.
 	// If the gantry does not intersect the line, this returns the position
 	// that gets the tool closest to intersecting the line.
 	
 	// Calculate gantry endpoints
-	float x1 = xc - (cosf(th) * gantryLength / 2);
-	float y1 = yc - (sinf(th) * gantryLength / 2);
-	float x2 = xc + (cosf(th) * gantryLength / 2);
-	float y2 = yc + (sinf(th) * gantryLength / 2);
+	float x1 = rPose.x - (cosf(rPose.yaw) * gantryLength / 2);
+	float y1 = rPose.y - (sinf(rPose.yaw) * gantryLength / 2);
+	float x2 = rPose.x + (cosf(rPose.yaw) * gantryLength / 2);
+	float y2 = rPose.y + (sinf(rPose.yaw) * gantryLength / 2);
 	
-	float den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+	float den = (x1 - x2) * (point3.y - point4.y) - (y1 - y2) * (point3.x - point4.x);
 
 	// Check for parallel lines (denominator is zero)
 	if (den == 0) {
 		return stepperX.currentPosition() * 1.0f / Conv;
 	}
 
-	float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+	float t = ((x1 - point3.x) * (point3.y - point4.y) - (y1 - point3.y) * (point3.x - point4.x)) / den;
 	
 	// Calculate intersection point
 	float x = x1 + t * (x2 - x1);
 	float y = y1 + t * (y2 - y1);
 
 	// Convert to gantry coordinates
-	float dx = x - xc;
-	float dy = y - yc;
+	float dx = x - rPose.x;
+	float dy = y - rPose.y;
 
-	float desiredPos = dx * cosf(th) + dy * sinf(th);
+	float desiredPos = dx * cosf(rPose.yaw) + dy * sinf(rPose.yaw);
 	float maxPos = (gantryLength / 2.0) - xBuffer;
 
 	return clamp(desiredPos, -maxPos, maxPos);

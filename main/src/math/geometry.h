@@ -11,12 +11,12 @@ float principalAngleRad(float x);
 float mapF(long x, float in_min, float in_max, float out_min, float out_max);
 
 // Path and angle calculations
-float signedDist(float xr, float yr, float xg, float yg, float th);
+float signedDist(RouterPose rPose, Point g);
 float angleFrom(Point a, Point b);
 
 // Gantry intersection calculations
-float desPosIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4);
-float desPosClosestToIntersect(float xc, float yc, float th, float x3, float y3, float x4, float y4);
+float desPosIntersect(RouterPose rPose, Point point3, Point point4);
+float desPosClosestToIntersect(RouterPose rPose, Point point3, Point point4);
 float desiredPosition(float dX, float dY, float theta);
 
 #endif

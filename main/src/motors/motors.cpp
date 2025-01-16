@@ -145,7 +145,6 @@ void workspaceZeroXY() {
 		stepperZ.run();
 	}
 
-	estPos[0] = 0;
-	estPos[1] = 0;
-	estYaw = 0;
+	// Reset router pose
+	pose = {0.0f};
 }
