@@ -47,10 +47,10 @@ typedef struct Point {
 // Path
 typedef struct Path {
 	// TODO: add other properties such as angle, numPoints, etc. (more info in notebook)
-	Point points[MAX_POINTS];
+	Point points[MAX_POINTS] = {0.0f};
 	int direction = 1;
 	Feature feature = NORMAL;
-	int numPoints;
+	int numPoints = 0;
 } Path;
 
 #endif

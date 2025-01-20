@@ -22,6 +22,7 @@ void lineGenerator() {
 
 	num_paths = 1;
 	paths[0].numPoints = MAX_POINTS;
+	paths[0].feature = NORMAL;
 }
 
 void sinGenerator() {
@@ -38,6 +39,7 @@ void sinGenerator() {
 
 	num_paths = 1;
 	paths[0].numPoints = MAX_POINTS;
+	paths[0].feature = NORMAL;
 }
 
 void zigZagGenerator() {
@@ -59,6 +61,7 @@ void zigZagGenerator() {
 	
 	num_paths = 1;
 	paths[0].numPoints = MAX_POINTS;
+	paths[0].feature = NORMAL;
 }
 
 void doubleLineGenerator() {
@@ -85,6 +88,7 @@ void doubleLineGenerator() {
 	num_paths = 2;
 	for (int i = 0; i < num_paths; i++){
 		paths[i].numPoints = MAX_POINTS;
+		paths[i].feature = NORMAL;
 	}
 }
 
@@ -134,6 +138,7 @@ void circleGenerator() {
 	num_paths = 4;
 	for (int i = 0; i < num_paths; i++){
 		paths[i].numPoints = MAX_POINTS;
+		paths[i].feature = NORMAL;
 	}
 }
 
@@ -162,6 +167,7 @@ void diamondGenerator() {
 	num_paths = 2;
 	for (int i = 0; i < num_paths; i++){
 		paths[i].numPoints = MAX_POINTS;
+		paths[i].feature = NORMAL;
 	}
 }
 
@@ -209,6 +215,7 @@ void squareGeneratorSine() {
 	num_paths = 3;
 	for (int i = 0; i < num_paths; i++){
 		paths[i].numPoints = MAX_POINTS;
+		paths[i].feature = NORMAL;
 	}
 }
 
@@ -312,6 +319,7 @@ void squareGeneratorMake() {
 	num_paths = 7;
 	for (int i = 0; i < num_paths; i++){
 		paths[i].numPoints = MAX_POINTS;
+		paths[i].feature = NORMAL;
 	}
 }
 

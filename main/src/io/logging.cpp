@@ -71,10 +71,24 @@ void handleFileSelection() {
 	}
 }
 
-bool validGCode(const char* gLine) {
-	int numCommands = 6;
-	const char* validCommands[numCommands] = {"G0", "G1", "G98", "X", "Y", "Z"};
-	int commandSizes[numCommands] = {2,2,3,1,1,1};
+bool validCommand(const char* gLine) {
+	int numCommands = 3;
+	const char* validCommands[numCommands] = {"G0", "G1", "G98"};
+	int commandSizes[numCommands] = {2,2,3};
+
+	for (int i = 0; i < numCommands; i++) {
+		if (strncmp(gLine, validCommands[i], commandSizes[i]) == 0) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool validCoordinate(const char* gLine) {
+	int numCommands = 3;
+	const char* validCommands[numCommands] = {"X", "Y", "Z"};
+	int commandSizes[numCommands] = {1,1,1};
 
 	for (int i = 0; i < numCommands; i++) {
 		if (strncmp(gLine, validCommands[i], commandSizes[i]) == 0) {
@@ -91,6 +105,20 @@ void parseGCodeFile(const String& sFilename) {
 	FsFile file;
 	if (!file.open(filename, O_READ)) {
 		return;
+	}
+	Serial.print("Filename: ");
+	Serial.println(filename);
+
+	// Reset paths
+	for (int i = 0; i < MAX_PATHS; i++) {
+		paths[i].direction = 1;
+		paths[i].feature = NORMAL;
+		paths[i].numPoints = 0;
+		
+		// Reset all points in the path
+		for (int j = 0; j < MAX_POINTS; j++) {
+			paths[i].points[j] = {0.0f};
+		}
 	}
 
 	int currentPathIndex = -1;
@@ -109,10 +137,6 @@ void parseGCodeFile(const String& sFilename) {
 				activeFeature = true;
 				currentPathIndex++;
 				currentPath = &paths[currentPathIndex];
-				currentPath->direction = 1;  // Default values
-				currentPath->feature = NORMAL;
-				// currentPath->angle = 0.0f;			// TODO!
-				currentPath->numPoints = 0;
 				lastPoint = {0};
 				minZ = 0.0f;
 				
@@ -125,16 +149,20 @@ void parseGCodeFile(const String& sFilename) {
 					ptr++;
 				}
 				num_paths++;
-				Serial.println("New Path!");
+				Serial.printf("New Path%i! D(%i) F(%i)\n", currentPathIndex, currentPath->direction, currentPath->feature);
 			}
 			continue;
 		}
 
 		// Skip all the nonsense
-		// if (!activeFeature) continue;
+		if (validCommand(line)) {
+			activeFeature = true;
+		} else if (!validCoordinate(line)){
+			activeFeature = false;
+		}
 
 		// Look for G moves
-		if (validGCode(line)) {
+		if (activeFeature) {
 			Point newPoint = lastPoint;
 			char* ptr = line;
 			
@@ -152,7 +180,7 @@ void parseGCodeFile(const String& sFilename) {
 					newPoint.z = atof(ptr + 1);
 					hasNewCoordinate = true;
 					if (newPoint.z < minZ) {
-						minZ = newPoint.z;
+						minZ = newPoint.z;			// TODO: maybe not necessary
 					}
 				}
 				// TODO: For holes - parse feedrate (F) and retract height (R)
