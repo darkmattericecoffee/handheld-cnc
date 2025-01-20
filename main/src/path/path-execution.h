@@ -7,7 +7,7 @@
 bool performSafetyChecks();
 
 // Path advancement and execution functions
-void advance(Point goal, Point next, bool autoAdvance=false);
+bool advance(Point goal, Point next, bool autoAdvance);
 void handleCutting();
 
 #endif

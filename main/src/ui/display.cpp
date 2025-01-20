@@ -1,6 +1,7 @@
 #include "display.h"
 #include "../config.h"
 #include "../globals.h"
+#include "../math/geometry.h"
 #include <Arduino.h>
 
 static int16_t lastX0, lastY0, lastX1, lastY1, lastX2, lastY2, lastX3, lastY3;
@@ -330,14 +331,23 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 
 	// float xMap = mapF(desPosition, -gantryLength/2, gantryLength/2, -radiusBounds, radiusBounds);
 	// float yMap = mapF();
-	float dx = (next.x-pose.x)*cosf(-pose.yaw) - (next.y-pose.y)*sinf(-pose.yaw);
-	float dy = (next.x-pose.x)*sinf(-pose.yaw) + (next.y-pose.y)*cosf(-pose.yaw);
+	float dx = 0.0f;
+	float dy = 0.0f;
+	if (paths[current_path_idx].feature != HOLE) {
+		dx = (next.x-pose.x)*cosf(-pose.yaw) - (next.y-pose.y)*sinf(-pose.yaw);
+		dy = (next.x-pose.x)*sinf(-pose.yaw) + (next.y-pose.y)*cosf(-pose.yaw);
+	} else {
+		dx = (goal.x-pose.x)*cosf(-pose.yaw) - (goal.y-pose.y)*sinf(-pose.yaw);
+		dy = (goal.x-pose.x)*sinf(-pose.yaw) + (goal.y-pose.y)*cosf(-pose.yaw);
+	}
+
 	float dySkewed = 5*exponentialSkew(dy);
 	// float theta = pose.yaw - atan2f(dySkewed, next.x-pose.x);
 	float theta = atan2f(dySkewed, dx);
 	// float thetaTool = pose.yaw - atan2f(next.y-(pose.y+motorPosX*sinf(pose.yaw)), next.x-(pose.x+motorPosX*cosf(pose.yaw)));
 	// float dist = myDist(pose.x, pose.y, next.x, pose.y + dySkewed);
 	float dist = sqrt(pow(dx,2)+pow(dySkewed,2));
+	float holeDistance = abs(signedDist(pose, goal));
 
 	// Serial.printf("yaw: %f\n", degrees(pose.yaw));
 
@@ -395,7 +405,17 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 			// lastTargetCircleY = centerY + ((offsetRadius)*sinf(theta) + toolY)/2;
 			// lastTargetCircleX = centerX + xMap;
 			// lastTargetCircleY = centerY + radiusInner*sqrt((1-pow(xMap/radiusBounds,2)));
-			screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, WHITE);
+			if (paths[current_path_idx].feature != HOLE){
+				screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, WHITE);
+			} else {
+				if (holeDistance <= holeTolerance) {
+					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GREEN);
+				} else if (holeDistance <= holeTolerance*10) {
+					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, YELLOW);
+				} else {
+					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, RED);
+				}
+			}
 			break;
 	}
 }

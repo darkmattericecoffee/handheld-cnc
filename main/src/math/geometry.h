@@ -17,6 +17,6 @@ float angleFrom(Point a, Point b);
 // Gantry intersection calculations
 float desPosIntersect(RouterPose rPose, Point point3, Point point4);
 float desPosClosestToIntersect(RouterPose rPose, Point point3, Point point4);
-float desiredPosition(float dX, float dY, float theta);
+float desPosSimple(RouterPose rPose, Point goal);
 
 #endif

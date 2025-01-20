@@ -32,36 +32,44 @@ bool performSafetyChecks() {
 	return true;
 }
 
-void advance(Point goal, Point next, bool autoAdvance=false) {
-	if (paths[current_path_idx].feature == NORMAL) {
-		// Move through point indeces as needed
-		if (paths[current_path_idx].direction * signedDist(pose,next) > 0 || autoAdvance) {
-			// If next point is behind router, it becomes the new goal.
-			current_point_idx++;
-			// if (autoAdvance) Serial.println("Auto-advanced!");
+bool advance(Point goal, Point next, bool autoAdvance=false) {
+	// Move through point indeces as needed
+	if (paths[current_path_idx].direction * signedDist(pose,next) > 0 || autoAdvance) {
+		// If next point is behind router, it becomes the new goal.
+		current_point_idx++;
+		// if (autoAdvance) Serial.println("Auto-advanced!");
 
-			// If we're at the end of the points, stop cutting so we can start the next path
-			if (current_point_idx == paths[current_path_idx].numPoints-1) {
-				Serial.println("Current path finished");
-				stepperZ.moveTo(Conv*restHeight);
-				path_started = false;
-				current_point_idx = 0;
-				current_path_idx++;
+		bool lastPoint = false;
+		if (paths[current_path_idx].feature == NORMAL) {
+			// normal paths can't go to the last point because they always look forward a point
+			// TODO: fix this ^
+			lastPoint = current_point_idx == paths[current_path_idx].numPoints-1;
+		} else {
+			// holes don't look forward a point
+			lastPoint = current_point_idx == paths[current_path_idx].numPoints;
+		}
 
-				// If we're done all paths then go back to design mode.
-				if (current_path_idx == num_paths) {
-					// Make sure tool is raised after path is finished
-					while (stepperZ.distanceToGo() != 0) {
-						stepperZ.run();
-					}
-					Serial.println("All paths finished");
-					encoderDesignType();
+		// If we're at the end of the points, stop cutting so we can start the next path
+		if (lastPoint) {
+			Serial.println("Current path finished");
+			stepperZ.moveTo(Conv*restHeight);
+			path_started = false;
+			current_point_idx = 0;
+			current_path_idx++;
+
+			// If we're done all paths then go back to design mode.
+			if (current_path_idx == num_paths) {
+				// Make sure tool is raised after path is finished
+				while (stepperZ.distanceToGo() != 0) {
+					stepperZ.run();
 				}
+				Serial.println("All paths finished");
+				encoderDesignType();
 			}
 		}
+		return true;
 	} else {
-		// HOLES!!!
-		
+		return false;
 	}
 }
 
@@ -79,19 +87,22 @@ void handleCutting() {
 	// If we have not started the path, and the first point is behind us
 	// keep the tool raised and return. We wait here until the first point
 	// is in front of us and ready to be cut
-	if (!path_started && paths[current_path_idx].direction * signedDist(pose, goal) > 0) {
+	bool goal_behind = paths[current_path_idx].direction * signedDist(pose, goal) > 0;
+	if (!path_started && goal_behind) {
 		// Move tool closest to intersect with cutting path
 		float desPos = desPosClosestToIntersect(pose, goal, next);
-		
-		if (outputOn) {
-			outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
-		}
-		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
 		
 		stepperX.moveTo(Conv*desPos);
 
 		// Update UI
 		updateUI(desPos, goal, next);
+
+		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
+		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
+		// Serial.printf("path_started:%i, goal_behind:%i\n", path_started, goal_behind);	// WARNING: this spams serial
+		if (debuggingOn) {
+			debugging(goal, next);
+		}
 		return;
 	}
 
@@ -104,6 +115,7 @@ void handleCutting() {
 	float desZ = (matThickness == 0 && designType == FROM_FILE) ? (goal.z - minZ) : goal.z;			// if matThickness is set to 0 (drawing), then don't pierce!
 	// Desired position if we do not intersect
 	float desPosClosest = desPosClosestToIntersect(pose, goal, next);
+	float desPosHole = desPosSimple(pose, goal);
 
 	// Conditions for cutting
 	bool handle_buttons_pressed = (digitalRead(BUTT_HANDLE_L) == LOW) && (digitalRead(BUTT_HANDLE_R) == LOW);
@@ -113,10 +125,10 @@ void handleCutting() {
 	// bool handle_buttons_ok = (digitalRead(BUTT_HANDLE_L) == LOW && digitalRead(BUTT_HANDLE_R) == LOW) || 
 	// 					   ((millis() - timeLastDebounce) < debounceDelay);
 	// if (handle_buttons_ok) timeLastDebounce = millis();
-
 	bool gantry_intersects = !isnan(desPos);
 	bool goal_behind_router = paths[current_path_idx].direction * signedDist(pose, goal) > 0;
 	bool gantry_angle_ok = angleFrom(goal, next) > (PI / 6);
+	bool within_hole_tol = abs(signedDist(pose, goal)) < holeTolerance;
 
 	// TODO: delete me
 	bool newChecks[4] = {handle_buttons_ok, gantry_intersects, goal_behind_router, gantry_angle_ok};
@@ -133,29 +145,37 @@ void handleCutting() {
 		prevChecks[i] = newChecks[i];
 	}
 
-	if (handle_buttons_ok && gantry_intersects && goal_behind_router && gantry_angle_ok && valid_sensors) {
-		// Path logging
-		if (outputOn) {
-			outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
-		}
-		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
-
+	if (handle_buttons_ok && gantry_intersects && goal_behind_router && gantry_angle_ok && valid_sensors && paths[current_path_idx].feature == NORMAL) {
 		// We are good to cut
 		stepperZ.moveTo(Conv*desZ);
 		stepperX.moveTo(Conv*desPos);
 
+		// Path logging
+		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
+		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
+
 		// Evaluate whether to move on to next point
 		advance(goal, next);
 	} else {
-		// Path logging
-		if (outputOn) {
-			outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
+		if (paths[current_path_idx].feature != HOLE) {
+			// Stop cutting
+			stepperZ.moveTo(Conv*restHeight);
+			stepperX.moveTo(Conv*desPosClosest);
+		} else {
+			// Handle hole
+			stepperZ.moveTo(Conv*restHeight);
+			stepperX.moveTo(Conv*desPosHole);
+			if (plungeReady && within_hole_tol) {
+				plungeZ(desZ, holeFeedrate);
+				advance(goal,next,true);
+			} else {
+				plungeReady = false;
+			}
 		}
+
+		// Path logging
+		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
 		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
-		
-		// Stop cutting
-		stepperZ.moveTo(Conv*restHeight);
-		stepperX.moveTo(Conv*desPosClosest);
 	}
 
 	// Update UI

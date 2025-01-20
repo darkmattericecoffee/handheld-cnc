@@ -148,3 +148,19 @@ void workspaceZeroXY() {
 	// Reset router pose
 	pose = {0.0f};
 }
+
+void plungeZ(float depth, float feedrate) {
+	stepperZ.setMaxSpeed(feedrate);
+	stepperZ.moveTo(Conv*depth);
+	while (stepperZ.distanceToGo() != 0) {
+		stepperZ.run();
+	}
+
+	stepperZ.moveTo(Conv*restHeight);
+	while (stepperZ.distanceToGo() != 0) {
+		stepperZ.run();
+	}
+
+	// Reset stepperZ speed
+	stepperZ.setMaxSpeed(maxSpeedZ);
+}

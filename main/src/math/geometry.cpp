@@ -141,9 +141,14 @@ float desPosClosestToIntersect(RouterPose rPose, Point point3, Point point4) {
 	return clamp(desiredPos, -maxPos, maxPos);
 }
 
-float desiredPosition(float dX, float dY, float theta) {
-	// Calculate the desired position for the tool using Sanzhar equation
-	return (dX + tanf(theta) * dY) * cosf(theta);
+float desPosSimple(RouterPose rPose, Point goal) {
+	float dX = goal.x - rPose.x;
+	float dY = goal.y - rPose.y;
+	// Calculate the desired position for the tool perpenidcular 
+	float desiredPos = (dX + tanf(rPose.yaw) * dY) * cosf(rPose.yaw);
 	// This can also be written as:
-	// return dX * cosf(theta) + dY * sinf(theta);
+	// return dX * cosf(rPose.yaw) + dY * sinf(rPose.yaw);
+	float maxPos = (gantryLength / 2.0) - xBuffer;
+
+	return clamp(desiredPos, -maxPos, maxPos);
 }

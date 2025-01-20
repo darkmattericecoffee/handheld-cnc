@@ -70,6 +70,7 @@ void onClickMakePath(EncoderButton &eb) {
 
 void onClickExecutePath(EncoderButton &eb) {
 	if (paths[current_path_idx].feature == HOLE) {
+		Serial.println("Plunge ready!");
 		plungeReady = true;
 	}
 }
@@ -164,7 +165,7 @@ void encoderDesignSelect() {
 
 	state = READY;
 	encoder.setEncoderHandler(nullHandler);
-	encoder.setClickHandler(nullHandler);
+	encoder.setClickHandler(onClickExecutePath);
 
 	screen->fillScreen(BLACK);
 	drawFixedUI();
