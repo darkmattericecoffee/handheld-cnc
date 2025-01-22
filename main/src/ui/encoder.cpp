@@ -11,8 +11,9 @@ void nullHandler(EncoderButton &eb) {
 	return;
 }
 
+// CLICK HANDLERS ----------------------------------------
 void onClickGoToDesignMode(EncoderButton &eb) {
-	encoderDesignMode();
+	encoderDesignType();
 }
 
 void onClickGoToSetThickness(EncoderButton &eb) {
@@ -46,6 +47,35 @@ void onClickZeroWorkspaceXY(EncoderButton &eb) {
 	state = WORKSPACE_XY_ZERO;
 }
 
+void onClickSetThickness(EncoderButton &eb) {
+	state = THICKNESS_SET;
+}
+
+void onClickSetType(EncoderButton &eb) {
+	state = TYPE_SELECTED;
+}
+
+void onClickMakePath(EncoderButton &eb) {
+	if (designType == PRESET) {
+		makePresetPath();
+		state = DESIGN_SELECTED;
+	} else {
+		handleFileSelection();
+		if (state != DESIGN_SELECTED) {
+			updateFileList();
+			listFiles();
+		}
+	}
+}
+
+void onClickExecutePath(EncoderButton &eb) {
+	if (paths[current_path_idx].feature == HOLE) {
+		Serial.println("Plunge ready!");
+		plungeReady = true;
+	}
+}
+
+// ENCODER HANDLERS ----------------------------------------
 void onEncoderUpdateThickness(EncoderButton &eb) {
 	float incrScalar = 0.1;
 	float tempThickness = matThickness + eb.increment()*incrScalar;
@@ -59,20 +89,23 @@ void onEncoderUpdateThickness(EncoderButton &eb) {
 	drawCenteredText(text2send, 1);
 }
 
-void onClickSetThickness(EncoderButton &eb) {
-	state = THICKNESS_SET;
+void onEncoderSwitchType(EncoderButton &eb) {
+	designType = (DesignType)((2 + designType + eb.increment()) % 2);
+	drawTypeMenu();
 }
 
-void onEncoderUpdateDesignMode(EncoderButton &eb) {
-	designMode = (NUM_DESIGNS + designMode + eb.increment()) % NUM_DESIGNS;
-	drawShape();
+void onEncoderUpdateDesign(EncoderButton &eb) {
+	if (designType == PRESET) {
+		designPreset = (NUM_DESIGNS + designPreset + eb.increment()) % NUM_DESIGNS;
+		drawShape();
+	} else {
+		current_file_idx = (totalFiles + current_file_idx + eb.increment()) % totalFiles;
+		listFiles();
+	}
+
 }
 
-void onClickMakePath(EncoderButton &eb) {
-	makePath();
-	state = DESIGN_SELECTED;
-}
-
+// FUNCTIONS ------------------------------------------------
 void encoderSetThickness() {
 	char text2send[50];
 	sprintf(text2send, "Turn to set thickness\n%.2f mm", matThickness);
@@ -85,19 +118,41 @@ void encoderSetThickness() {
 		encoder.update();
 	}
 
-	encoderDesignMode();
+	encoderDesignType();
 }
 
-void encoderDesignMode() {
-	drawShape();
+void encoderDesignType() {
+	char text2send[50];
+	sprintf(text2send, "Select design type:");			// TODO: make this better
+	drawCenteredText(text2send, 1);
+
+	encoder.setEncoderHandler(onEncoderSwitchType);
+	encoder.setClickHandler(onClickSetType);
+
+	while (state != TYPE_SELECTED) {
+		encoder.update();
+	}
+		
+	encoderDesignSelect();
+}
+
+void encoderDesignSelect() {
+	if (designType == PRESET) {
+		drawShape();
+	} else {
+		updateFileList();
+		listFiles();
+	}
+	
 	closeSDFile();
 
 	state = SELECTING_DESIGN;
-	encoder.setEncoderHandler(onEncoderUpdateDesignMode);
+	encoder.setEncoderHandler(onEncoderUpdateDesign);
 	encoder.setClickHandler(onClickMakePath);
 
 	while (state != DESIGN_SELECTED) {
 		encoder.update();
+		if (designType == FROM_FILE) listFiles();
 	}
 
 	// Hack for opensauce, auto-zero XY
@@ -110,7 +165,7 @@ void encoderDesignMode() {
 
 	state = READY;
 	encoder.setEncoderHandler(nullHandler);
-	encoder.setClickHandler(nullHandler);
+	encoder.setClickHandler(onClickExecutePath);
 
 	screen->fillScreen(BLACK);
 	drawFixedUI();
@@ -138,7 +193,7 @@ void encoderZeroWorkspaceXY() {
 
 	state = READY;
 	encoder.setEncoderHandler(nullHandler);
-	encoder.setClickHandler(nullHandler);
+	encoder.setClickHandler(onClickExecutePath);
 
 	screen->fillScreen(BLACK);
 	drawFixedUI();

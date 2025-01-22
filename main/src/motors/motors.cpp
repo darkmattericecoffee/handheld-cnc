@@ -16,13 +16,13 @@ void motorSetup() {
 
 	// Set motor properties
 	stepperX.setMinPulseWidth(stepPulseWidth);
-	stepperX.setMaxSpeed(speed_x0);
-	stepperX.setAcceleration(maxAccel);
+	stepperX.setMaxSpeed(zeroSpeed_0);
+	stepperX.setAcceleration(zeroAccel);
 	stepperX.setCurrentPosition(0);
 	
 	stepperZ.setMinPulseWidth(stepPulseWidth);
-	stepperZ.setMaxSpeed(speed_x0);
-	stepperZ.setAcceleration(maxAccel);
+	stepperZ.setMaxSpeed(zeroSpeed_0);
+	stepperZ.setAcceleration(zeroAccel);
 	stepperZ.setCurrentPosition(0);
 }
 
@@ -53,7 +53,7 @@ void driverSetup() {
 	
 	driverZ.pwm_autoscale(true);
 	driverZ.en_spreadCycle(false);
-	driverX.TPWMTHRS(0x753);
+	driverZ.TPWMTHRS(0x753);
 }
 
 void enableStepperZ() {
@@ -75,7 +75,7 @@ void stopStepperZ() {
 }
 
 void machineZeroX() {
-	stepperX.setSpeed(speed_x0);
+	stepperX.setSpeed(zeroSpeed_0);
 	while (digitalRead(LIMIT_MACH_X0) == HIGH) {
 		stepperX.runSpeed();
 	}
@@ -85,13 +85,13 @@ void machineZeroX() {
 		stepperX.run();
 	}
 
-	stepperX.setSpeed(speed_x1);
+	stepperX.setSpeed(zeroSpeed_1);
 	while (digitalRead(LIMIT_MACH_X0) == HIGH) {
 		stepperX.runSpeed();
 	}
 
 	stepperX.setMaxSpeed(maxSpeedX/2);
-	stepperX.setAcceleration(maxAccel/2);
+	stepperX.setAcceleration(maxAccelX/2);
 
 	stepperX.move(-Conv*((gantryLength/2) - xLimitOffset));
 	while (stepperX.distanceToGo() != 0) {
@@ -99,7 +99,7 @@ void machineZeroX() {
 	}
 
 	stepperX.setMaxSpeed(maxSpeedX);
-	stepperX.setAcceleration(maxAccel);
+	stepperX.setAcceleration(maxAccelX);
 	stepperX.setCurrentPosition(0);
 }
 
@@ -107,7 +107,7 @@ void workspaceZeroZ() {
 	enableStepperZ();
 	stepperZ.setCurrentPosition(0);
 
-	stepperZ.setSpeed(speed_x0);
+	stepperZ.setSpeed(zeroSpeed_0);
 	while (digitalRead(LIMIT_MACH_Z0) == HIGH) {
 		stepperZ.runSpeed();
 	}
@@ -117,7 +117,7 @@ void workspaceZeroZ() {
 		stepperZ.run();
 	}
 
-	stepperZ.setSpeed(speed_x1);
+	stepperZ.setSpeed(zeroSpeed_1);
 	while (digitalRead(LIMIT_MACH_Z0) == HIGH) {
 		stepperZ.runSpeed();
 	}
@@ -131,6 +131,7 @@ void workspaceZeroZ() {
 	}
 
 	stepperZ.setMaxSpeed(maxSpeedZ);
+	stepperZ.setAcceleration(maxAccelZ);
 }
 
 void workspaceZeroXY() {
@@ -144,7 +145,22 @@ void workspaceZeroXY() {
 		stepperZ.run();
 	}
 
-	estPos[0] = 0;
-	estPos[1] = 0;
-	estYaw = 0;
+	// Reset router pose
+	pose = {0.0f};
+}
+
+void plungeZ(float depth, float feedrate) {
+	stepperZ.setMaxSpeed(feedrate);
+	stepperZ.moveTo(Conv*depth);
+	while (stepperZ.distanceToGo() != 0) {
+		stepperZ.run();
+	}
+
+	stepperZ.moveTo(Conv*restHeight);
+	while (stepperZ.distanceToGo() != 0) {
+		stepperZ.run();
+	}
+
+	// Reset stepperZ speed
+	stepperZ.setMaxSpeed(maxSpeedZ);
 }

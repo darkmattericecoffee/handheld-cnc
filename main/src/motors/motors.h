@@ -10,5 +10,6 @@ void stopStepperZ();
 void machineZeroX();
 void workspaceZeroZ();
 void workspaceZeroXY();
+void plungeZ(float depth, float feedrate);
 
 #endif

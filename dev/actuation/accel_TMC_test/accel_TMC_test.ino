@@ -19,8 +19,8 @@ int uSteps = 2;                       // microstep configuration
 int Conv = 25*uSteps;                 // conversion factor (mm -> steps)
 float stepPulseWidth = 20.0;          // min pulse width (from Mark Rober's code)
 float maxCurrent_RMS = 640.0;         // motor RMS current rating (mOhm)
-//float maxAccel = 800.0 * Conv;        // max acceleration (step/s^2)
-float maxAccel = 40000.0;             // max acceleration (step/s^2)
+//float maxAccelX = 800.0 * Conv;        // max acceleration (step/s^2)
+float maxAccelX = 40000.0;             // max acceleration (step/s^2)
 #define motorInterfaceType 1
 
 bool useDriver = 1;
@@ -70,7 +70,7 @@ void setup() {
 
   stepperX.setMinPulseWidth(stepPulseWidth);
   stepperX.setMaxSpeed(12500);
-  stepperX.setAcceleration(maxAccel);
+  stepperX.setAcceleration(maxAccelX);
   stepperX.setCurrentPosition(0);
   // stepper.setCurrentPositionInSteps(0);                   // Set zero position
   // stepper.setSpeedInStepsPerSecond(400);              //Set Speed

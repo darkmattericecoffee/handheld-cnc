@@ -1,10 +1,17 @@
 #include "display.h"
 #include "../config.h"
 #include "../globals.h"
+#include "../math/geometry.h"
 #include <Arduino.h>
 
 static int16_t lastX0, lastY0, lastX1, lastY1, lastX2, lastY2, lastX3, lastY3;
 static int16_t lastTargetCircleX, lastTargetCircleY;
+
+unsigned long lastScrollTime = 0;
+int scrollPosition = 0;
+const int SCROLL_DELAY = 500;    // Time before scrolling starts (ms)
+const int SCROLL_SPEED = 150;    // Time between each scroll step (ms)
+const int CHARS_TO_DISPLAY = 12; // Max characters that fit on screen with text size 2
 
 float exponentialSkew(float x) {
 	if (x > 0) {
@@ -13,6 +20,41 @@ float exponentialSkew(float x) {
 		return -(x + (1/exp(x)));
 	}
 	return 0.0f;
+}
+
+void drawTypeMenu() {
+	const char* options[] = {"Preset", "From File"};
+	const int numOptions = 2;
+
+	screen->fillScreen(BLACK);
+
+	// Set text properties
+	screen->setTextSize(2);
+	screen->setTextColor(WHITE);
+	
+	// Calculate vertical spacing
+	int16_t yStart = screen->height() / 3;
+	int16_t ySpacing = 30;
+	
+	// Draw each option
+	for (int i = 0; i < numOptions; i++) {
+		// Highlight selected option
+		if (i == designType) {
+			screen->setTextColor(YELLOW);
+		} else {
+			screen->setTextColor(WHITE);
+		}
+		
+		// Center text horizontally
+		int16_t x1, y1;
+		uint16_t w, h;
+		screen->getTextBounds(options[i], 0, 0, &x1, &y1, &w, &h);
+		int16_t x = (screen->width() - w) / 2;
+		
+		// Draw option text
+		screen->setCursor(x, yStart + (i * ySpacing));
+		screen->print(options[i]);
+	}
 }
 
 void drawShape() {
@@ -27,7 +69,7 @@ void drawShape() {
 
 	screen->fillScreen(BLACK);
 
-	switch (designMode) {
+	switch (designPreset) {
 		// TODO: draw an accurate representation of the design here
 		case 0:
 			// line
@@ -63,42 +105,157 @@ void drawShape() {
 			break;
 		case 4:
 			// diamond
-			drawCenteredText("0",2);
 			screen->drawLine(centerX-size, centerY, centerX, centerY+size, WHITE);
 			screen->drawLine(centerX, centerY+size, centerX+size, centerY, WHITE);
 			screen->drawLine(centerX+size, centerY, centerX, centerY-size, WHITE);
 			screen->drawLine(centerX, centerY-size, centerX-size, centerY, WHITE);
 			break;
 		case 5:
-			// circle
-			screen->drawCircle(centerX, centerY, size, WHITE);
+			// square w/ squiggly
+			screen->drawLine(centerX-size, centerY, centerX, centerY+size, WHITE);
+			screen->drawLine(centerX, centerY+size, centerX+size, centerY, WHITE);
+			screen->drawLine(centerX+size, centerY, centerX, centerY-size, WHITE);
+			screen->drawLine(centerX, centerY-size, centerX-size, centerY, WHITE);
+			scale = size / PI;
+			for (int y = -size; y <= size; y++) {
+				x = (int16_t) (scale*sin(y/scale));
+				screen->drawPixel(centerX+x, centerY+y, WHITE);
+			}
 			break;
 		case 6:
-			// diamond 1
-			drawCenteredText("1",2);
+			// square with Make
+			drawCenteredText("M:",2);
 			screen->drawLine(centerX-size, centerY, centerX, centerY+size, WHITE);
 			screen->drawLine(centerX, centerY+size, centerX+size, centerY, WHITE);
 			screen->drawLine(centerX+size, centerY, centerX, centerY-size, WHITE);
 			screen->drawLine(centerX, centerY-size, centerX-size, centerY, WHITE);
 			break;
-		case 7:
-			// diamond 2
-			drawCenteredText("2",2);
-			screen->drawLine(centerX-size, centerY, centerX, centerY+size, WHITE);
-			screen->drawLine(centerX, centerY+size, centerX+size, centerY, WHITE);
-			screen->drawLine(centerX+size, centerY, centerX, centerY-size, WHITE);
-			screen->drawLine(centerX, centerY-size, centerX-size, centerY, WHITE);
-			break;
-		case 8:
-			// hexagon
-			screen->drawLine(centerX, centerY+size, centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
-			screen->drawLine(centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
-			screen->drawLine(centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX, centerY-size, WHITE);
-			screen->drawLine(centerX, centerY-size, centerX-size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
-			screen->drawLine(centerX-size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX-size*cos(M_PI/6), centerY+size*sin(M_PI/6), WHITE);
-			screen->drawLine(centerX-size*cos(M_PI/6), centerY+size*sin(M_PI/6), centerX, centerY+size, WHITE);
-			break;
+		// case 8:
+		// 	// hexagon
+		// 	screen->drawLine(centerX, centerY+size, centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
+		// 	screen->drawLine(centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
+		// 	screen->drawLine(centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX, centerY-size, WHITE);
+		// 	screen->drawLine(centerX, centerY-size, centerX-size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
+		// 	screen->drawLine(centerX-size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX-size*cos(M_PI/6), centerY+size*sin(M_PI/6), WHITE);
+		// 	screen->drawLine(centerX-size*cos(M_PI/6), centerY+size*sin(M_PI/6), centerX, centerY+size, WHITE);
+		// 	break;
 	}
+}
+
+void listFiles() {
+	screen->fillScreen(BLACK);
+	screen->setTextSize(2);
+
+	int16_t tftHeight = screen->height();
+
+	// Calculate vertical centering
+    int totalHeight = displayLines * 20;  				// Total height of all lines (7 lines * 20px)
+    int startY = (tftHeight - totalHeight) / 2;  		// Center vertically on screen
+	
+	// Calculate which files to show to keep selection centered
+	int startIndex = max(0, current_file_idx - centerLine);
+	
+	// Adjust start index if we're near the end of the list
+	if (startIndex + displayLines > totalFiles) {
+		startIndex = max(0, totalFiles - displayLines);
+	}
+
+	// Handle scrolling for selected item
+    unsigned long currentTime = millis();
+    if (currentTime - lastScrollTime > SCROLL_SPEED) {
+        lastScrollTime = currentTime;
+        scrollPosition++;
+    }
+	
+	// Draw each visible line
+	for (int i = 0; i < displayLines; i++) {
+		int fileIndex = startIndex + i;
+		if (fileIndex >= totalFiles) break;
+		
+		// Calculate Y position
+		int y = startY + i * 20;  // Assuming 20 pixels per line with text size 2
+		screen->setCursor(0, y);
+
+		String displayText = fileList[fileIndex];
+		
+		// Set color based on selection
+		if (fileIndex == current_file_idx) {
+			screen->setTextColor(YELLOW);
+			screen->print("> ");
+
+			// Handle scrolling for long filename
+            if (displayText.length() > CHARS_TO_DISPLAY) {
+                // Add spaces at the end before repeating
+                displayText = displayText + "    " + displayText;
+                int totalScroll = displayText.length();
+                int currentPos = scrollPosition % totalScroll;
+                displayText = displayText.substring(currentPos, currentPos + CHARS_TO_DISPLAY);
+            }
+		} else {
+			screen->setTextColor(WHITE);
+			screen->print("  ");
+
+			// Truncate non-selected long filenames
+            if (displayText.length() > CHARS_TO_DISPLAY) {
+                displayText = displayText.substring(0, CHARS_TO_DISPLAY - 3) + "...";
+            }
+		}
+		
+		// Print file/folder name
+		screen->println(displayText);
+	}
+
+	// Reset scroll position when selection changes
+    static int lastIndex = -1;
+    if (lastIndex != current_file_idx) {
+        scrollPosition = 0;
+        lastScrollTime = currentTime + SCROLL_DELAY; // Add delay before scrolling starts
+        lastIndex = current_file_idx;
+    }
+}
+
+void updateFileList() {
+	totalFiles = 0;
+	
+	// Clear previous list
+	for (int i = 0; i < MAX_FILES; i++) {
+		fileList[i] = "";
+	}
+	
+	// Add parent directory entry if not in root
+	char currentDirName[256];
+	currentDir.getName(currentDirName, sizeof(currentDirName));
+	if (strcmp(currentDirName, "/") != 0) {
+		fileList[totalFiles++] = "../";
+	}
+	
+	// First pass: add directories
+	currentDir.rewindDirectory();
+	while (FsFile entry = currentDir.openNextFile()) {
+		if (totalFiles >= MAX_FILES) break;
+		
+		if (entry.isDirectory()) {
+			char nameBuf[256];
+			entry.getName(nameBuf, sizeof(nameBuf));
+			fileList[totalFiles++] = String(nameBuf) + "/";
+		}
+		entry.close();
+	}
+	
+	// Second pass: add files
+	currentDir.rewindDirectory();
+	while (FsFile entry = currentDir.openNextFile()) {
+		if (totalFiles >= MAX_FILES) break;
+		
+		if (!entry.isDirectory()) {
+			char nameBuf[256];
+			entry.getName(nameBuf, sizeof(nameBuf));
+			fileList[totalFiles++] = String(nameBuf);
+		}
+		entry.close();
+	}
+	
+	currentDir.rewindDirectory();
 }
 
 void drawCenteredText(const char* text, int size) {
@@ -170,20 +327,29 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 	int16_t centerX = screen->width() / 2;
 	int16_t centerY = screen->width() / 2;
 
-	float dTheta = estYaw + PI/2 - atan2f(next.y-goal.y, next.x-goal.x);
+	float dTheta = pose.yaw + PI/2 - atan2f(next.y-goal.y, next.x-goal.x);
 
 	// float xMap = mapF(desPosition, -gantryLength/2, gantryLength/2, -radiusBounds, radiusBounds);
 	// float yMap = mapF();
-	float dx = (next.x-estPos[0])*cosf(-estYaw) - (next.y-estPos[1])*sinf(-estYaw);
-	float dy = (next.x-estPos[0])*sinf(-estYaw) + (next.y-estPos[1])*cosf(-estYaw);
-	float dySkewed = 5*exponentialSkew(dy);
-	// float theta = estYaw - atan2f(dySkewed, next.x-estPos[0]);
-	float theta = atan2f(dySkewed, dx);
-	// float thetaTool = estYaw - atan2f(next.y-(estPos[1]+motorPosX*sinf(estYaw)), next.x-(estPos[0]+motorPosX*cosf(estYaw)));
-	// float dist = myDist(estPos[0], estPos[1], next.x, estPos[1] + dySkewed);
-	float dist = sqrt(pow(dx,2)+pow(dySkewed,2));
+	float dx = 0.0f;
+	float dy = 0.0f;
+	if (paths[current_path_idx].feature != HOLE) {
+		dx = (next.x-pose.x)*cosf(-pose.yaw) - (next.y-pose.y)*sinf(-pose.yaw);
+		dy = (next.x-pose.x)*sinf(-pose.yaw) + (next.y-pose.y)*cosf(-pose.yaw);
+	} else {
+		dx = (goal.x-pose.x)*cosf(-pose.yaw) - (goal.y-pose.y)*sinf(-pose.yaw);
+		dy = (goal.x-pose.x)*sinf(-pose.yaw) + (goal.y-pose.y)*cosf(-pose.yaw);
+	}
 
-	// Serial.printf("yaw: %f\n", degrees(estYaw));
+	float dySkewed = 5*exponentialSkew(dy);
+	// float theta = pose.yaw - atan2f(dySkewed, next.x-pose.x);
+	float theta = atan2f(dySkewed, dx);
+	// float thetaTool = pose.yaw - atan2f(next.y-(pose.y+motorPosX*sinf(pose.yaw)), next.x-(pose.x+motorPosX*cosf(pose.yaw)));
+	// float dist = myDist(pose.x, pose.y, next.x, pose.y + dySkewed);
+	float dist = sqrt(pow(dx,2)+pow(dySkewed,2));
+	float holeDistance = abs(signedDist(pose, goal));
+
+	// Serial.printf("yaw: %f\n", degrees(pose.yaw));
 
 	float offsetRadius = radiusBounds*0.9*tanh(dist*0.05);
 	//float offsetRadius = (radius - radiusInner)*0.8*tanh(dist*0.1);
@@ -239,7 +405,17 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 			// lastTargetCircleY = centerY + ((offsetRadius)*sinf(theta) + toolY)/2;
 			// lastTargetCircleX = centerX + xMap;
 			// lastTargetCircleY = centerY + radiusInner*sqrt((1-pow(xMap/radiusBounds,2)));
-			screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, WHITE);
+			if (paths[current_path_idx].feature != HOLE){
+				screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, WHITE);
+			} else {
+				if (holeDistance <= holeTolerance) {
+					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GREEN);
+				} else if (holeDistance <= holeTolerance*10) {
+					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, YELLOW);
+				} else {
+					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, RED);
+				}
+			}
 			break;
 	}
 }
@@ -270,7 +446,7 @@ void drawDirection() {
 
 	uint16_t forwardColor, reverseColor;
 
-	if (pathDir[current_path_idx] > 0) {
+	if (paths[current_path_idx].direction > 0) {
 		forwardColor = GC9A01A_WEBWORK_GREEN;
 		reverseColor = DARKGREY;
 	} else {

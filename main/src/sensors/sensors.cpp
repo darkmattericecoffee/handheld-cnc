@@ -104,14 +104,14 @@ void doSensing() {
 	}
 
 	// Body position estimation
-	estVel[0][0] = measVel[0][0]*cosf(estYaw)-measVel[1][0]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)-(ly)*sinf(estYaw));
-	estVel[0][1] = measVel[0][1]*cosf(estYaw)-measVel[1][1]*sinf(estYaw) + 0.5*estAngVel1*(lx*cosf(estYaw)+(ly)*sinf(estYaw));
-	estVel[0][2] = measVel[0][2]*cosf(estYaw)-measVel[1][2]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)-(ly)*sinf(estYaw));
-	estVel[0][3] = measVel[0][3]*cosf(estYaw)-measVel[1][3]*sinf(estYaw) + 0.5*estAngVel1*(-lx*cosf(estYaw)+(ly)*sinf(estYaw));
-	estVel[1][0] = measVel[0][0]*sinf(estYaw)+measVel[1][0]*cosf(estYaw) + 0.5*estAngVel1*((ly)*cosf(estYaw)+lx*sinf(estYaw));
-	estVel[1][1] = measVel[0][1]*sinf(estYaw)+measVel[1][1]*cosf(estYaw) + 0.5*estAngVel1*(-(ly)*cosf(estYaw)+lx*sinf(estYaw));
-	estVel[1][2] = measVel[0][2]*sinf(estYaw)+measVel[1][2]*cosf(estYaw) + 0.5*estAngVel1*((ly)*cosf(estYaw)-lx*sinf(estYaw));
-	estVel[1][3] = measVel[0][3]*sinf(estYaw)+measVel[1][3]*cosf(estYaw) + 0.5*estAngVel1*(-(ly)*cosf(estYaw)-lx*sinf(estYaw));
+	estVel[0][0] = measVel[0][0]*cosf(pose.yaw)-measVel[1][0]*sinf(pose.yaw) + 0.5*estAngVel1*(lx*cosf(pose.yaw)-(ly)*sinf(pose.yaw));
+	estVel[0][1] = measVel[0][1]*cosf(pose.yaw)-measVel[1][1]*sinf(pose.yaw) + 0.5*estAngVel1*(lx*cosf(pose.yaw)+(ly)*sinf(pose.yaw));
+	estVel[0][2] = measVel[0][2]*cosf(pose.yaw)-measVel[1][2]*sinf(pose.yaw) + 0.5*estAngVel1*(-lx*cosf(pose.yaw)-(ly)*sinf(pose.yaw));
+	estVel[0][3] = measVel[0][3]*cosf(pose.yaw)-measVel[1][3]*sinf(pose.yaw) + 0.5*estAngVel1*(-lx*cosf(pose.yaw)+(ly)*sinf(pose.yaw));
+	estVel[1][0] = measVel[0][0]*sinf(pose.yaw)+measVel[1][0]*cosf(pose.yaw) + 0.5*estAngVel1*((ly)*cosf(pose.yaw)+lx*sinf(pose.yaw));
+	estVel[1][1] = measVel[0][1]*sinf(pose.yaw)+measVel[1][1]*cosf(pose.yaw) + 0.5*estAngVel1*(-(ly)*cosf(pose.yaw)+lx*sinf(pose.yaw));
+	estVel[1][2] = measVel[0][2]*sinf(pose.yaw)+measVel[1][2]*cosf(pose.yaw) + 0.5*estAngVel1*((ly)*cosf(pose.yaw)-lx*sinf(pose.yaw));
+	estVel[1][3] = measVel[0][3]*sinf(pose.yaw)+measVel[1][3]*cosf(pose.yaw) + 0.5*estAngVel1*(-(ly)*cosf(pose.yaw)-lx*sinf(pose.yaw));
 
 	// Simple average of linear velocities
 	float sumVelX = 0.0f;
@@ -133,19 +133,19 @@ void doSensing() {
 	} else {
 		valid_sensors = true;
 		// (TODO: figure out deeper cause) Acounting for weird rotation
-		// estVel1[0] = (sumVelX / ns) - estAngVel1*(xSensorOffset*sinf(estYaw) + ySensorOffset*cosf(estYaw));
-		// estVel1[1] = (sumVelY / ns) + estAngVel1*(xSensorOffset*cosf(estYaw) - ySensorOffset*sinf(estYaw));
+		// estVel1[0] = (sumVelX / ns) - estAngVel1*(xSensorOffset*sinf(pose.yaw) + ySensorOffset*cosf(pose.yaw));
+		// estVel1[1] = (sumVelY / ns) + estAngVel1*(xSensorOffset*cosf(pose.yaw) - ySensorOffset*sinf(pose.yaw));
 		estVel1[0] = sumVelX / ns;
 		estVel1[1] = sumVelY / ns;
 	}
 
 	// Integrate to get position and orientation
-	estYaw = estYaw + estAngVel1*sensingTime;
-	estPos[0] = estPos[0] + estVel1[0]*sensingTime;
-	estPos[1] = estPos[1] + estVel1[1]*sensingTime;
+	pose.yaw = pose.yaw + estAngVel1*sensingTime;
+	pose.x = pose.x + estVel1[0]*sensingTime;
+	pose.y = pose.y + estVel1[1]*sensingTime;
 
 	// Sensor plotting
-	if (plotting) {
+	if (plottingOn) {
 		sensorPlotting();
 	}
 }
