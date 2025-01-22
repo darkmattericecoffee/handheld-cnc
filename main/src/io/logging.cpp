@@ -11,6 +11,8 @@ static long unsigned timeLastOutputSD = 0;
 static long unsigned timeLastDebug = 0;
 static long unsigned timeLastClocked = 0;
 static long unsigned timeLastFlush = 0;
+static void* lastDebugCaller = nullptr;  // Store the address of the last debug call
+static bool firstCall = true;  // Track if this is a new sequence of debug calls
 
 // Read -----------------------------------------------------
 void handleSerial() {
@@ -231,24 +233,88 @@ void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos, boo
 }
 
 void debugging(Point point1, Point point2) {
-	if(millis() - timeLastDebug >= dtDebug) {
-		timeLastDebug = millis();
+	// TODO: make this sequential timing work better
+	void* currentCaller = __builtin_return_address(0);
+    if(millis() - timeLastDebug < dtDebug) {
+        // If not enough time has passed, only allow a different caller once
+        if(!firstCall || __builtin_return_address(0) == lastDebugCaller) {
+            return;
+        }
+    } else {
+        // Enough time has passed, reset the first call flag
+        firstCall = true;
+    }
+    
+    if(firstCall) {
+        firstCall = false;  // Mark that we've done the first call in this sequence
+    }
+    
+    lastDebugCaller = currentCaller;
+	timeLastDebug = millis();
 
-		// Print debug data
-		Serial.printf("x:%f,y:%f,theta:%f\n", pose.x, pose.y, pose.yaw * 180.0 / PI);
-		Serial.printf("goal.x:%f,goal.y:%f,next.x:%f,next.y:%f\n", point1.x, point1.y, point2.x, point2.y);
+	// Print debug data
+	Serial.printf("x:%f,y:%f,theta:%f\n", pose.x, pose.y, pose.yaw * 180.0 / PI);
+	Serial.printf("goal.x:%f,goal.y:%f,next.x:%f,next.y:%f\n", point1.x, point1.y, point2.x, point2.y);
 
-		// Additional debug info can be uncommented as needed:
-		/*
-		Serial.printf("w0:%f,w0:%f,w0:%f,%w0:%f\n", 1000*estAngVel[0], 1000*estAngVel[1], 
-					 1000*estAngVel[2], 1000*estAngVel[3]);
-		Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",
-					 estPosX,estPosY,pose.yaw,goalX,goalY,desPos);
-		Serial.printf("x_raw:%f,y_raw:%f\n",measVel[0][0],measVel[1][0]);
-		Serial.printf("curr_pnt_idx:%i,curr_path_idx:%i\n",current_point_idx, current_path_idx);
-		Serial.printf("Sensing time = %i\n", sensingTime);
-		*/
-	}
+	// Additional debug info can be uncommented as needed:
+	/*
+	Serial.printf("w0:%f,w0:%f,w0:%f,%w0:%f\n", 1000*estAngVel[0], 1000*estAngVel[1], 
+					1000*estAngVel[2], 1000*estAngVel[3]);
+	Serial.printf("x:%f,y:%f,theta:%f,xg:%f,yg:%f,desPos:%f",
+					estPosX,estPosY,pose.yaw,goalX,goalY,desPos);
+	Serial.printf("x_raw:%f,y_raw:%f\n",measVel[0][0],measVel[1][0]);
+	Serial.printf("curr_pnt_idx:%i,curr_path_idx:%i\n",current_point_idx, current_path_idx);
+	Serial.printf("Sensing time = %i\n", sensingTime);
+	*/
+
+}
+
+// Variatic debug function (mimicking Serial.printf)
+void debugging(const char* format, ...) {
+	void* currentCaller = __builtin_return_address(0);
+    if(millis() - timeLastDebug < dtDebug) {
+        // If not enough time has passed, only allow a different caller once
+        if(!firstCall || __builtin_return_address(0) == lastDebugCaller) {
+            return;
+        }
+    } else {
+        // Enough time has passed, reset the first call flag
+        firstCall = true;
+    }
+    
+    if(firstCall) {
+        firstCall = false;  // Mark that we've done the first call in this sequence
+    }
+
+	lastDebugCaller = currentCaller;
+	timeLastDebug = millis();
+
+	va_list args;
+	va_start(args, format);
+	vdprintf((int)&Serial, format, args);
+	va_end(args);
+}
+
+// Flash string version if needed
+void debugging(const __FlashStringHelper* format, ...) {
+	void* currentCaller = __builtin_return_address(0);
+    if(millis() - timeLastDebug < dtDebug) {
+        if(!firstCall || __builtin_return_address(0) == lastDebugCaller) {
+            return;
+        }
+    } else {
+        firstCall = true;
+    }
+    
+    if(firstCall) {firstCall = false;}
+    
+    lastDebugCaller = currentCaller;
+	timeLastDebug = millis();
+
+	va_list args;
+	va_start(args, format);
+	vdprintf((int)&Serial, (const char*)format, args);
+	va_end(args);
 }
 
 void stopwatch() {

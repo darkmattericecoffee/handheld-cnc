@@ -9,6 +9,8 @@ void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos, boo
 
 // Debugging functions
 void debugging(Point point1, Point point2);
+void debugging(const char* format, ...);
+void debugging(const __FlashStringHelper* format, ...);
 void stopwatch();
 
 // SD card functions

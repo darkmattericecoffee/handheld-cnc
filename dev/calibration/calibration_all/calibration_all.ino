@@ -155,7 +155,7 @@ void setup() {
 
   // Setup systems
   sensorSetup();
-  encoder.setClickHandler(onClickSetDistance);
+  encoder.setClickHandler(onClickReset);
   encoder.setEncoderHandler(onEncoderUpdateDistance);
 
   Serial.println("Calibration ready!");

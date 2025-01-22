@@ -99,7 +99,7 @@ void handleCutting() {
 
 		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
 		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
-		// Serial.printf("path_started:%i, goal_behind:%i\n", path_started, goal_behind);	// WARNING: this spams serial
+		debugging("path_started:%i, goal_behind:%i\n", (int)path_started, (int)goal_behind);
 		if (debuggingOn) {
 			debugging(goal, next);
 		}

@@ -53,7 +53,7 @@ int16_t centerY = 0;
 
 // Mode select
 bool plottingOn = false;			// plot values  (1 = yes; 0 = no)
-bool debuggingOn = true;			// print values (1 = yes; 0 = no)
+bool debuggingOn = false;			// print values (1 = yes; 0 = no)
 bool stopwatchOn = false;
 bool outputOn = false;				// output data to serial
 int designPreset = 0;				// choose the design 
