@@ -17,17 +17,17 @@
 - (1x) UIFrameLeft_01.stl
 - (1x) UIFrameRight_01.stl
 - (1x) zCarriage_01.stl
-### Tool Mounts (PLA)
+#### Tool Mounts (PLA)
 - Dremel 3000
 	- (1x) dremelMount_01.stl
 	- (1x) dremelSinch_01.stl
 - Makita RT0701C
 	- (1x) RT0701C_mount_bottom.stl
 	- (1x) RT0701C_mount_top.stl
-### Test Parts (PLA) - optional, but recommended
+#### Test Parts (PLA) - optional, but recommended
 - (1x) penMount.stl
 - (1x) markerMount_jacobs.stl
-### Jigs (PLA)
+#### Jigs (PLA)
 - (1x) encoderJig.stl
 
 ### Aluminum Sheet Metal (6061)
