@@ -6,10 +6,11 @@ void sinGenerator();
 void zigZagGenerator();
 void doubleLineGenerator();
 void circleGenerator();
-void squareGenerator();
+void diamondGenerator();
 void squareGeneratorSine();
 void squareGeneratorWave();
-void makePath();
+void squareGeneratorMake();
+void makePresetPath();
 void parseNC(const char* filename);
 
 // Path properties

@@ -20,7 +20,6 @@ extern PMW3360 sensors[4];
 extern EncoderButton encoder;
 extern Arduino_GFX *screen;
 extern SdFat sd;
-extern FsFile dataFile;
 
 // State variables
 extern State state;
@@ -28,18 +27,26 @@ extern bool cutting;
 extern bool path_started;
 extern bool valid_sensors;
 extern float motorPosX;
+extern DesignType designType;
+extern bool plungeReady;
 
 // Path data
-extern Point paths[MAX_PATHS][MAX_POINTS];
-extern int pathDir[MAX_PATHS];
+extern Path paths[MAX_PATHS];
 extern int num_paths;
-extern int num_points;
 extern int current_path_idx;
 extern int current_point_idx;
+extern float minZ;
+
+// SD stuff
+extern FsFile logFile;
+extern FsFile root;
+extern FsFile currentDir;
+extern int current_file_idx;
+extern int totalFiles;
+extern String fileList[MAX_FILES];
 
 // Position tracking
-extern float estPos[2];
-extern float estYaw;
+extern RouterPose pose;
 extern float measVel[2][4];
 
 // Calibration data
@@ -52,15 +59,23 @@ extern int16_t centerX;
 extern int16_t centerY;
 
 // Mode flags
-extern int plotting;
-extern int debugMode;
-extern int outputMode;
-extern int designMode;
+extern bool plottingOn;
+extern bool debuggingOn;
+extern bool stopwatchOn;
+extern bool outputOn;
+extern int designPreset;
 
 // Material properties
 extern float matThickness;
 
 // Timing variables
+extern long unsigned totalLoopTime;
+extern long unsigned sensingTime_debug;
+extern long unsigned stepperTime;
+extern long unsigned serialTime;
+extern long unsigned safetyTime;
+extern long unsigned cuttingTime;
+extern long unsigned timeLoopStart;
 extern long unsigned timeLastDebounce;
 extern long unsigned lastDraw;
 extern long unsigned timeLastPoll;
