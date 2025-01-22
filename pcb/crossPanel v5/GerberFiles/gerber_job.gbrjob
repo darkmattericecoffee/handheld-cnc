@@ -1,0 +1,24 @@
+{
+    "Header": {
+        "Comment": "All values are metric (mm)",
+        "CreationDate": "2025-01-20T20:14:21Z",
+        "GenerationSoftware": {
+            "Application": "Fusion Electronics",
+            "Vendor": "Autodesk",
+            "Version": "9.7.0"
+        },
+        "Part": "Single"
+    },
+    "Overall": {
+        "BoardThickness": 3.17,
+        "LayerNumber": 2,
+        "Name": {
+            "ProjectId": "crossPanel v5"
+        },
+        "Owner": "Cameron Chaney <camchaney@berkeley.edu>",
+        "Size": {
+            "X": 196,
+            "Y": 48.0613
+        }
+    }
+}

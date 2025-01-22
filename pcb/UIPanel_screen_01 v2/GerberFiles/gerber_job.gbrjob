@@ -1,0 +1,24 @@
+{
+    "Header": {
+        "Comment": "All values are metric (mm)",
+        "CreationDate": "2025-01-20T20:38:51Z",
+        "GenerationSoftware": {
+            "Application": "Fusion Electronics",
+            "Vendor": "Autodesk",
+            "Version": "9.7.0"
+        },
+        "Part": "Single"
+    },
+    "Overall": {
+        "BoardThickness": 1.57,
+        "LayerNumber": 2,
+        "Name": {
+            "ProjectId": "UIPanel_screen_01 v2"
+        },
+        "Owner": "Cameron Chaney <camchaney@berkeley.edu>",
+        "Size": {
+            "X": 250,
+            "Y": 92.367538
+        }
+    }
+}

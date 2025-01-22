@@ -1,0 +1,34 @@
+connectors:
+  X1: &pmw3360 # define a template for later use
+    pinlabels: [VCC, SCK, GND, MOSI, GND, MISO, GND, CS] # pincount implicit in pinout
+    type: JST GHR-08V-S
+    # subtype: female
+    # manufacturer: '<a href="https://www.molex.com/">Molex</a>' # set manufacter name
+    # mpn: '<a href="https://www.molex.com/molex/products/part-detail/crimp_housings/0022013047">22013047</a>' # set manufacturer part number
+    # supplier: Digimouse
+    # spn: 1234
+    image:
+      src: ../img/GH-8.jpg
+      caption: JST GH 8-pin
+      height: 100
+  X2:
+    <<: *pmw3360 # reuse template
+
+cables:
+  W1:
+    color_code: T568B
+    wirecount: 8
+    length: 0.4
+    gauge: 28 AWG
+    show_equiv: true
+    #color_code: DIN # auto-assign colors based on DIN 47100
+    #colors: [RD, BNRD, PK, GY, YE, GN, BN, WH]
+    #shield: true # add cable shielding
+    type: CAT5
+    notes: Similar colors are in a twisted pair.
+
+connections:
+  -
+    - X1: [1-8]
+    - W1: [1-8]
+    - X2: [1-8]
