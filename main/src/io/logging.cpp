@@ -253,8 +253,8 @@ void debugging(Point point1, Point point2) {
 	timeLastDebug = millis();
 
 	// Print debug data
-	Serial.printf("x:%f,y:%f,theta:%f\n", pose.x, pose.y, pose.yaw * 180.0 / PI);
-	Serial.printf("goal.x:%f,goal.y:%f,next.x:%f,next.y:%f\n", point1.x, point1.y, point2.x, point2.y);
+	Serial.printf("x:%f, y:%f, theta:%f, dir:%i\n", pose.x, pose.y, pose.yaw * 180.0 / PI,paths[current_path_idx].direction);
+	Serial.printf("goal.x:%f,goal.y:%f,goal.z%f, next.x:%f,next.y:%f,next.z%f\n", point1.x, point1.y, point1.z, point2.x, point2.y, point2.z);
 
 	// Additional debug info can be uncommented as needed:
 	/*

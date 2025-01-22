@@ -32,7 +32,7 @@ bool performSafetyChecks() {
 	return true;
 }
 
-bool advance(Point goal, Point next, bool autoAdvance=false) {
+void advance(Point goal, Point next, bool autoAdvance=false) {
 	// Move through point indeces as needed
 	if (paths[current_path_idx].direction * signedDist(pose,next) > 0 || autoAdvance) {
 		// If next point is behind router, it becomes the new goal.
@@ -67,9 +67,6 @@ bool advance(Point goal, Point next, bool autoAdvance=false) {
 				encoderDesignType();
 			}
 		}
-		return true;
-	} else {
-		return false;
 	}
 }
 
@@ -99,10 +96,10 @@ void handleCutting() {
 
 		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
 		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
-		debugging("path_started:%i, goal_behind:%i\n", (int)path_started, (int)goal_behind);
 		if (debuggingOn) {
 			debugging(goal, next);
 		}
+		// debugging("path_started:%i, goal_behind:%i\n", (int)path_started, (int)goal_behind);
 		return;
 	}
 

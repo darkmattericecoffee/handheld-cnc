@@ -38,8 +38,8 @@ float mapF(long x, float in_min, float in_max, float out_min, float out_max) {
 	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-float signedDist(RouterPose rPose, Point g) {
-	// Calculate the signed distance between goal point and line of gantry
+float signedDist(RouterPose rPose, Point p) {
+	// Calculate the signed distance between point and line of gantry
 	// Note: if the distance is:
 	//    < 0 - the point is in front of the gantry (it is yet to be passed)
 	//    > 0 - the point is behind the gantry (it has been passed)
@@ -49,7 +49,7 @@ float signedDist(RouterPose rPose, Point g) {
 	float B = -1;
 	float C = b;
 
-	return (A * g.x + B * g.y + C) / sqrt(pow(A, 2) + pow(B, 2));
+	return (A * p.x + B * p.y + C) / sqrt(pow(A, 2) + pow(B, 2));
 }
 
 float angleFrom(Point a, Point b) {
