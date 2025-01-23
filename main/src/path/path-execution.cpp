@@ -153,22 +153,21 @@ void handleCutting() {
 
 		// Evaluate whether to move on to next point
 		advance(goal, next);
-	} else {
-		if (paths[current_path_idx].feature != HOLE) {
-			// Stop cutting
-			stepperZ.moveTo(Conv*restHeight);
-			stepperX.moveTo(Conv*desPosClosest);
+	} else if (paths[current_path_idx].feature == HOLE) {
+		// Handle hole
+		stepperZ.moveTo(Conv*restHeight);
+		stepperX.moveTo(Conv*desPosHole);
+		
+		if (valid_sensors && plungeReady && within_hole_tol) {
+			plungeZ(desZ, holeFeedrate);
+			advance(goal,next,true);
 		} else {
-			// Handle hole
-			stepperZ.moveTo(Conv*restHeight);
-			stepperX.moveTo(Conv*desPosHole);
-			if (plungeReady && within_hole_tol) {
-				plungeZ(desZ, holeFeedrate);
-				advance(goal,next,true);
-			} else {
-				plungeReady = false;
-			}
+			plungeReady = false;
 		}
+	} else {
+		// Stop cutting
+		stepperZ.moveTo(Conv*restHeight);
+		stepperX.moveTo(Conv*desPosClosest);
 
 		// Path logging
 		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
