@@ -4,35 +4,33 @@
 #include <Arduino.h>
 
 // Pin definitions
-#define SS0   				39
-// #define SS1   10
-// #define SS2   40
-// #define SS3   32
-#define SS1   				9					// *** changed when soldering *** TODO: change back once ready
-#define SS2   				32					// *** swapped when soldering *** TODO: swap back once ready
-#define SS3					40					// *** swapped when soldering *** TODO: swap back once ready
+#define SS0   				30
+#define SS1					10
+#define SS2					31
+#define SS3					32
 #define LIMIT_MACH_X0       6
 #define LIMIT_MACH_Z0       5
 #define BUTT_HANDLE_L       2
 #define BUTT_HANDLE_R       3
-#define ENCODER_PIN_A       21
-#define ENCODER_PIN_B       22
+#define ENCODER_PIN_A       22
+#define ENCODER_PIN_B       21
 #define ENCODER_BUTTON_PIN  4
-#define MOT_EN_X    		18
-#define MOT_DIR_X   		14
-#define MOT_STEP_X  		15
+#define MOT_EN_X    		23
+#define MOT_DIR_X   		18
+#define MOT_STEP_X  		19
 #define MOT_EN_Z    		41
 #define MOT_DIR_Z   		36
 #define MOT_STEP_Z  		33
-#define TFT_CS      		31
-#define TFT_DC      		30
-#define TFT_RST     		-1
+#define TFT_CS      		29
+#define TFT_DC      		28
+#define TFT_RST     		25
+#define TFT_BL				24
 
 // Driver settings
-#define DRIVER_ADDRESS      0b00
+#define DRIVER_ADDRESS_X	0b00
+#define DRIVER_ADDRESS_Z	0b10
 #define R_SENSE            	0.11f
-#define SERIAL_PORT_X     	Serial4
-#define SERIAL_PORT_Z     	Serial8
+#define SERIAL_PORT     	Serial4
 
 // Constants
 #define MAX_PATHS  			10

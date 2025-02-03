@@ -27,13 +27,10 @@ void onClickReset(EncoderButton &eb);
 
 // Pin definitions -------------------------------------------------------------------------------
 // Sensor pins
-#define SS0   39   // Chip select pin. Connect this to SS on the module.
-// #define SS1   10
-// #define SS2   40
-// #define SS3   32
-#define SS1   9       // *** changed when soldering *** TODO: change back once ready
-#define SS2   32      // *** swapped when soldering *** TODO: swap back once ready
-#define SS3   40      // *** swapped when soldering *** TODO: swap back once ready
+#define SS0   30   // Chip select pin. Connect this to SS on the module.
+#define SS1   10
+#define SS2   31
+#define SS3   32
 int sensorPins[4] = {SS0, SS1, SS2, SS3};
 #define ENCODER_PIN_A       21
 #define ENCODER_PIN_B       22
