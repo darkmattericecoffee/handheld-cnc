@@ -1,7 +1,6 @@
 # Manufacturing BOM
 
 ## 3D Printed Parts (PLA, unless stated otherwise)
-- (2x) cableClip.stl
 - (1x) crossPanel_3DP.stl (not needed if using SHM or PCB crossPanel)
 - (1x) frameLeft_01.stl
 - (1x) frameRight_01.stl
@@ -25,8 +24,8 @@
 	- (1x) RT0701C_mount_bottom.stl
 	- (1x) RT0701C_mount_top.stl
 ### Test Parts (PLA) - optional, but recommended
-- (1x) penMount.stl
-- (1x) markerMount_jacobs.stl
+- (1x) penMount_bic.stl
+- (1x) penMount_papermate.stl
 ### Jigs (PLA)
 - (1x) encoderJig.stl
 
