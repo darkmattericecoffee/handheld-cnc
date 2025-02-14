@@ -165,9 +165,14 @@ void sensorPlotting() {
 
 void readEepromCalibration(float (&cVal)[2][4]) {
 	int addr = 0;
+	float tempVal = 0.0f;
 	for (int i = 0; i < ns; i++) {
 		for (int j = 0; j < 2; j++) {
-			EEPROM.get(addr, cVal[j][i]);
+			EEPROM.get(addr, tempVal);
+
+			// check if calibration has been performed
+			cVal[j][i] = isnan(tempVal) ? cVal[j][i] : tempVal;
+
 			addr += sizeof(float);
 		}
 	}

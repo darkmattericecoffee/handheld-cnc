@@ -40,10 +40,10 @@ float measVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
 						{0.0f,0.0f,0.0f,0.0f}};
 
 // Calibration data
-float cVal[2][4] = {{0.0f,0.0f,0.0f,0.0f},
-					{0.0f,0.0f,0.0f,0.0f}};
+float cVal[2][4] = {{0.01f,0.01f,0.01f,0.01f},
+					{0.01f,0.01f,0.01f,0.01f}};						// default values before calibration
 float selfCal[2][3] = {{1.0f,0.997606f,0.989168f},
-						{1.0f,1.004717f,1.000850f}};
+						{1.0f,1.004717f,1.000850f}};				// (UNUSED)
 
 // Display variables
 int16_t radius = 0;
