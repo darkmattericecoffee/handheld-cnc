@@ -27,8 +27,7 @@ void motorSetup() {
 }
 
 void driverSetup() {
-	SERIAL_PORT_X.begin(115200);
-	SERIAL_PORT_Z.begin(115200);
+	SERIAL_PORT.begin(115200);
 	delay(100);
 
 	driverX.begin();

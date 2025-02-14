@@ -411,8 +411,8 @@ void makePresetPath() {
 
 		// UNUSED
 		case 7:
-			squareGeneratorWave();
-			Serial.println("____ square path generated!");
+			circleGenerator();
+			Serial.println("Circle path generated!");
 			break;
 		case 8:
 			squareGeneratorWave();

@@ -140,7 +140,7 @@ void parseGCodeFile(const String& sFilename) {
 				currentPathIndex++;
 				currentPath = &paths[currentPathIndex];
 				lastPoint = {0};
-				minZ = 0.0f;
+				currentPath->minZ = 0.0f;
 				
 				// Parse the M800 parameters
 				char* ptr = line;
@@ -181,8 +181,9 @@ void parseGCodeFile(const String& sFilename) {
 				if (*ptr == 'Z') {
 					newPoint.z = atof(ptr + 1);
 					hasNewCoordinate = true;
-					if (newPoint.z < minZ) {
-						minZ = newPoint.z;			// TODO: maybe not necessary
+					if (newPoint.z < currentPath->minZ) {
+						currentPath->minZ = newPoint.z;			// TODO: maybe not necessary
+						Serial.printf("Minimum z = %f", currentPath->minZ);
 					}
 				}
 				// TODO: For holes - parse feedrate (F) and retract height (R)

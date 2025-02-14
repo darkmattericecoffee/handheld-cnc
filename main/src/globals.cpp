@@ -4,8 +4,8 @@
 // Initialize hardware objects
 AccelStepper stepperX(motorInterfaceType, MOT_STEP_X, MOT_DIR_X);
 AccelStepper stepperZ(motorInterfaceType, MOT_STEP_Z, MOT_DIR_Z);
-TMC2209Stepper driverX(&SERIAL_PORT_X, R_SENSE, DRIVER_ADDRESS);
-TMC2209Stepper driverZ(&SERIAL_PORT_Z, R_SENSE, DRIVER_ADDRESS);
+TMC2209Stepper driverX(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS_X);
+TMC2209Stepper driverZ(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS_Z);
 PMW3360 sensors[4];
 EncoderButton encoder(ENCODER_PIN_A, ENCODER_PIN_B, ENCODER_BUTTON_PIN);
 Arduino_DataBus *bus = new Arduino_HWSPI(TFT_DC, TFT_CS, &SPI1);
@@ -25,7 +25,6 @@ Path paths[MAX_PATHS];
 int num_paths = 0;
 int current_path_idx = 0;
 int current_point_idx = 0;
-float minZ = 0.0f;
 
 // SD Stuff
 FsFile logFile;

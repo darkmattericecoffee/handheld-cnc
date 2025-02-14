@@ -51,6 +51,7 @@ typedef struct Path {
 	int direction = 1;
 	Feature feature = NORMAL;
 	int numPoints = 0;
+	float minZ = 0.0f;
 } Path;
 
 #endif

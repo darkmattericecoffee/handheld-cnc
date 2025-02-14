@@ -58,7 +58,7 @@ const float restHeight = 2.0;					// rest height of tool before cutting (mm)
 // const float gantryLength = 106.0;				// usable length of x-gantry (mm)
 const float gantryLength = 34.0;				// usable length of x-gantry (mm) (FOR XZ SWAP TESTING)
 const float xLimitOffset = 2.54;				// distance from wall of stepper when zeroed (mm)
-const float xBuffer = 3.0;						// safety buffer between tool body and walls (mm)
+const float wallBuffer = 3.0;						// safety buffer between tool body and walls (mm)
 const float xSensorOffset = -2.32;				
 const float ySensorOffset = -3.2;				// offset to try to counteract weird rotation behavior (mm) (UNUSED)
 const float zLength = 34.0;						// usable length of z-gantry (mm)
@@ -353,7 +353,7 @@ void updateMotorPosition(float desSpeed) {
     stepperX.setMaxSpeed(currentSpeed);
 		currentPos = stepperX.currentPosition()/Conv;
     if (moveDir > 0) {
-      stepperX.moveTo(((gantryLength/2) - xBuffer)*Conv);
+      stepperX.moveTo(((gantryLength/2) - wallBuffer)*Conv);
     } else if (moveDir < 0) {
       stepperX.moveTo(0);
     }
@@ -364,7 +364,7 @@ void updateMotorPosition(float desSpeed) {
     stepperZ.setMaxSpeed(currentSpeed);
 		currentPos = stepperZ.currentPosition()/Conv;
     if (moveDir > 0) {
-      stepperZ.moveTo(((zLength/2) - xBuffer)*Conv);
+      stepperZ.moveTo(((zLength/2) - wallBuffer)*Conv);
     } else if (moveDir < 0) {
       stepperZ.moveTo(0);
     }
@@ -378,16 +378,16 @@ void updateMotorPositionSpeed(float desSpeed) {
   Serial.printf("Current speed = %f mm/s\n", desSpeed/Conv);
 	if (testing_x) {
 		currentPos = stepperX.currentPosition()/Conv;
-		if (currentPos <= xBuffer) {
+		if (currentPos <= wallBuffer) {
 			stepperX.setSpeed(desSpeed);
-		} else if (currentPos >= (gantryLength/2) - xBuffer) {
+		} else if (currentPos >= (gantryLength/2) - wallBuffer) {
 			stepperX.setSpeed(-desSpeed);
 		}
 	} else {
 		currentPos = stepperZ.currentPosition()/Conv;
 		if (currentPos <= 0) {
 			stepperZ.setSpeed(desSpeed);
-		} else if (currentPos >= (zLength/2) - xBuffer) {
+		} else if (currentPos >= (zLength/2) - wallBuffer) {
 			stepperZ.setSpeed(-desSpeed);
 		}
 	}

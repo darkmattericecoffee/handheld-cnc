@@ -136,7 +136,7 @@ float desPosClosestToIntersect(RouterPose rPose, Point point3, Point point4) {
 	float dy = y - rPose.y;
 
 	float desiredPos = dx * cosf(rPose.yaw) + dy * sinf(rPose.yaw);
-	float maxPos = (gantryLength / 2.0) - xBuffer;
+	float maxPos = (gantryLength / 2.0) - wallBuffer;
 
 	return clamp(desiredPos, -maxPos, maxPos);
 }
@@ -148,7 +148,7 @@ float desPosSimple(RouterPose rPose, Point goal) {
 	float desiredPos = (dX + tanf(rPose.yaw) * dY) * cosf(rPose.yaw);
 	// This can also be written as:
 	// return dX * cosf(rPose.yaw) + dY * sinf(rPose.yaw);
-	float maxPos = (gantryLength / 2.0) - xBuffer;
+	float maxPos = (gantryLength / 2.0) - wallBuffer;
 
 	return clamp(desiredPos, -maxPos, maxPos);
 }

@@ -95,7 +95,7 @@ void doSensing() {
 	}
 
 	if (validVals == 0) {
-		Serial.print("Sensors are poo-poo!");
+		// Serial.print("Sensors are poo-poo!");
 		valid_sensors = false;
 		return;
 	} else {
@@ -127,7 +127,7 @@ void doSensing() {
 	}
 	if (validVals == 0) {
 		// TODO: make this prompt a re-zeroing
-		Serial.print("Sensors are poo-poo!");
+		// Serial.print("Sensors are poo-poo!");
 		valid_sensors = false;
 		return;
 	} else {

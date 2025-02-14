@@ -109,7 +109,7 @@ void handleCutting() {
 
 	// Desired position if we intersect
 	float desPos = desPosIntersect(pose, goal, next);
-	float desZ = (matThickness == 0 && designType == FROM_FILE) ? (goal.z - minZ) : goal.z;			// if matThickness is set to 0 (drawing), then don't pierce!
+	float desZ = (matThickness == 0 && designType == FROM_FILE) ? (goal.z - paths[current_path_idx].minZ) : goal.z;			// if matThickness is set to 0 (drawing), then don't pierce!
 	// Desired position if we do not intersect
 	float desPosClosest = desPosClosestToIntersect(pose, goal, next);
 	float desPosHole = desPosSimple(pose, goal);

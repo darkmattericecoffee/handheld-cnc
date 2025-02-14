@@ -130,7 +130,10 @@ void drawShape() {
 			screen->drawLine(centerX+size, centerY, centerX, centerY-size, WHITE);
 			screen->drawLine(centerX, centerY-size, centerX-size, centerY, WHITE);
 			break;
-		// case 8:
+		case 8:
+			// circle
+			screen->drawCircle(centerX, centerY, size, WHITE);
+			break;
 		// 	// hexagon
 		// 	screen->drawLine(centerX, centerY+size, centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
 		// 	screen->drawLine(centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);
