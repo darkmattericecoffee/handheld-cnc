@@ -47,6 +47,7 @@ extern String fileList[MAX_FILES];
 // Position tracking
 extern RouterPose pose;
 extern float measVel[2][4];
+extern float calPos[2][4];
 
 // Calibration data
 extern float cVal[2][4];
@@ -62,6 +63,7 @@ extern bool plottingOn;
 extern bool debuggingOn;
 extern bool stopwatchOn;
 extern bool outputOn;
+extern int designOrCalibrate;
 extern int designPreset;
 
 // Material properties

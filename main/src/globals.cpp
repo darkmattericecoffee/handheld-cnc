@@ -38,6 +38,8 @@ String fileList[MAX_FILES];
 RouterPose pose = {0.0f};
 float measVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
 						{0.0f,0.0f,0.0f,0.0f}};
+float calPos[2][4] = {{0.0f,0.0f,0.0f,0.0f},
+						{0.0f,0.0f,0.0f,0.0f}};
 
 // Calibration data
 float cVal[2][4] = {{0.01f,0.01f,0.01f,0.01f},
@@ -55,6 +57,7 @@ bool plottingOn = false;			// plot values  (1 = yes; 0 = no)
 bool debuggingOn = false;			// print values (1 = yes; 0 = no)
 bool stopwatchOn = false;
 bool outputOn = false;				// output data to serial
+int designOrCalibrate = 0;			// choose design or calibrate
 int designPreset = 0;				// choose the design 
 
 // Material properties

@@ -5,6 +5,7 @@
 
 void sensorSetup();
 void doSensing();
+void doSensingLinear();
 void sensorPlotting();
 void readEepromCalibration(float (&cVal)[2][4]);
 void calibrate();

@@ -19,14 +19,20 @@ void onEncoderUpdateThickness(EncoderButton &eb);
 void onClickSetThickness(EncoderButton &eb);
 
 // Design mode handlers
+void onEncoderDesignOrCalibrate(EncoderButton &eb);
+void onClickSetDoC(EncoderButton &eb);
 void onEncoderUpdateDesign(EncoderButton &eb);
 void onClickMakePath(EncoderButton &eb);
 
 // Path execution handlers
 void onClickExecutePath(EncoderButton &eb);
 
+// Calibration handlers
+void onClickCalibrationAdvance(EncoderButton &eb);
+
 // Mode switching functions
 void encoderSetThickness();
+void encoderDesignOrCalibrate();
 void encoderDesignType();
 void encoderDesignSelect();
 void encoderZeroWorkspaceXY();

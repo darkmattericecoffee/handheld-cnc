@@ -2,6 +2,8 @@
 #include "../config.h"
 #include "../globals.h"
 #include "../ui/display.h"
+#include "../ui/encoder.h"
+#include "../math/geometry.h"
 #include <EEPROM.h>
 
 /*
@@ -62,8 +64,10 @@ void doSensing() {
 	for (int i = 0; i < ns; i++) {
 		surfaceQuality[i] = data[i].SQUAL;
 		if (surfaceQuality[i] > 20) {
-			measVel[0][i] = -convTwosComp(data[i].dx)*cVal[0][i]/sensingTime;
-			measVel[1][i] = convTwosComp(data[i].dy)*cVal[1][i]/sensingTime;
+			float dx = -convTwosComp(data[i].dx);
+			float dy = convTwosComp(data[i].dy);
+			measVel[0][i] = dx*cVal[0][i] / sensingTime;
+			measVel[1][i] = dy*cVal[1][i] / sensingTime;
 
 			estPosSen[0][i] = estPosSen[0][i] + measVel[0][i]*sensingTime;
 			estPosSen[1][i] = estPosSen[1][i] + measVel[1][i]*sensingTime;
@@ -86,21 +90,21 @@ void doSensing() {
 	// Average angular velocities
 	float sumAngVel = 0.0f;
 	float estAngVel1 = 0.0f;
-	int validVals = 0;
+	int valalScalars = 0;
 	for (int i = 0; i < 8; i++) {
 		if (!isnan(estAngVel[i])) {
 			sumAngVel = sumAngVel + estAngVel[i];
-			validVals++;
+			valalScalars++;
 		}
 	}
 
-	if (validVals == 0) {
+	if (valalScalars == 0) {
 		// Serial.print("Sensors are poo-poo!");
 		valid_sensors = false;
 		return;
 	} else {
 		valid_sensors = true;
-		estAngVel1 = sumAngVel / validVals;
+		estAngVel1 = sumAngVel / valalScalars;
 	}
 
 	// Body position estimation
@@ -117,15 +121,15 @@ void doSensing() {
 	float sumVelX = 0.0f;
 	float sumVelY = 0.0f;
 	float estVel1[2] = {0.0f, 0.0f};
-	validVals = 0;
+	valalScalars = 0;
 	for (int i = 0; i<ns; i++) {
 		if (!isnan(estVel[0][i]) && !isnan(estVel[1][i])) {
 			sumVelX = sumVelX + estVel[0][i];
 			sumVelY = sumVelY + estVel[1][i];
-			validVals++;
+			valalScalars++;
 		}
 	}
-	if (validVals == 0) {
+	if (valalScalars == 0) {
 		// TODO: make this prompt a re-zeroing
 		// Serial.print("Sensors are poo-poo!");
 		valid_sensors = false;
@@ -147,6 +151,37 @@ void doSensing() {
 	// Sensor plotting
 	if (plottingOn) {
 		sensorPlotting();
+	}
+}
+
+void doSensingLinear() {
+    timeLastPoll = micros();
+
+    // Sensing ---------------------------------------------------------------------
+    // Collect sensor data (raw)
+ 
+    PMW3360_DATA data[4];
+    for (int i = 0; i < 4; i++) {
+      data[i] = sensors[i].readBurst();
+      surfaceQuality[i] = data[i].SQUAL;
+    }
+
+    for (int i = 0; i < 4; i++) {
+      // Sensor velocity sensing
+      // measVel[0][i] = -convTwosComp(data[i].dx);     // '-' convention is used to flip sensor's z axis
+      measVel[0][i] = -convTwosComp(data[i].dx);
+      measVel[1][i] = convTwosComp(data[i].dy);
+
+      // Integrate linear velocities to get position
+      calPos[0][i] = calPos[0][i] + measVel[0][i];
+      calPos[1][i] = calPos[1][i] + measVel[1][i];
+    }
+
+    // Sensor plotting
+	for (int i = 0; i < 4; i++) {
+		float angle = atanf(calPos[1][i]/calPos[0][i]);
+		Serial.printf("%i: x:%.2f,\ty:%.2f,\tb:%.3f",i,calPos[0][i],calPos[1][i],angle);
+		Serial.println();
 	}
 }
 
@@ -179,39 +214,66 @@ void readEepromCalibration(float (&cVal)[2][4]) {
 }
 
 void calibrate() {
-	float calDistance = 100.0;
-	float calPos[2][3] = {{0.0f, 0.0f, 0.0f},
-						  {0.0f, 0.0f, 0.0f}};
+	encoder.setEncoderHandler(nullHandler);
+	encoder.setClickHandler(onClickCalibrationAdvance);
+
+	float calDistance = 300.0;
+	int currentRun = 0;
+	int numRuns = 5;
+	float tempCalScalar[2][ns] = {0.0f};
+	float tempCalRotation[2][ns] = {0.0f};
 
 	for (int axis = 0; axis < 2; axis++) {
-		delay(500);
-		calPos[axis][0] = 0.0;
-
-		screen->fillScreen(BLACK);
-		drawCenteredText("Move router in direction", 1);
-		Serial.printf("Move router in %i direction", axis);
-
-		while (calPos[axis][0] < calDistance) {
-			if(micros() - timeLastPoll >= dt) {
-				doSensing();
-				for (int i = 0; i < ns; i++){
-					calPos[axis][i] = calPos[axis][i] + estVel[axis][i]*dt;
-				}
+		while (currentRun < numRuns) {
+			if (axis == 0) {
+				drawCenteredText("Align X axis\nClick when at 0", 2);
+			} else {
+				drawCenteredText("Align Y axis\nClick when at 0", 2);
 			}
-			Serial.println(calPos[axis][0]);
-		}
-		
-		screen->fillScreen(BLACK);
-		drawCenteredText("STOP", 1);
-		delay(100);
+			while (state != CALIBRATION_ADVANCE) encoder.update();
+			state = CALIBRATION;
+			
+			// Flush sensor readings then reset
+			for (int i = 0; i < 4; i++) {
+				sensors[i].readBurst();
+				calPos[0][i] = 0.0f;
+				calPos[1][i] = 0.0f;
+			}
 
-		for (int i = 0; i < ns; i++) {
-			selfCal[axis][i] = calPos[axis][0]/calPos[axis][i];
-		}    
+			// prompt x calibration
+			// 	- do x run
+			//		- "Reached 300?"
+			// 		- "Retry?"
+			if (axis == 0) {
+				drawCenteredText("Move in +X\nClick when at 300mm", 2);
+			} else {
+				drawCenteredText("Move in +Y\nClick when at 300mm", 2);
+			}
+			while (state != CALIBRATION_ADVANCE) {
+				doSensingLinear();
+				encoder.update();
+			}
+			
+			for (int i = 0; i < ns; i++) {
+				float sensorDist = calDistance / (myDist(calPos[0][i],calPos[1][i],0,0));
+				tempCalScalar[axis][i] = tempCalScalar[axis][i] + (sensorDist / numRuns);
+
+				float sensorRot = axis ? atanf(-calPos[0][i]/calPos[1][i]) : atanf(calPos[1][i]/calPos[0][i]);
+				tempCalRotation[axis][i] =  tempCalRotation[axis][i] + (sensorRot / numRuns);
+			}
+
+			state = CALIBRATION;
+			currentRun++;
+		}
+		currentRun = 0;
 	}
 
-	Serial.println("Calibration values:");
-	Serial.printf("\t0: (%f, %f)", selfCal[0][0], selfCal[1][0]);
-	Serial.printf("\t1: (%f, %f)", selfCal[0][1], selfCal[1][1]);
-	Serial.printf("\t2: (%f, %f)", selfCal[0][2], selfCal[1][2]);
+	Serial.println("Calibration results:");
+	for (int i = 0; i < ns; i++) {
+		float avgRot = (tempCalRotation[0][i]+tempCalRotation[1][i]) / 2;
+		Serial.printf("\tCx:%f,Cy:%f,Cr:%f\n",tempCalScalar[0][i],tempCalScalar[1][i],avgRot);
+	}
+
+
+
 }

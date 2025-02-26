@@ -5,6 +5,7 @@
 #include "display.h"
 #include "../path/path-generators.h"
 #include "../io/logging.h"
+#include "../sensors/sensors.h"
 
 void nullHandler(EncoderButton &eb) {
 	Serial.println("null handler called");
@@ -21,21 +22,21 @@ void onClickGoToSetThickness(EncoderButton &eb) {
 }
 
 void onClickResetState(EncoderButton &eb) {
-	drawCenteredText("Zero Machine X", 1);
+	drawCenteredText("Zero Machine X", 2);
 	state = POWER_ON;
 	encoder.setClickHandler(onClickZeroMachineX);
 }
 
 void onClickZeroMachineX(EncoderButton &eb) {
-	drawCenteredText("Zeroing Machine X...", 1);
+	drawCenteredText("Zeroing Machine X...", 2);
 	machineZeroX();
 	state = MACHINE_X_ZERO;
-	drawCenteredText("Zero Workspace Z", 1);
+	drawCenteredText("Zero Workspace Z", 2);
 	encoder.setClickHandler(onClickZeroWorkspaceZ);
 }
 
 void onClickZeroWorkspaceZ(EncoderButton &eb) {
-	drawCenteredText("Zeroing Workspace Z...", 1);
+	drawCenteredText("Zeroing Workspace Z...", 2);
 	workspaceZeroZ();
 	state = WORKSPACE_Z_ZERO;
 	encoderSetThickness();
@@ -49,6 +50,14 @@ void onClickZeroWorkspaceXY(EncoderButton &eb) {
 
 void onClickSetThickness(EncoderButton &eb) {
 	state = THICKNESS_SET;
+}
+
+void onClickSetDoC(EncoderButton &eb) {
+	state = DOC_SELECTED;
+}
+
+void onClickCalibrationAdvance(EncoderButton &eb) {
+	state = CALIBRATION_ADVANCE;
 }
 
 void onClickSetType(EncoderButton &eb) {
@@ -85,9 +94,19 @@ void onEncoderUpdateThickness(EncoderButton &eb) {
 	}
 	
 	char text2send[50];
-	sprintf(text2send, "Turn to set thickness\n%.2f mm", matThickness);
-	drawCenteredText(text2send, 1);
+	sprintf(text2send, "Turn to\nset thickness\n%.2f mm", matThickness);
+	drawCenteredText(text2send, 2);
 }
+
+void onEncoderDesignOrCalibrate(EncoderButton &eb) {
+	designOrCalibrate = (2 + designOrCalibrate + eb.increment()) % 2;
+	drawDoCMenu();
+}
+
+// void onEncoderAcceptCalibration(EncoderButton &eb) {
+// 	acceptCal = (2 + acceptCal + eb.increment()) % 2;
+// 	drawDoCMenu();
+// }
 
 void onEncoderSwitchType(EncoderButton &eb) {
 	designType = (DesignType)((2 + designType + eb.increment()) % 2);
@@ -108,8 +127,8 @@ void onEncoderUpdateDesign(EncoderButton &eb) {
 // FUNCTIONS ------------------------------------------------
 void encoderSetThickness() {
 	char text2send[50];
-	sprintf(text2send, "Turn to set thickness\n%.2f mm", matThickness);
-	drawCenteredText(text2send, 1);
+	sprintf(text2send, "Turn to\nset thickness\n%.2f mm", matThickness);
+	drawCenteredText(text2send, 2);
 
 	encoder.setEncoderHandler(onEncoderUpdateThickness);
 	encoder.setClickHandler(onClickSetThickness);
@@ -118,13 +137,28 @@ void encoderSetThickness() {
 		encoder.update();
 	}
 
-	encoderDesignType();
+	encoderDesignOrCalibrate();
+}
+
+void encoderDesignOrCalibrate() {
+	drawDoCMenu();
+
+	encoder.setEncoderHandler(onEncoderDesignOrCalibrate);
+	encoder.setClickHandler(onClickSetDoC);
+
+	while (state != DOC_SELECTED) {
+		encoder.update();
+	}
+
+	if (designOrCalibrate == 0) {
+		encoderDesignType();
+	} else {
+		calibrate();
+	}
 }
 
 void encoderDesignType() {
-	char text2send[50];
-	sprintf(text2send, "Select design type:");			// TODO: make this better
-	drawCenteredText(text2send, 1);
+	drawTypeMenu();
 
 	encoder.setEncoderHandler(onEncoderSwitchType);
 	encoder.setClickHandler(onClickSetType);
@@ -177,7 +211,7 @@ void encoderDesignSelect() {
 }
 
 void encoderZeroWorkspaceXY() {
-	drawCenteredText("Zero workspace XY", 1);
+	drawCenteredText("Zero workspace XY", 2);
 	encoder.setClickHandler(onClickZeroWorkspaceXY);
 
 	while (state != WORKSPACE_XY_ZERO) {
