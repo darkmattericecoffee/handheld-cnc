@@ -40,6 +40,13 @@ typedef struct RouterPose {
 	// Future additions like velocity, acceleration, etc.
 } RouterPose;
 
+// Calibration parameters
+typedef struct CalParams {
+	float x = 0.01f;		// x scalar
+	float y = 0.01f;		// y scalar
+	float r = 0.0f;			// sensor rotation
+} CalParams;
+
 // Coordinate
 typedef struct Point {
 	float x;

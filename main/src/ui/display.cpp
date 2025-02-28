@@ -22,10 +22,7 @@ float exponentialSkew(float x) {
 	return 0.0f;
 }
 
-void drawDoCMenu() {
-	const char* options[] = {"Cut Design!", "Calibrate"};
-	const int numOptions = 2;
-
+void drawMenu(const char* options[], const int numOptions, int select) {
 	screen->fillScreen(BLACK);
 
 	// Set text properties
@@ -39,42 +36,7 @@ void drawDoCMenu() {
 	// Draw each option
 	for (int i = 0; i < numOptions; i++) {
 		// Highlight selected option
-		if (i == designOrCalibrate) {
-			screen->setTextColor(YELLOW);
-		} else {
-			screen->setTextColor(WHITE);
-		}
-		
-		// Center text horizontally
-		int16_t x1, y1;
-		uint16_t w, h;
-		screen->getTextBounds(options[i], 0, 0, &x1, &y1, &w, &h);
-		int16_t x = (screen->width() - w) / 2;
-		
-		// Draw option text
-		screen->setCursor(x, yStart + (i * ySpacing));
-		screen->print(options[i]);
-	}
-}
-
-void drawTypeMenu() {
-	const char* options[] = {"Preset", "From File"};
-	const int numOptions = 2;
-
-	screen->fillScreen(BLACK);
-
-	// Set text properties
-	screen->setTextSize(2);
-	screen->setTextColor(WHITE);
-	
-	// Calculate vertical spacing
-	int16_t yStart = screen->height() / 3;
-	int16_t ySpacing = 30;
-	
-	// Draw each option
-	for (int i = 0; i < numOptions; i++) {
-		// Highlight selected option
-		if (i == designType) {
+		if (i == select) {
 			screen->setTextColor(YELLOW);
 		} else {
 			screen->setTextColor(WHITE);

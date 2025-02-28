@@ -66,8 +66,8 @@ void doSensing() {
 		if (surfaceQuality[i] > 20) {
 			float dx = -convTwosComp(data[i].dx);
 			float dy = convTwosComp(data[i].dy);
-			measVel[0][i] = dx*cVal[0][i] / sensingTime;
-			measVel[1][i] = dy*cVal[1][i] / sensingTime;
+			measVel[0][i] = cal[i].x * (dx*cosf(cal[i].r) - dy*sinf(cal[i].r)) / sensingTime;
+			measVel[1][i] = cal[i].y * (dx*sinf(cal[i].r) + dy*cosf(cal[i].r)) / sensingTime;
 
 			estPosSen[0][i] = estPosSen[0][i] + measVel[0][i]*sensingTime;
 			estPosSen[1][i] = estPosSen[1][i] + measVel[1][i]*sensingTime;
@@ -198,19 +198,43 @@ void sensorPlotting() {
 	}
 }
 
-void readEepromCalibration(float (&cVal)[2][4]) {
+void readEepromCalibration() {
 	int addr = 0;
 	float tempVal = 0.0f;
 	for (int i = 0; i < ns; i++) {
-		for (int j = 0; j < 2; j++) {
-			EEPROM.get(addr, tempVal);
+		EEPROM.get(addr, tempVal);
+		cal[i].x = isnan(tempVal) ? cal[i].x : tempVal;			// check if calibration has been performed
+		addr += sizeof(float);
 
-			// check if calibration has been performed
-			cVal[j][i] = isnan(tempVal) ? cVal[j][i] : tempVal;
+		EEPROM.get(addr, tempVal);
+		cal[i].y = isnan(tempVal) ? cal[i].y : tempVal;
+		addr += sizeof(float);
 
-			addr += sizeof(float);
-		}
+		EEPROM.get(addr, tempVal);
+		cal[i].r = isnan(tempVal) ? cal[i].r : tempVal;
+		addr += sizeof(float);
 	}
+}
+
+void writeEepromCalibration() {
+	//  - Calibration values will be stored using (4)x(4)x(3) = 48 bytes
+	//  - This comes from (4 bytes per float)x(4 sensors)x(2 vals per sensor)
+	//	- The values will be stored in the order (cal[0].x),(cal[0].y),(cal[0].r),
+	//		(cal[1].x),...,(cal[i].r), so sensor 0 calibration value for x,
+	//		sensor 0 calibration value for y, sensor 0 calibration for rotation,
+	//		sensor 1 calibration value for x, and so on
+
+	Serial.println("writing calibration values to EEPROM...");
+
+	int addr = 0;         // starting address is always 0
+	for (int i = 0; i < ns; i++) {    // sensor number
+		EEPROM.put(addr, cal[i].x);
+		addr += sizeof(float);
+		EEPROM.put(addr, cal[i].y);
+		addr += sizeof(float);
+		EEPROM.put(addr, cal[i].r);
+		addr += sizeof(float);
+  	}
 }
 
 void calibrate() {
@@ -221,7 +245,7 @@ void calibrate() {
 	int currentRun = 0;
 	int numRuns = 5;
 	float tempCalScalar[2][ns] = {0.0f};
-	float tempCalRotation[2][ns] = {0.0f};
+	float tempCalRot[2][ns] = {0.0f};
 
 	for (int axis = 0; axis < 2; axis++) {
 		while (currentRun < numRuns) {
@@ -258,8 +282,8 @@ void calibrate() {
 				float sensorDist = calDistance / (myDist(calPos[0][i],calPos[1][i],0,0));
 				tempCalScalar[axis][i] = tempCalScalar[axis][i] + (sensorDist / numRuns);
 
-				float sensorRot = axis ? atanf(-calPos[0][i]/calPos[1][i]) : atanf(calPos[1][i]/calPos[0][i]);
-				tempCalRotation[axis][i] =  tempCalRotation[axis][i] + (sensorRot / numRuns);
+				float sensorRot = axis ? atanf(calPos[0][i]/calPos[1][i]) : atanf(-calPos[1][i]/calPos[0][i]);
+				tempCalRot[axis][i] =  tempCalRot[axis][i] + (sensorRot / numRuns);
 			}
 
 			state = CALIBRATION;
@@ -270,10 +294,33 @@ void calibrate() {
 
 	Serial.println("Calibration results:");
 	for (int i = 0; i < ns; i++) {
-		float avgRot = (tempCalRotation[0][i]+tempCalRotation[1][i]) / 2;
-		Serial.printf("\tCx:%f,Cy:%f,Cr:%f\n",tempCalScalar[0][i],tempCalScalar[1][i],avgRot);
+		float avgRot = (tempCalRot[0][i]+tempCalRot[1][i]) / 2;
+		Serial.printf("\tCx:%f,Cy:%f, Crx:%f,Cry:%f, Cr:%f\n",tempCalScalar[0][i],tempCalScalar[1][i],tempCalRot[0][i],tempCalRot[1][i],avgRot);
 	}
 
+	const char* options[] = {"Exit", "Save!"};
+	drawMenu(options, 2, acceptCal);
+	encoder.setEncoderHandler(onEncoderAcceptCalibration);
+	encoder.setClickHandler(onClickAcceptCalibration);
+	while (state != CALIBRATION_ADVANCE) encoder.update();
 
+	if (acceptCal) {
+		for (int i=0; i<ns; i++) {
+			cal[i].x = tempCalScalar[0][i];
+			cal[i].y = tempCalScalar[1][i];
+			cal[i].r = (tempCalRot[0][i]+tempCalRot[1][i]) / 2;
+		}
+		writeEepromCalibration();
 
+		Serial.println("Values written to EEPROM. Reading them back just to double check:");
+		readEepromCalibration();
+	
+		for (int i = 0; i < ns; i++) {
+			Serial.printf("Sensor %i:\tCx:%.4f, Cy:%.4f, Cr:%.4f\n", i, cal[i].x, cal[i].y, cal[i].r);
+		}
+
+		encoderDesignType();
+	} else {
+		encoderDesignOrCalibrate();
+	}
 }

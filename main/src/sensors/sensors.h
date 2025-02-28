@@ -7,7 +7,8 @@ void sensorSetup();
 void doSensing();
 void doSensingLinear();
 void sensorPlotting();
-void readEepromCalibration(float (&cVal)[2][4]);
+void readEepromCalibration();
+void writeEepromCalibration();
 void calibrate();
 int16_t convTwosComp(int16_t value);
 

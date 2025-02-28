@@ -60,6 +60,10 @@ void onClickCalibrationAdvance(EncoderButton &eb) {
 	state = CALIBRATION_ADVANCE;
 }
 
+void onClickAcceptCalibration(EncoderButton &eb) {
+	state = CALIBRATION_ADVANCE;
+}
+
 void onClickSetType(EncoderButton &eb) {
 	state = TYPE_SELECTED;
 }
@@ -100,17 +104,20 @@ void onEncoderUpdateThickness(EncoderButton &eb) {
 
 void onEncoderDesignOrCalibrate(EncoderButton &eb) {
 	designOrCalibrate = (2 + designOrCalibrate + eb.increment()) % 2;
-	drawDoCMenu();
+	const char* options[] = {"Cut Design!", "Calibrate"};
+	drawMenu(options, 2, designOrCalibrate);
 }
 
-// void onEncoderAcceptCalibration(EncoderButton &eb) {
-// 	acceptCal = (2 + acceptCal + eb.increment()) % 2;
-// 	drawDoCMenu();
-// }
+void onEncoderAcceptCalibration(EncoderButton &eb) {
+	acceptCal = (2 + acceptCal + eb.increment()) % 2;
+	const char* options[] = {"Exit", "Save!"};
+	drawMenu(options, 2, acceptCal);
+}
 
 void onEncoderSwitchType(EncoderButton &eb) {
 	designType = (DesignType)((2 + designType + eb.increment()) % 2);
-	drawTypeMenu();
+	const char* options[] = {"Preset", "From File"};
+	drawMenu(options, 2, designType);
 }
 
 void onEncoderUpdateDesign(EncoderButton &eb) {
@@ -141,7 +148,8 @@ void encoderSetThickness() {
 }
 
 void encoderDesignOrCalibrate() {
-	drawDoCMenu();
+	const char* options[] = {"Cut Design!", "Calibrate"};
+	drawMenu(options, 2, designOrCalibrate);
 
 	encoder.setEncoderHandler(onEncoderDesignOrCalibrate);
 	encoder.setClickHandler(onClickSetDoC);
@@ -158,7 +166,8 @@ void encoderDesignOrCalibrate() {
 }
 
 void encoderDesignType() {
-	drawTypeMenu();
+	const char* options[] = {"Preset", "From File"};
+	drawMenu(options, 2, designType);
 
 	encoder.setEncoderHandler(onEncoderSwitchType);
 	encoder.setClickHandler(onClickSetType);

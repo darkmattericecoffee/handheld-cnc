@@ -28,20 +28,10 @@ void setup() {
 	drawCenteredText("Initializing...", 2);
 
 	Serial.println("Loading calibration coefficients:");
-	readEepromCalibration(cVal);
+	readEepromCalibration();
 
-	Serial.print("Cx values: ");
-	for (int j = 0; j < 2; j++) {
-		for (int i = 0; i < ns; i++) {
-			Serial.print(cVal[j][i], 4);
-			if (i < ns - 1) {
-				Serial.print(", ");
-			}
-		}
-		Serial.println();
-		if (j == 0) {
-			Serial.print("Cy values: ");
-		}
+	for (int i = 0; i < ns; i++) {
+		Serial.printf("Sensor %i:\tCx:%.4f, Cy:%.4f, Cr:%.4f\n", i, cal[i].x, cal[i].y, cal[i].r);
 	}
 
 	// Initialize buttons

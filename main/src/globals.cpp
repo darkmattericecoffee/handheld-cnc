@@ -42,8 +42,7 @@ float calPos[2][4] = {{0.0f,0.0f,0.0f,0.0f},
 						{0.0f,0.0f,0.0f,0.0f}};
 
 // Calibration data
-float cVal[2][4] = {{0.01f,0.01f,0.01f,0.01f},
-					{0.01f,0.01f,0.01f,0.01f}};						// default values before calibration
+CalParams cal[4];
 float selfCal[2][3] = {{1.0f,0.997606f,0.989168f},
 						{1.0f,1.004717f,1.000850f}};				// (UNUSED)
 
@@ -57,7 +56,8 @@ bool plottingOn = false;			// plot values  (1 = yes; 0 = no)
 bool debuggingOn = false;			// print values (1 = yes; 0 = no)
 bool stopwatchOn = false;
 bool outputOn = false;				// output data to serial
-int designOrCalibrate = 0;			// choose design or calibrate
+int designOrCalibrate = 0;			// choose design or calibrate (0 or 1)
+int acceptCal = 0;					// accept calibration or not
 int designPreset = 0;				// choose the design 
 
 // Material properties

@@ -8,8 +8,7 @@ const int displayLines = 7;
 const int centerLine = 3;
 
 float exponentialSkew(float x);
-void drawDoCMenu();
-void drawTypeMenu();
+void drawMenu(const char* options[], const int numOptions, int select);
 void drawShape();
 void listFiles();
 void updateFileList();

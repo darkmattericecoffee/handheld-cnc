@@ -29,6 +29,8 @@ void onClickExecutePath(EncoderButton &eb);
 
 // Calibration handlers
 void onClickCalibrationAdvance(EncoderButton &eb);
+void onEncoderAcceptCalibration(EncoderButton &eb);
+void onClickAcceptCalibration(EncoderButton &eb);
 
 // Mode switching functions
 void encoderSetThickness();
