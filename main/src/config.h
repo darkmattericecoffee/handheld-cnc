@@ -68,7 +68,7 @@ const float restHeight = 2.0;					// rest height of tool before cutting (mm)
 const float holeTolerance = 0.25;					// tolerance for hole positioning (mm)
 
 // Gantry geometry
-const float gantryLength = 100.0;				// usable length of x-gantry (mm)
+const float gantryLength = 100.0;				// usable length of x-gantry (mm) (default=100, DW611=94)
 const float xLimitOffset = 2.54;				// distance from wall of stepper when zeroed (mm)
 const float zLength = 34.0;						// usable length of z-gantry (mm)
 const float zLimitOffset = 2.13;				// distance from wall when zeroed (mm)
