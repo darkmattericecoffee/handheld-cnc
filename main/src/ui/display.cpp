@@ -329,7 +329,7 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 
 	float dTheta = pose.yaw + PI/2 - atan2f(next.y-goal.y, next.x-goal.x);
 
-	// float xMap = mapF(desPosition, -gantryLength/2, gantryLength/2, -radiusBounds, radiusBounds);
+	// float xMap = mapF(desPosition, -gantryLengthRouter/2, gantryLengthRouter/2, -radiusBounds, radiusBounds);
 	// float yMap = mapF();
 	float dx = 0.0f;
 	float dy = 0.0f;
