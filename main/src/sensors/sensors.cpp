@@ -28,18 +28,39 @@ static float estAngVel[8] = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
 
 void sensorSetup() {
 	int sensorPins[4] = {SS0, SS1, SS2, SS3};
-	
+
+	screen->fillScreen(BLACK);
+	int size = 2;
+	int16_t centerX = screen->width() / 2;
+	int16_t centerY = screen->height() / 2;
+	int16_t totalHeight = 4 * size * 10;			// 4 lines, size 2, 10px per line
+	int16_t yStart = centerY - totalHeight / 2;
+
 	for (int i = 0; i < 4; i++) {
+		// display each sensors' initialization status on the screen, showing each sensor on a new line
+		// and setting text color green or red depending on initialization status
+		Serial.print("Sensor");
+		Serial.print(i);
+
 		if (sensors[i].begin(sensorPins[i], CPI)) {
-			Serial.print("Sensor");
-			Serial.print(i);
+			screen->setTextColor(GREEN);
+
 			Serial.print(" initialization succeeded, with CPI = ");
 			Serial.println(sensors[i].getCPI());
 		} else {
-			Serial.print("Sensor");
-			Serial.print(i);
+			screen->setTextColor(RED);
+
 			Serial.println(" initialization failed");
 		}
+
+		int16_t x1, y1;
+		uint16_t w, h;
+		char text[10];
+		sprintf(text, "Sensor %i", i);
+		screen->getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
+		int16_t xStart = centerX - w / 2;
+		screen->setCursor(xStart, yStart + i * size * 10);
+		screen->println(text);
 	}
 }
 
