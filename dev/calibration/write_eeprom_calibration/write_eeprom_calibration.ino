@@ -1,5 +1,12 @@
 #include <EEPROM.h>
 
+// Calibration parameters
+typedef struct CalParams {
+	float x = 0.01f;		// x scalar
+	float y = 0.01f;		// y scalar
+	float r = 0.0f;			// sensor rotation
+} CalParams;
+
 // Calibration values (hardcoded for now)
 // TODO: serial input or python serial input
 // Even better python input    
@@ -23,46 +30,31 @@
 //                     {0.01031892353f, 0.01044306441f, 0.01036856803f, 0.01044059303f}};  // CAM V5
 // float vals[2][4] = {{0.01003579433f, 0.01003237112f, 0.009931012566f, 0.01002318697f},
 //                     {0.01040387857f, 0.01025970739f, 0.01015262784f, 0.01023373859f}};  // CAM V6
-float vals[2][4] = {{0.009974863344f, 0.01003854802f, 0.01001917001f, 0.01003713741f},
-                    {0.01021554806f, 0.01031019954f, 0.01027291717f, 0.01030163178f}};  // CAM V7
+float vals[3][4] = {{0.009974863344f, 0.01003854802f, 0.01001917001f, 0.01003713741f},
+                    {0.01021554806f,  0.01031019954f, 0.01027291717f, 0.01030163178f},
+                    {0.0f,            0.0f,           0.0f,           0.0f}};  // CAM V7
       
-
-const int eepromAddrCx = 0;  
-const int eepromAddrCy = 12;  
 
 int ns = 4;         // number of sensors in use
 
-// float Cx[3] = {0.0f,0.0f,0.0f};
-// float Cy[3] = {0.0f,0.0f,0.0f};
-float cVal[2][4] = {{0.0f,0.0f,0.0f,0.0f},
-                    {0.0f,0.0f,0.0f,0.0f}}; 
+CalParams cal[4];
 
 void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(9600);
+	// put your setup code here, to run once:
+	Serial.begin(9600);
 
-  delay(100);
+	delay(100);
 
-  writeEepromCalibration();
+	writeEepromCalibration();
 
-  delay(1000);
+	delay(1000);
 
-  Serial.println("Values written to EEPROM. Reading them back just to double check:");
-  readEepromCalibration(cVal);
+	Serial.println("Values written to EEPROM. Reading them back just to double check:");
+	readEepromCalibration();
 
-  Serial.print("Cx values: ");
-  for (int j = 0; j < 2; j++) {
-    for (int i = 0; i < ns; i++) {
-      Serial.print(cVal[j][i], 6);
-      if (i < ns - 1) {
-        Serial.print(", ");
-      }
-    }
-    Serial.println();
-    if (j == 0){
-      Serial.print("Cy values: ");
-    }
-  }
+	for (int i = 0; i < ns; i++) {
+		Serial.printf("Sensor %i:\tCx:%.4f, Cy:%.4f, Cr:%.4f\n", i, cal[i].x, cal[i].y, cal[i].r);
+	}
 
 }
 
@@ -72,54 +64,40 @@ void loop() {
 }
 
 void writeEepromCalibration() {
-  Serial.println("writing calibration values to EEPROM...");
+	//  - Calibration values will be stored using (4)x(4)x(3) = 48 bytes
+	//  - This comes from (4 bytes per float)x(4 sensors)x(2 vals per sensor)
+	//	- The values will be stored in the order (cal[0].x),(cal[0].y),(cal[0].r),
+	//		(cal[1].x),...,(cal[i].r), so sensor 0 calibration value for x,
+	//		sensor 0 calibration value for y, sensor 0 calibration for rotation,
+	//		sensor 1 calibration value for x, and so on
 
+	Serial.println("writing calibration values to EEPROM...");
 
-  // int addr = eepromAddrCx;
-  // for (int i = 0; i < 3; i++) {
-  //   EEPROM.put(addr, x_vals[i]);
-  //   addr += sizeof(float);
-  // }
-
-  // addr = eepromAddrCy;
-  // for (int i = 0; i < 3; i++) {
-  //   EEPROM.put(addr, y_vals[i]);
-  //   addr += sizeof(float);
-  // }
-
-  // Notes
-  //  - Calibration values will be stored using (4)x(4)x(2) = 32 bytes
-  //  - This comes from (4 bytes per float)x(4 sensors)x(2 vals per sensor)
-  //  - The values will be stored in the order (cVal[0][0]),(cVal[1][0]),
-  //    (cVal[0][1]),...,(cVal[j][i]), so sensor 0 calibration value for x,
-  //    sensor 0 calibration value for y, sensor 1 calibration value for x, and so on
-  int addr = 0;         // starting address is always 0
-  for (int i = 0; i < ns; i++) {    // sensor number
-    for (int j = 0; j < 2; j++) {   // calibration axis (x = 0, y = 1)
-      EEPROM.put(addr, vals[j][i]);
-      addr += sizeof(float);
-    }
-  }
+	int addr = 0;         // starting address is always 0
+	for (int i = 0; i < ns; i++) {    // sensor number
+		EEPROM.put(addr, vals[0][i]);
+		addr += sizeof(float);
+		EEPROM.put(addr, vals[1][i]);
+		addr += sizeof(float);
+		EEPROM.put(addr, vals[2][i]);
+		addr += sizeof(float);
+	}
 }
 
-void readEepromCalibration(float (&cVal)[2][4]) {
-  // int addr = eepromAddrCx;
-  // for (int i = 0; i < ns; i++) {
-  //   Cx[i] = EEPROM.get(addr, Cx[i]);
-  //   addr += sizeof(float);
-  // }
+void readEepromCalibration() {
+	int addr = 0;
+	float tempVal = 0.0f;
+	for (int i = 0; i < ns; i++) {
+		EEPROM.get(addr, tempVal);
+		cal[i].x = isnan(tempVal) ? cal[i].x : tempVal;			// check if calibration has been performed
+		addr += sizeof(float);
 
-  // addr = eepromAddrCy;
-  // for (int i = 0; i < ns; i++) {
-  //   Cy[i] = EEPROM.get(addr, Cy[i]);
-  //   addr += sizeof(float);
-  // }
+		EEPROM.get(addr, tempVal);
+		cal[i].y = isnan(tempVal) ? cal[i].y : tempVal;
+		addr += sizeof(float);
 
-  int addr = 0;
-  for (int i = 0; i < ns; i++) {
-    for (int j = 0; j < 2; j++) {
-      EEPROM.get(addr, cVal[j][i]);
-      addr += sizeof(float);
-    }
-  }
+		EEPROM.get(addr, tempVal);
+		cal[i].r = isnan(tempVal) ? cal[i].r : tempVal;
+		addr += sizeof(float);
+	}
 }

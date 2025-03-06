@@ -732,6 +732,7 @@ function writeBlock() {
       writeWords(text + suffix);
     }
   }
+  writeln(""); // Add a blank line for readability
 }
 
 validate(settings.comments, "Setting 'comments' is required but not defined.");
