@@ -205,7 +205,7 @@ void parseGCodeFile(const String& sFilename) {
 }
 
 // Write ------------------------------------------------------
-void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos, bool cutting) {
+void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos) {
 	if(millis() - timeLastOutput >= dtOutput) {
 		timeLastOutput = millis();
 
@@ -217,7 +217,7 @@ void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos, boo
 		float desY = rPose.y + desPos*sinf(rPose.yaw);
 
 		Serial.printf(
-			"POS:%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f\n",
+			"POS:%f,%f,%f,%f,%f,%f,%f,%f,%f,%i,%f\n",
 			rPose.x,
 			rPose.y,
 			rPose.yaw,
@@ -227,7 +227,7 @@ void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos, boo
 			toolY,
 			desX,
 			desY,
-			cutting,
+			cutState,
 			toolPos
 		);
 	}
@@ -365,7 +365,7 @@ bool initializeLogFile() {
 	return true;
 }
 
-void outputSD(RouterPose rPose, Point goal, float toolPos, float desPos, bool cutting) {
+void outputSD(RouterPose rPose, Point goal, float toolPos, float desPos) {
 	if(millis() - timeLastOutputSD >= dtOutputSD) {
 		timeLastOutputSD = millis();
 
@@ -378,7 +378,7 @@ void outputSD(RouterPose rPose, Point goal, float toolPos, float desPos, bool cu
 		if (logFile) {
 			// Write data in CSV format
 			logFile.printf(
-				"%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f\n",
+				"%f,%f,%f,%f,%f,%f,%f,%f,%f,%i,%f\n",
 				rPose.x,
 				rPose.y,
 				rPose.yaw,
@@ -388,7 +388,7 @@ void outputSD(RouterPose rPose, Point goal, float toolPos, float desPos, bool cu
 				toolY,
 				desX,
 				desY,
-				cutting,
+				cutState,
 				toolPos
 			);
 			

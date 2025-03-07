@@ -15,7 +15,6 @@ SdFat sd;
 // State variables
 State state = POWER_ON;
 CutState cutState = NOT_CUT_READY;
-bool cutting = false;
 bool path_started = false;
 bool valid_sensors = true;
 DesignType designType = PRESET;

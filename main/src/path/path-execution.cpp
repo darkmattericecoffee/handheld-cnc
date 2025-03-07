@@ -95,8 +95,8 @@ void handleCutting() {
 		// Update UI
 		updateUI(desPos, goal, next);
 
-		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
-		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, false);
+		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos);
+		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos);
 		if (debuggingOn) {
 			debugging(goal, next);
 		}
@@ -150,8 +150,8 @@ void handleCutting() {
 		stepperX.moveTo(Conv*desPos);
 
 		// Path logging
-		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
-		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos, true);
+		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos);
+		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos);
 
 		// Evaluate whether to move on to next point
 		advance(goal, next);
@@ -185,8 +185,8 @@ void handleCutting() {
 		stepperX.moveTo(Conv*desPosClosest);
 
 		// Path logging
-		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
-		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest, false);
+		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
+		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
 	}
 
 	// Update UI
