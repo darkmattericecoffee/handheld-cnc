@@ -19,6 +19,12 @@ typedef enum State {
 	READY
 } State;
 
+typedef enum CutState {
+	NOT_CUT_READY,
+	CUT_READY,
+	CUTTING
+} CutState;
+
 // Type of design
 typedef enum DesignType {
 	PRESET,

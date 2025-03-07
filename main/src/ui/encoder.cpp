@@ -207,6 +207,7 @@ void encoderDesignSelect() {
 	current_point_idx = 0;
 
 	state = READY;
+	cutState = NOT_CUT_READY;
 	encoder.setEncoderHandler(nullHandler);
 	encoder.setClickHandler(onClickExecutePath);
 

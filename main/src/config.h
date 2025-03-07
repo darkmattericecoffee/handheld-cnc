@@ -39,6 +39,7 @@
 #define MAX_FILES			100
 #define GC9A01A_WEBWORK_GREEN 0x8FF1
 #define motorInterfaceType 	1
+const float angleThreshold = PI/6;				// angle threshold for cuttable region (rads)
 
 // Sensor properties
 const int ns = 4;								// number of sensors

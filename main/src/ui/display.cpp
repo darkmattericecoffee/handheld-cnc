@@ -301,19 +301,15 @@ void drawCenteredText(const char* text, int size) {
 void drawFixedUI() {
 	screen->fillScreen(BLACK);
 
-	int16_t radius = screen->width()*0.95 / 2;
+	int16_t r = screen->width()*0.95 / 2;
 	int16_t centerX = screen->width() / 2;
 	int16_t centerY = screen->width() / 2;
+	float angleInc = 0.01;			// angle increment
 
 	// Draw arcs
-	for (int i=0; i<radius; i++) {
-		float xOffset = radius*cosf((PI/4)*i/radius);
-		float yOffset = radius*sinf((PI/4)*i/radius);
-
-		screen->drawPixel(centerX - xOffset, centerY - yOffset, WHITE);
-		screen->drawPixel(centerX - xOffset, centerY + yOffset, WHITE);
-		screen->drawPixel(centerX + xOffset, centerY - yOffset, WHITE);
-		screen->drawPixel(centerX + xOffset, centerY + yOffset, WHITE);
+	for (float th = angleThreshold; th < (PI - angleThreshold); th += angleInc) {
+		screen->drawPixel(r*cosf(th) + centerX, r*sinf(th) + centerY, WHITE);
+		screen->drawPixel(r*cosf(th) + centerX, -r*sinf(th) + centerY, WHITE);
 	}
 	
 	// Draw bounds circle
@@ -327,7 +323,7 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 	int16_t centerX = screen->width() / 2;
 	int16_t centerY = screen->width() / 2;
 
-	float dTheta = pose.yaw + PI/2 - atan2f(next.y-goal.y, next.x-goal.x);
+	float dTheta = pose.yaw - atan2f(next.y-goal.y, next.x-goal.x);			// angle between pose and next point
 
 	// float xMap = mapF(desPosition, -gantryLengthRouter/2, gantryLengthRouter/2, -radiusBounds, radiusBounds);
 	// float yMap = mapF();
@@ -354,7 +350,7 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 	float offsetRadius = radiusBounds*0.9*tanh(dist*0.05);
 	//float offsetRadius = (radius - radiusInner)*0.8*tanh(dist*0.1);
 
-	switch (i%8) {
+	switch (i%6) {
 		case 0:
 			// draw the center target
 			screen->drawLine(centerX, centerY-5, centerX, centerY+5, WHITE);
@@ -366,15 +362,11 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 			screen->drawLine(centerX-radiusBounds, centerY, centerX-radiusBounds+5, centerY, WHITE);
 			break;
 		case 2:
-			// clear the old line left
+			// clear the old compass line
 			screen->drawLine(lastX0, lastY0, lastX1, lastY1, BLACK);
 			break;
 		case 3:
-			// clear old line right
-			screen->drawLine(lastX2, lastY2, lastX3, lastY3, BLACK);
-			break;
-		case 4:
-			// draw the new line left
+			// draw the new compass line
 			lastX0 = centerX + 1.4*radiusBounds*cosf(dTheta);
 			lastY0 = centerY + 1.4*radiusBounds*sinf(dTheta);
 			lastX1 = centerX + (radiusBounds+2)*cosf(dTheta);
@@ -382,20 +374,11 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 
 			screen->drawLine(lastX0, lastY0, lastX1, lastY1, WHITE);
 			break;
-		case 5:
-			// draw the new line right
-			lastX2 = centerX - (radiusBounds+2)*cosf(dTheta);
-			lastY2 = centerY - (radiusBounds+2)*sinf(dTheta);
-			lastX3 = centerX - 1.4*radiusBounds*cosf(dTheta);
-			lastY3 = centerY - 1.4*radiusBounds*sinf(dTheta);
-			
-			screen->drawLine(lastX2, lastY2, lastX3, lastY3, WHITE);
-			break;
-		case 6:
+		case 4:
 			// clear the old target circle
 			screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, BLACK);
 			break;
-		case 7:
+		case 5:
 			// draw new target circle
 			// float toolX = radiusBounds*cosf(thetaTool);
 			// float toolY = radiusBounds*sinf(thetaTool);
@@ -406,7 +389,14 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 			// lastTargetCircleX = centerX + xMap;
 			// lastTargetCircleY = centerY + radiusInner*sqrt((1-pow(xMap/radiusBounds,2)));
 			if (paths[current_path_idx].feature != HOLE){
-				screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, WHITE);
+				if (cutState == NOT_CUT_READY) {
+					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, RED);
+				} else if (cutState == CUT_READY) {
+					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, YELLOW);
+				} else {
+					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GREEN);
+				}
+				
 			} else {
 				if (holeDistance <= holeTolerance) {
 					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GREEN);
@@ -460,7 +450,7 @@ void drawDirection() {
 
 void updateUI(float desPosition, Point goal, Point next) {
 	if ((millis()-lastDraw) > 15) {
-		iter = (iter + 1)%8;
+		iter = (iter + 1)%6;
 		// unsigned long now = micros();
 		// motorPosX = stepperX.currentPosition()*1.0f/Conv;
 		drawUI(desPosition, goal, next, iter);

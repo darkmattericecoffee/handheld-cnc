@@ -86,6 +86,7 @@ void handleCutting() {
 	// is in front of us and ready to be cut
 	bool goal_behind = paths[current_path_idx].direction * signedDist(pose, goal) > 0;
 	if (!path_started && goal_behind) {
+		cutState = NOT_CUT_READY;
 		// Move tool closest to intersect with cutting path
 		float desPos = desPosClosestToIntersect(pose, goal, next);
 		
@@ -104,7 +105,6 @@ void handleCutting() {
 	}
 
 	// If we get here start the path
-	// TODO: change w.r.t. naming convention (i.e. cluster, pass, path, point)
 	path_started = true;
 
 	// Desired position if we intersect
@@ -124,7 +124,7 @@ void handleCutting() {
 	// if (handle_buttons_ok) timeLastDebounce = millis();
 	bool gantry_intersects = !isnan(desPos);
 	bool goal_behind_router = paths[current_path_idx].direction * signedDist(pose, goal) > 0;
-	bool gantry_angle_ok = angleFrom(goal, next) > (PI / 6);
+	bool gantry_angle_ok = angleFrom(goal, next) > (angleThreshold);
 	bool within_hole_tol = abs(signedDist(pose, goal)) < holeTolerance;
 
 	// TODO: delete me
@@ -142,7 +142,9 @@ void handleCutting() {
 		prevChecks[i] = newChecks[i];
 	}
 
+	// TODO: handle valid_sensors better (want to prompt re-zeroing if sensors are bad)
 	if (handle_buttons_ok && gantry_intersects && goal_behind_router && gantry_angle_ok && valid_sensors && paths[current_path_idx].feature == NORMAL) {
+		cutState = CUTTING;
 		// We are good to cut
 		stepperZ.moveTo(Conv*desZ);
 		stepperX.moveTo(Conv*desPos);
@@ -159,12 +161,25 @@ void handleCutting() {
 		stepperX.moveTo(Conv*desPosHole);
 		
 		if (valid_sensors && plungeReady && within_hole_tol) {
+			cutState = CUTTING;
 			plungeZ(desZ, holeFeedrate);
 			advance(goal,next,true);
 		} else {
+			cutState = NOT_CUT_READY;
 			plungeReady = false;
 		}
+	} else if (gantry_intersects && gantry_angle_ok && valid_sensors){
+		// Conditions are good except for pressed buttons and the goal point being behind the router
+		cutState = CUT_READY;
+		// Stop cutting
+		stepperZ.moveTo(Conv*restHeight);
+		stepperX.moveTo(Conv*desPosClosest);
+
+		// Path logging
+		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
+		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
 	} else {
+		cutState = NOT_CUT_READY;
 		// Stop cutting
 		stepperZ.moveTo(Conv*restHeight);
 		stepperX.moveTo(Conv*desPosClosest);

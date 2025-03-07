@@ -23,7 +23,8 @@ extern SdFat sd;
 
 // State variables
 extern State state;
-extern bool cutting;
+extern CutState cutState;
+extern bool cutting;		// unused?
 extern bool path_started;
 extern bool valid_sensors;
 extern float motorPosX;

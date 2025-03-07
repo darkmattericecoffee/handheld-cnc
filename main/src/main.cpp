@@ -26,6 +26,7 @@ void setup() {
 	centerY = screen->width() / 2;
 
 	drawCenteredText("Initializing...", 2);
+	delay(200);
 
 	Serial.println("Loading calibration coefficients:");
 	readEepromCalibration();

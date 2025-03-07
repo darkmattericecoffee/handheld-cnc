@@ -201,7 +201,7 @@ void doSensingLinear() {
     // Sensor plotting
 	for (int i = 0; i < 4; i++) {
 		float angle = atanf(calPos[1][i]/calPos[0][i]);
-		Serial.printf("%i: x:%.2f,\ty:%.2f,\tb:%.3f",i,calPos[0][i],calPos[1][i],angle);
+		Serial.printf("%i: x:%.2f,\ty:%.2f,\tb:%.3f,\tsq:%i",i,calPos[0][i],calPos[1][i],angle,surfaceQuality[i]);
 		Serial.println();
 	}
 }
