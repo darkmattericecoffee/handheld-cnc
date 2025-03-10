@@ -13,6 +13,7 @@ float mapF(long x, float in_min, float in_max, float out_min, float out_max);
 // Path and angle calculations
 float signedDist(RouterPose rPose, Point g);
 float angleFrom(Point a, Point b);
+int direction(Point g, Point n);
 
 // Gantry intersection calculations
 float desPosIntersect(RouterPose rPose, Point point3, Point point4);

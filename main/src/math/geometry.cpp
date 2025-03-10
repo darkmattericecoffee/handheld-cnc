@@ -56,14 +56,37 @@ float angleFrom(Point a, Point b) {
 	// Returns the angle (rads) between the gantry and the 
 	// line connecting points a and b.
 	float th1 = principalAngleRad(atan2f(b.y - a.y, b.x - a.x));
+	// float dx = b.x - a.x;
+	// float dy = b.y - a.y;
+	// // float th1 = atan2f(dx, dy);			// angle from +y axis
+	// float th1 = atan2f(dy,dx);
 
 	// Using yaw here is a bit odd, since yaw is 0 when the router is in the
 	// original orientation, which would actually be 90 degrees from +x. However,
 	// we actually care about the angle of the gantry, which will be 0 degrees from +x
 	// when the yaw is 0, so this works ok.
 	float th2 = principalAngleRad(pose.yaw);
+	// float th2 = pose.yaw;
 
 	return abs(th1 - th2);
+}
+
+int direction(Point g, Point n) {
+	// Returns the direction of the path at the given orientation
+	// 1 - forward
+	// -1 - backward
+	// 0 - no direction
+
+	// float angle = angleFrom(g, n);
+	float angle = atan2f(n.y - g.y, n.x - g.x) - pose.yaw;
+	
+	if (sin(angle) > 0) {
+		return 1;
+	} else if (sin(angle) < 0) {
+		return -1;
+	} else {
+		return 0;
+	}
 }
 
 float desPosIntersect(RouterPose rPose, Point point3, Point point4) {

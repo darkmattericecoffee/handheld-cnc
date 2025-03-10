@@ -410,44 +410,6 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 	}
 }
 
-void drawDirection() {
-	float width = 30;
-	float height = screen->height() / 3;
-	float spacing = 5;
-
-	int16_t centerX = screen->height() / 2;
-	int16_t centerY = screen->height() / 2;
-	
-	// Forward triangle
-	int16_t x0 = centerX - width;
-	int16_t y0 = centerY-spacing;
-	int16_t x1 = centerX;
-	int16_t y1 = centerY-height;
-	int16_t x2 = centerX + width;
-	int16_t y2 = centerY-spacing;
-
-	// Backward triangle
-	int16_t x3 = centerX - width;
-	int16_t y3 = centerY+spacing;
-	int16_t x4 = centerX;
-	int16_t y4 = centerY+height;
-	int16_t x5 = centerX + width;
-	int16_t y5 = centerY+spacing;
-
-	uint16_t forwardColor, reverseColor;
-
-	if (paths[current_path_idx].direction > 0) {
-		forwardColor = GC9A01A_WEBWORK_GREEN;
-		reverseColor = DARKGREY;
-	} else {
-		forwardColor = DARKGREY;
-		reverseColor = GC9A01A_WEBWORK_GREEN;
-	}
-
-	screen->drawTriangle(x0,y0,x1,y1,x2,y2,forwardColor);
-	screen->drawTriangle(x3,y3,x4,y4,x5,y5,reverseColor);
-}
-
 void updateUI(float desPosition, Point goal, Point next) {
 	if ((millis()-lastDraw) > 15) {
 		iter = (iter + 1)%6;

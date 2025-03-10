@@ -303,6 +303,7 @@ void calibrate() {
 				float sensorDist = calDistance / (myDist(calPos[0][i],calPos[1][i],0,0));
 				tempCalScalar[axis][i] = tempCalScalar[axis][i] + (sensorDist / numRuns);
 
+				// TODO: might want to convert this to atan2f
 				float sensorRot = axis ? atanf(calPos[0][i]/calPos[1][i]) : atanf(-calPos[1][i]/calPos[0][i]);
 				tempCalRot[axis][i] =  tempCalRot[axis][i] + (sensorRot / numRuns);
 			}

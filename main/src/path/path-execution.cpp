@@ -34,7 +34,7 @@ bool performSafetyChecks() {
 
 void advance(Point goal, Point next, bool autoAdvance=false) {
 	// Move through point indeces as needed
-	if (paths[current_path_idx].direction * signedDist(pose,next) > 0 || autoAdvance) {
+	if (direction(goal,next) * signedDist(pose,next) > 0 || autoAdvance) {
 		// If next point is behind router, it becomes the new goal.
 		current_point_idx++;
 		// if (autoAdvance) Serial.println("Auto-advanced!");
@@ -84,8 +84,8 @@ void handleCutting() {
 	// If we have not started the path, and the first point is behind us
 	// keep the tool raised and return. We wait here until the first point
 	// is in front of us and ready to be cut
-	bool goal_behind = paths[current_path_idx].direction * signedDist(pose, goal) > 0;
-	if (!path_started && goal_behind) {
+	bool goal_behind_router = direction(goal, next) * signedDist(pose, goal) > 0;
+	if (!path_started && goal_behind_router) {
 		cutState = NOT_CUT_READY;
 		// Move tool closest to intersect with cutting path
 		float desPos = desPosClosestToIntersect(pose, goal, next);
@@ -123,8 +123,7 @@ void handleCutting() {
 	// 					   ((millis() - timeLastDebounce) < debounceDelay);
 	// if (handle_buttons_ok) timeLastDebounce = millis();
 	bool gantry_intersects = !isnan(desPos);
-	bool goal_behind_router = paths[current_path_idx].direction * signedDist(pose, goal) > 0;
-	bool gantry_angle_ok = angleFrom(goal, next) > (angleThreshold);
+	bool gantry_angle_ok = angleFrom(goal, next) > (angleThreshold);		// TODO: how is this working?
 	bool within_hole_tol = abs(signedDist(pose, goal)) < holeTolerance;
 
 	// TODO: delete me

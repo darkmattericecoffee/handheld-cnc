@@ -82,9 +82,6 @@ void doubleLineGenerator() {
 		};
 	}
 
-	paths[0].direction = 1;
-	paths[1].direction = -1;
-
 	num_paths = 2;
 	for (int i = 0; i < num_paths; i++){
 		paths[i].numPoints = MAX_POINTS;
@@ -96,12 +93,6 @@ void circleGenerator() {
 	float r = 30.0;
 	Point center = Point{x: 0.0, y: 50.0, z: -matThickness};
 	float theta;
-	
-	// Path alternates forward and backward
-	paths[0].direction = 1;
-	paths[1].direction = -1;
-	paths[2].direction = 1;
-	paths[3].direction = -1;
 
 	for (int i = 0; i < MAX_POINTS; i++) {
 		theta = (float)i/MAX_POINTS*PI/2;
@@ -146,8 +137,7 @@ void diamondGenerator() {
 	float angle = 60;
 	float angle_rad = angle * (M_PI / 180.0);
 	float segment_length = 100.0;
-	paths[0].direction = 1;
-	paths[1].direction = -1;
+	int dirs[2] = {1, -1};
 
 	float y_increment = segment_length / (MAX_POINTS - 1);
 	float x_increment = y_increment / tan(angle_rad);
@@ -157,7 +147,7 @@ void diamondGenerator() {
 			int xIndex = (i >= MAX_POINTS / 2) ? (MAX_POINTS - 1 - i) : i;
 			int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
 			paths[p].points[i] = Point{
-				x: paths[p].direction * xIndex * x_increment,
+				x: dirs[p] * xIndex * x_increment,
 				y: yIndex * y_increment,
 				z: -matThickness
 			};
@@ -176,9 +166,7 @@ void squareGeneratorSine() {
 	float angle_rad = angle * (M_PI / 180.0);
 	float segment_length = 100.0;
 	float engrave_depth = matThickness / 4;
-	paths[0].direction = 1;
-	paths[1].direction = -1;
-	paths[2].direction = 1;
+	int dirs[3] = {1, -1, 1};
 
 	// Generate design engraving
 	for (int i = 0; i < MAX_POINTS; ++i) {
@@ -198,13 +186,13 @@ void squareGeneratorSine() {
 			int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
 			if (p == 0) {
 				paths[2].points[i] = Point{
-					x: paths[p].direction * xIndex * x_increment,
+					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
 					z: -matThickness
 				};
 			} else {
 				paths[1].points[i] = Point{
-					x: paths[p].direction * xIndex * x_increment,
+					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
 					z: -matThickness
 				};
@@ -237,13 +225,7 @@ void squareGeneratorMake() {
 	float colon_ratio = 0.6;
 	float make_length = make_ratio * segment_length;
 	float colon_length = colon_ratio * make_length;
-	paths[0].direction = 1;				// left M vertical line
-	paths[1].direction = -1;			// left M slanted line
-	paths[2].direction = 1;				// right M slanted line
-	paths[3].direction = -1;			// right M vertical line
-	paths[4].direction = 1;				// colon
-	paths[5].direction = -1;			// left half of square
-	paths[6].direction = 1;				// right half of square
+	int dirs[7] = {1, -1, 1, -1, 1, -1, 1};
 
 	// Generate left M vertical
 	start_y = (segment_length/2) - (make_length/2);
@@ -302,13 +284,13 @@ void squareGeneratorMake() {
 			int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
 			if (p == 0) {
 				paths[6].points[i] = Point{
-					x: paths[p].direction * xIndex * x_increment,
+					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
 					z: -matThickness
 				};
 			} else {
 				paths[5].points[i] = Point{
-					x: paths[p].direction * xIndex * x_increment,
+					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
 					z: -matThickness
 				};

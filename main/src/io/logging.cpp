@@ -2,6 +2,7 @@
 #include "../config.h"
 #include "../globals.h"
 #include <Arduino.h>
+#include "../math/geometry.h"
 
 #define LINE_BUFFER_SIZE 100
 
@@ -113,7 +114,6 @@ void parseGCodeFile(const String& sFilename) {
 
 	// Reset paths
 	for (int i = 0; i < MAX_PATHS; i++) {
-		paths[i].direction = 1;
 		paths[i].feature = NORMAL;
 		paths[i].numPoints = 0;
 		
@@ -145,13 +145,13 @@ void parseGCodeFile(const String& sFilename) {
 				// Parse the M800 parameters
 				char* ptr = line;
 				while (*ptr) {
-					if (*ptr == 'D') currentPath->direction = atoi(ptr + 1);
+					// if (*ptr == 'D') currentPath->direction = atoi(ptr + 1);		// direction not needed anymore
 					if (*ptr == 'F') currentPath->feature = (Feature)atoi(ptr + 1);
 					// if (*ptr == 'A') currentPath->angle = atof(ptr + 1);
 					ptr++;
 				}
 				num_paths++;
-				Serial.printf("New Path%i! D(%i) F(%i)\n", currentPathIndex, currentPath->direction, currentPath->feature);
+				Serial.printf("New Path%i! F(%i)\n", currentPathIndex, currentPath->feature);
 			}
 			continue;
 		}
@@ -254,7 +254,7 @@ void debugging(Point point1, Point point2) {
 	timeLastDebug = millis();
 
 	// Print debug data
-	Serial.printf("x:%f, y:%f, theta:%f, dir:%i\n", pose.x, pose.y, pose.yaw * 180.0 / PI,paths[current_path_idx].direction);
+	Serial.printf("x:%f, y:%f, theta:%f, dir:%i\n", pose.x, pose.y, pose.yaw * 180.0 / PI, direction(point1, point2));
 	Serial.printf("goal.x:%f,goal.y:%f,goal.z%f, next.x:%f,next.y:%f,next.z%f\n", point1.x, point1.y, point1.z, point2.x, point2.y, point2.z);
 
 	// Additional debug info can be uncommented as needed:
