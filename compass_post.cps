@@ -10,7 +10,7 @@
   FORKID {56909A11-6573-4922-8519-4E95E0E06197}
 */
 
-description = "Compass Handheld CNC Router";
+description = "CompassCNC";
 vendor = "Compass CNC";
 vendorUrl = "https://www.compassrouter.com/";
 legal = "Copyright (C) 2012-2024 by Autodesk, Inc.";
@@ -20,7 +20,6 @@ minimumRevision = 45917;
 longDescription = "Routing post for Compass Handheld CNC.";
 
 extension = "nc";
-programNameIsInteger = true;
 setCodePage("ascii");
 
 capabilities = CAPABILITY_MILLING | CAPABILITY_MACHINE_SIMULATION;
@@ -122,7 +121,6 @@ var toolFormat = createFormat({decimals:0});
 var rpmFormat = createFormat({decimals:0});
 var secFormat = createFormat({decimals:3, type:FORMAT_REAL}); // seconds - range 0.001-1000
 var taperFormat = createFormat({decimals:1, scale:DEG});
-var oFormat = createFormat({minDigitsLeft:4, decimals:0});
 
 var xOutput = createOutputVariable({onchange:function() {state.retractedX = false;}, prefix:"X"}, xyzFormat);
 var yOutput = createOutputVariable({onchange:function() {state.retractedY = false;}, prefix:"Y"}, xyzFormat);
@@ -191,8 +189,7 @@ function onOpen() {
     setWordSeparator("");
   }
 
-  writeln("%");
-  writeln(":O" + oFormat.format(getProgramNumber()));
+  writeComment(programName);
   writeComment(programComment);
   writeProgramHeader();
 
@@ -220,7 +217,11 @@ function onSection() {
     writeRetract(Z); // retract to safe plane
   }
 
+  // Add empty line at the end of each section for readability
+  writeln("");
   writeComment(getParameter("operation-comment", ""));
+  // Add M800 line before the first line of every feature
+  writeBlock("M800");
 
   // tool change
   writeToolCall(tool, insertToolCall);
@@ -456,7 +457,6 @@ function onClose() {
   // }
   writeBlock(gFormat.format(28)); // return to home
   writeBlock(mFormat.format(30)); // stop program, spindle stop, coolant off
-  writeln("%");
 }
 
 // >>>>> INCLUDED FROM include_files/commonFunctions.cpi
@@ -732,7 +732,6 @@ function writeBlock() {
       writeWords(text + suffix);
     }
   }
-  writeln(""); // Add a blank line for readability
 }
 
 validate(settings.comments, "Setting 'comments' is required but not defined.");
@@ -1556,30 +1555,3 @@ Matrix.getOrientationFromDirection = function (ijk) {
   return W;
 };
 // <<<<< INCLUDED FROM include_files/initialPositioning_fanuc.cpi
-// >>>>> INCLUDED FROM include_files/getProgramNumber_fanuc.cpi
-function getProgramNumber() {
-  if (typeof oFormat != "undefined" && getProperty("o8")) {
-    oFormat.setMinDigitsLeft(8);
-  }
-  var minimumProgramNumber = getSetting("programNumber.min", 1);
-  var maximumProgramNumber = getSetting("programNumber.max", getProperty("o8") ? 99999999 : 9999);
-  var reservedProgramNumbers = getSetting("programNumber.reserved", [8000, 9999]);
-  if (programName) {
-    var _programNumber;
-    try {
-      _programNumber = getAsInt(programName);
-    } catch (e) {
-      error(localize("Program name must be a number."));
-    }
-    if (!((_programNumber >= minimumProgramNumber) && (_programNumber <= maximumProgramNumber))) {
-      error(subst(localize("Program number '%1' is out of range. Please enter a program number between '%2' and '%3'."), _programNumber, minimumProgramNumber, maximumProgramNumber));
-    }
-    if ((_programNumber >= reservedProgramNumbers[0]) && (_programNumber <= reservedProgramNumbers[1])) {
-      warning(subst(localize("Program number '%1' is potentially reserved by the machine tool builder. Reserved range is '%2' to '%3'."), _programNumber, reservedProgramNumbers[0], reservedProgramNumbers[1]));
-    }
-  } else {
-    error(localize("Program name has not been specified."));
-  }
-  return _programNumber;
-}
-// <<<<< INCLUDED FROM include_files/getProgramNumber_fanuc.cpi

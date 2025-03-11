@@ -154,7 +154,7 @@ void handleCutting() {
 
 		// Evaluate whether to move on to next point
 		advance(goal, next);
-	} else if (paths[current_path_idx].feature == HOLE) {
+	} else if (paths[current_path_idx].feature == DRILL) {
 		// Handle hole
 		stepperZ.moveTo(Conv*restHeight);
 		stepperX.moveTo(Conv*desPosHole);

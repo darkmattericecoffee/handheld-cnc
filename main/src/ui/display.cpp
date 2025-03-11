@@ -329,7 +329,7 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 	// float yMap = mapF();
 	float dx = 0.0f;
 	float dy = 0.0f;
-	if (paths[current_path_idx].feature != HOLE) {
+	if (paths[current_path_idx].feature != DRILL) {
 		dx = (next.x-pose.x)*cosf(-pose.yaw) - (next.y-pose.y)*sinf(-pose.yaw);
 		dy = (next.x-pose.x)*sinf(-pose.yaw) + (next.y-pose.y)*cosf(-pose.yaw);
 	} else {
@@ -369,10 +369,14 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 			// draw the new compass line
 			lastX0 = centerX + 1.4*radiusBounds*cosf(dTheta);
 			lastY0 = centerY + 1.4*radiusBounds*sinf(dTheta);
-			lastX1 = centerX + (radiusBounds+2)*cosf(dTheta);
-			lastY1 = centerY + (radiusBounds+2)*sinf(dTheta);
+			lastX1 = centerX + (radiusBounds+6)*cosf(dTheta);
+			lastY1 = centerY + (radiusBounds+6)*sinf(dTheta);
 
-			screen->drawLine(lastX0, lastY0, lastX1, lastY1, WHITE);
+			if (paths[current_path_idx].feature != DRILL) {
+				screen->drawLine(lastX0, lastY0, lastX1, lastY1, WHITE);
+			} else {
+				screen->drawLine(lastX0, lastY0, lastX1, lastY1, BLACK);
+			}
 			break;
 		case 4:
 			// clear the old target circle
@@ -388,7 +392,7 @@ void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
 			// lastTargetCircleY = centerY + ((offsetRadius)*sinf(theta) + toolY)/2;
 			// lastTargetCircleX = centerX + xMap;
 			// lastTargetCircleY = centerY + radiusInner*sqrt((1-pow(xMap/radiusBounds,2)));
-			if (paths[current_path_idx].feature != HOLE){
+			if (paths[current_path_idx].feature != DRILL){
 				if (cutState == NOT_CUT_READY) {
 					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, RED);
 				} else if (cutState == CUT_READY) {

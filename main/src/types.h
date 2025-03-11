@@ -35,7 +35,7 @@ typedef enum DesignType {
 typedef enum Feature {
 	// TODO: add types for travel, contour, pocket, etc.
 	NORMAL,
-	HOLE,
+	DRILL,
 } Feature;
 
 // Router pose

@@ -82,7 +82,7 @@ void onClickMakePath(EncoderButton &eb) {
 }
 
 void onClickExecutePath(EncoderButton &eb) {
-	if (paths[current_path_idx].feature == HOLE) {
+	if (paths[current_path_idx].feature == DRILL) {
 		Serial.println("Plunge ready!");
 		plungeReady = true;
 	}

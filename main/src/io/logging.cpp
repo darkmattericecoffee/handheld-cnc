@@ -75,6 +75,8 @@ void handleFileSelection() {
 }
 
 bool validCommand(const char* gLine) {
+	// Returns true if the line contains a valid GCode command
+
 	int numCommands = 3;
 	const char* validCommands[numCommands] = {"G0", "G1", "G98"};
 	int commandSizes[numCommands] = {2,2,3};
@@ -89,6 +91,8 @@ bool validCommand(const char* gLine) {
 }
 
 bool validCoordinate(const char* gLine) {
+	// Returns true if the line contains a valid coordinate (X, Y, or Z)
+
 	int numCommands = 3;
 	const char* validCommands[numCommands] = {"X", "Y", "Z"};
 	int commandSizes[numCommands] = {1,1,1};
@@ -146,12 +150,12 @@ void parseGCodeFile(const String& sFilename) {
 				char* ptr = line;
 				while (*ptr) {
 					// if (*ptr == 'D') currentPath->direction = atoi(ptr + 1);		// direction not needed anymore
-					if (*ptr == 'F') currentPath->feature = (Feature)atoi(ptr + 1);
+					// if (*ptr == 'F') currentPath->feature = (Feature)atoi(ptr + 1);		// feauture not used
 					// if (*ptr == 'A') currentPath->angle = atof(ptr + 1);
 					ptr++;
 				}
 				num_paths++;
-				Serial.printf("New Path%i! F(%i)\n", currentPathIndex, currentPath->feature);
+				Serial.printf("New Path%i!\n", currentPathIndex);
 			}
 			continue;
 		}
@@ -160,6 +164,7 @@ void parseGCodeFile(const String& sFilename) {
 		if (validCommand(line)) {
 			activeFeature = true;
 		} else if (!validCoordinate(line)){
+			// once (X,Y,Z) coordinates have stopped being sent, the command is over
 			activeFeature = false;
 		}
 
@@ -170,6 +175,12 @@ void parseGCodeFile(const String& sFilename) {
 			
 			// Parse X, Y, Z coordinates from line
 			while (*ptr) {
+				if (*ptr == 'G') {
+					// TODO: make this cleaner and more universal
+					if (atof(ptr+1) == 98) {
+						currentPath->feature = DRILL;
+					}
+				}
 				if (*ptr == 'X') {
 					newPoint.x = atof(ptr + 1);
 					hasNewCoordinate = true;
