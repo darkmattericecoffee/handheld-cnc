@@ -305,6 +305,22 @@ void squareGeneratorMake() {
 	}
 }
 
+void drillSquareGenerator() {
+	// Generate a drill cycle that starts at (0,0) and does a square pattern
+	float l = 50.0f;
+
+	paths[0].points[0] = Point{x: 0.0f, y: 0.0f, z: -matThickness};
+	paths[0].points[1] = Point{x: l, y: l, z: -matThickness};
+	paths[0].points[2] = Point{x: -l, y: l, z: -matThickness};
+	paths[0].points[3] = Point{x: -l, y: -l, z: -matThickness};
+	paths[0].points[4] = Point{x: l, y: -l, z: -matThickness};
+	paths[0].points[5] = Point{x: 0.0f, y: 0.0f, z: -matThickness};
+
+	num_paths = 1;
+	paths[0].numPoints = 6;
+	paths[0].feature = DRILL;
+}
+
 void parseNC(const char* filename) {
 	// TODO: maybe take some of this parseGCodeFile function
 	FsFile myFile = sd.open(filename);
@@ -391,14 +407,13 @@ void makePresetPath() {
 			Serial.println("Wave square path generated!");
 			break;
 
-		// UNUSED
 		case 7:
 			circleGenerator();
 			Serial.println("Circle path generated!");
 			break;
 		case 8:
-			squareGeneratorWave();
-			Serial.println("Hexagon square path generated!");
+			drillSquareGenerator();
+			Serial.println("Square drill path generated!");
 			break;
 	}
 

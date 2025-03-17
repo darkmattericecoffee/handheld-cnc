@@ -89,7 +89,7 @@ void loop() {
 
 	// Safety stuff
 	unsigned long startSafetyTime = micros();
-	if (!performSafetyChecks()) {
+	if (!handleZeroing()) {
 		safetyTime = micros() - startSafetyTime;
 		totalLoopTime = micros() - timeLoopStart;
 		return;

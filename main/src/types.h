@@ -22,7 +22,9 @@ typedef enum State {
 typedef enum CutState {
 	NOT_CUT_READY,
 	CUT_READY,
-	CUTTING
+	CUTTING,
+	PLUNGING,
+	RETRACTING
 } CutState;
 
 // Type of design
@@ -63,7 +65,7 @@ typedef struct Point {
 // Path
 typedef struct Path {
 	// TODO: add other properties such as angle, etc. (more info in notebook)
-	Point points[MAX_POINTS] = {0.0f};
+	Point points[MAX_POINTS] = {NAN};
 	Feature feature = NORMAL;
 	int numPoints = 0;
 	float minZ = 0.0f;

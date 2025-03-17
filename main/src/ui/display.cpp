@@ -60,6 +60,7 @@ void drawShape() {
 	int16_t centerX = tftWidth / 2;
 	int16_t centerY = tftHeight / 2;
 	int16_t size = min(tftWidth, tftHeight) / 3;
+	int16_t dot_size = 2;
 
 	float scale;
 	int16_t minY,maxY,minX,maxX,y_quarter,y_3_quarter,x;
@@ -130,6 +131,14 @@ void drawShape() {
 		case 7:
 			// circle
 			screen->drawCircle(centerX, centerY, size, WHITE);
+			break;
+		case 8:
+			// square drill
+			screen->drawCircle(centerX-size, centerY-size, dot_size, WHITE);
+			screen->drawCircle(centerX+size, centerY-size, dot_size, WHITE);
+			screen->drawCircle(centerX-size, centerY+size, dot_size, WHITE);
+			screen->drawCircle(centerX+size, centerY+size, dot_size, WHITE);
+			screen->drawCircle(centerX, centerY, dot_size, WHITE);
 			break;
 		// 	// hexagon
 		// 	screen->drawLine(centerX, centerY+size, centerX+size*cos(M_PI/6), centerY-size*sin(M_PI/6), WHITE);

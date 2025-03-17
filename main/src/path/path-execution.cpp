@@ -9,7 +9,7 @@
 
 bool prevChecks[4] = {false};
 
-bool performSafetyChecks() {
+bool handleZeroing() {
 	if (digitalRead(LIMIT_MACH_X0) == LOW) {
 		stopStepperX();
 		stepperZ.moveTo(Conv*restHeight);
@@ -37,6 +37,7 @@ void advance(Point goal, Point next, bool autoAdvance=false) {
 	if (direction(goal,next) * signedDist(pose,next) > 0 || autoAdvance) {
 		// If next point is behind router, it becomes the new goal.
 		current_point_idx++;
+		Serial.printf("On to point %i/%i\n", current_point_idx, paths[current_path_idx].numPoints);
 		// if (autoAdvance) Serial.println("Auto-advanced!");
 
 		bool lastPoint = false;
@@ -77,6 +78,7 @@ void handleCutting() {
 
 	// TODO: handle this case better
 	if (goal.x == next.x && goal.y == next.y) {
+		Serial.println("goal=next");
 		advance(goal, next, true);
 		return;
 	}
@@ -155,17 +157,32 @@ void handleCutting() {
 		// Evaluate whether to move on to next point
 		advance(goal, next);
 	} else if (paths[current_path_idx].feature == DRILL) {
-		// Handle hole
-		stepperZ.moveTo(Conv*restHeight);
-		stepperX.moveTo(Conv*desPosHole);
-		
+		// Handle drilling		
 		if (valid_sensors && plungeReady && within_hole_tol) {
-			cutState = CUTTING;
-			plungeZ(desZ, holeFeedrate);
-			advance(goal,next,true);
+			// TODO: add PLUNGE_READY into CutState
+			if (cutState == NOT_CUT_READY) cutState = PLUNGING;
+			stepperZ.setMaxSpeed(holeFeedrate);
+
+			if (cutState == PLUNGING) {
+				stepperZ.moveTo(Conv*desZ);
+				if (stepperZ.distanceToGo() == 0) {
+					cutState = RETRACTING;
+				}
+			} else if (cutState == RETRACTING) {
+				stepperZ.moveTo(Conv*restHeight);
+				if (stepperZ.distanceToGo() == 0) {
+					stepperZ.setMaxSpeed(maxSpeedZ);
+					plungeReady = false;
+					advance(goal,next,true);
+				}
+			}
 		} else {
+			stepperZ.setMaxSpeed(maxSpeedZ);	// TODO: (see below)
+			stepperZ.moveTo(Conv*restHeight);
+			stepperX.moveTo(Conv*desPosHole);
+
 			cutState = NOT_CUT_READY;
-			plungeReady = false;
+			plungeReady = false;		// TODO: make OO so that motor speed can be adjust automatically when flipped
 		}
 	} else if (gantry_intersects && gantry_angle_ok && valid_sensors){
 		// Conditions are good except for pressed buttons and the goal point being behind the router
