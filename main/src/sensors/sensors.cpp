@@ -200,10 +200,16 @@ void doSensingLinear() {
 
     // Sensor plotting
 	for (int i = 0; i < 4; i++) {
-		float angle = atanf(calPos[1][i]/calPos[0][i]);
-		Serial.printf("%i: x:%.2f,\ty:%.2f,\tb:%.3f,\tsq:%i",i,calPos[0][i],calPos[1][i],angle,surfaceQuality[i]);
+		float angle = 0.0f;
+		if (abs(calPos[0][i]) > abs(calPos[1][i])) {
+			angle = atan2f(-calPos[1][i],calPos[0][i]);
+		} else {
+			angle = atan2f(calPos[0][i],calPos[1][i]);
+		}
+		Serial.printf("%i: x:%.0f,\ty:%.0f,\tb:%.6f,\tsq:%i",i,calPos[0][i],calPos[1][i],angle,surfaceQuality[i]);
 		Serial.println();
 	}
+	Serial.println();
 }
 
 void sensorPlotting() {
@@ -275,6 +281,21 @@ void calibrate() {
 			} else {
 				drawCenteredText("Align Y axis\nClick when at 0", 2);
 			}
+			// draw circular progress bar based on run number
+			int progressRadius = (screen->width()/2) - 10;
+			int centerX = screen->width() / 2;
+			int centerY = screen->height() / 2;
+			float progressAngle = (currentRun + 1) * (TWO_PI / numRuns);
+
+			screen->drawCircle(centerX, centerY, progressRadius, WHITE);
+			for (float rad = 0; rad < progressAngle; rad+=0.01) {
+				for (int i = 0; i < 3; i++) {
+					int x = centerX + (progressRadius-1+i) * sinf(rad);
+					int y = centerY - (progressRadius-1+i) * cosf(rad);
+					screen->drawPixel(x, y, GREEN);
+				}
+			}
+
 			while (state != CALIBRATION_ADVANCE) encoder.update();
 			state = CALIBRATION;
 			
@@ -294,6 +315,7 @@ void calibrate() {
 			} else {
 				drawCenteredText("Move in +Y\nClick when at 300mm", 2);
 			}
+
 			while (state != CALIBRATION_ADVANCE) {
 				doSensingLinear();
 				encoder.update();
@@ -301,10 +323,11 @@ void calibrate() {
 			
 			for (int i = 0; i < ns; i++) {
 				float sensorDist = calDistance / (myDist(calPos[0][i],calPos[1][i],0,0));
-				tempCalScalar[axis][i] = tempCalScalar[axis][i] + (sensorDist / numRuns);
+				float sensorRot = axis ? atan2f(calPos[0][i],calPos[1][i]) : atan2f(-calPos[1][i],calPos[0][i]);	// Cry : Crx
+				
+				Serial.printf("Cx/y:%f, Cr:%f\n",sensorDist,sensorRot);
 
-				// TODO: might want to convert this to atan2f
-				float sensorRot = axis ? atanf(calPos[0][i]/calPos[1][i]) : atanf(-calPos[1][i]/calPos[0][i]);
+				tempCalScalar[axis][i] = tempCalScalar[axis][i] + (sensorDist / numRuns);
 				tempCalRot[axis][i] =  tempCalRot[axis][i] + (sensorRot / numRuns);
 			}
 
@@ -317,7 +340,8 @@ void calibrate() {
 	Serial.println("Calibration results:");
 	for (int i = 0; i < ns; i++) {
 		float avgRot = (tempCalRot[0][i]+tempCalRot[1][i]) / 2;
-		Serial.printf("\tCx:%f,Cy:%f, Crx:%f,Cry:%f, Cr:%f\n",tempCalScalar[0][i],tempCalScalar[1][i],tempCalRot[0][i],tempCalRot[1][i],avgRot);
+		Serial.printf("\t%i: Cx:%f,Cy:%f, Crx:%f,Cry:%f, Cr:%f\n",
+			i,tempCalScalar[0][i],tempCalScalar[1][i],tempCalRot[0][i],tempCalRot[1][i],avgRot);
 	}
 
 	const char* options[] = {"Exit", "Save!"};
