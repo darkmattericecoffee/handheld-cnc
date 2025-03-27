@@ -13,11 +13,8 @@ void nullHandler(EncoderButton &eb) {
 }
 
 // CLICK HANDLERS ----------------------------------------
-void onClickGoToDesignMode(EncoderButton &eb) {
-	encoderDesignType();
-}
-
 void onClickGoToSetThickness(EncoderButton &eb) {
+	state = RESET;
 	encoderSetThickness();
 }
 
@@ -140,7 +137,7 @@ void encoderSetThickness() {
 	encoder.setEncoderHandler(onEncoderUpdateThickness);
 	encoder.setClickHandler(onClickSetThickness);
 
-	while (state != THICKNESS_SET) {
+	while (state != THICKNESS_SET  && state != READY) {
 		encoder.update();
 	}
 
@@ -154,7 +151,7 @@ void encoderDesignOrCalibrate() {
 	encoder.setEncoderHandler(onEncoderDesignOrCalibrate);
 	encoder.setClickHandler(onClickSetDoC);
 
-	while (state != DOC_SELECTED) {
+	while (state != DOC_SELECTED  && state != READY) {
 		encoder.update();
 	}
 
@@ -172,7 +169,7 @@ void encoderDesignType() {
 	encoder.setEncoderHandler(onEncoderSwitchType);
 	encoder.setClickHandler(onClickSetType);
 
-	while (state != TYPE_SELECTED) {
+	while (state != TYPE_SELECTED  && state != READY) {
 		encoder.update();
 	}
 		
@@ -189,11 +186,10 @@ void encoderDesignSelect() {
 	
 	closeSDFile();
 
-	state = SELECTING_DESIGN;
 	encoder.setEncoderHandler(onEncoderUpdateDesign);
 	encoder.setClickHandler(onClickMakePath);
 
-	while (state != DESIGN_SELECTED) {
+	while (state != DESIGN_SELECTED && state != READY) {
 		encoder.update();
 		if (designType == FROM_FILE) listFiles();
 	}
@@ -224,7 +220,7 @@ void encoderZeroWorkspaceXY() {
 	drawCenteredText("Zero workspace XY", 2);
 	encoder.setClickHandler(onClickZeroWorkspaceXY);
 
-	while (state != WORKSPACE_XY_ZERO) {
+	while (state != WORKSPACE_XY_ZERO  && state != READY) {
 		encoder.update();
 	}
 

@@ -9,7 +9,7 @@
 
 bool prevChecks[4] = {false};
 
-bool handleZeroing() {
+bool checkEndstops() {
 	if (digitalRead(LIMIT_MACH_X0) == LOW) {
 		stopStepperX();
 		stepperZ.moveTo(Conv*restHeight);
@@ -65,6 +65,7 @@ void advance(Point goal, Point next, bool autoAdvance=false) {
 					stepperZ.run();
 				}
 				Serial.println("All paths finished");
+				state = RESET;
 				encoderDesignType();
 			}
 		}
@@ -82,6 +83,8 @@ void handleCutting() {
 		advance(goal, next, true);
 		return;
 	}
+
+	Serial.printf("goal:%.2f,%.2f, next:%.2f,%.2f\n", goal.x, goal.y, next.x, next.y);
 
 	// If we have not started the path, and the first point is behind us
 	// keep the tool raised and return. We wait here until the first point

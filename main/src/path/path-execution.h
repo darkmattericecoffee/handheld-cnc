@@ -4,7 +4,7 @@
 #include "../types.h"
 
 // Safety check functions
-bool handleZeroing();
+bool checkEndstops();
 
 // Path advancement and execution functions
 void advance(Point goal, Point next, bool autoAdvance);

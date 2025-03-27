@@ -51,7 +51,6 @@ extern float calPos[2][4];
 
 // Calibration data
 extern CalParams cal[4];
-extern float selfCal[2][3];
 
 // Display variables
 extern int16_t radius;

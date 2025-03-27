@@ -46,6 +46,8 @@ const int ns = 4;								// number of sensors
 const int CPI = 2500;							// counts per inch. This value changes calibration coefficients
 const float lx = 120.0f;						// x length of rectangular sensor configuration (mm)
 const float ly = 140.0f;						// y length of rectangular sensor configuration (mm)
+const float xSensorOffset = -2.32;				
+const float ySensorOffset = -3.2;				// offset to try to counteract weird rotation behavior (mm) (UNUSED)
 
 // Motor properties
 const int uSteps = 4;							// microstep configuration
@@ -75,8 +77,6 @@ const float xLimitOffset = 2.54;				// distance from wall of stepper when zeroed
 const float zLength = 34.0;						// usable length of z-gantry (mm)
 const float zLimitOffset = 2.13;				// distance from wall when zeroed (mm)
 const float wallBuffer = 3.0;						// safety buffer between tool body and walls (mm)
-const float xSensorOffset = -2.32;				
-const float ySensorOffset = -3.2;				// offset to try to counteract weird rotation behavior (mm) (UNUSED)
 
 // Timing constants
 const long unsigned debounceDelay = 50;			// the debounce time; increase if the output flickers

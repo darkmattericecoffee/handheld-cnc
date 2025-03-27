@@ -38,13 +38,11 @@ String fileList[MAX_FILES];
 RouterPose pose = {0.0f};
 float measVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
 						{0.0f,0.0f,0.0f,0.0f}};
-float calPos[2][4] = {{0.0f,0.0f,0.0f,0.0f},
-						{0.0f,0.0f,0.0f,0.0f}};
 
 // Calibration data
+float calPos[2][4] = {{0.0f,0.0f,0.0f,0.0f},
+						{0.0f,0.0f,0.0f,0.0f}};		// used for calibration
 CalParams cal[4];
-float selfCal[2][3] = {{1.0f,0.997606f,0.989168f},
-						{1.0f,1.004717f,1.000850f}};				// (UNUSED)
 
 // Display variables
 int16_t radius = 0;

@@ -41,7 +41,7 @@ void setup() {
 	pinMode(BUTT_HANDLE_L, INPUT);
 	pinMode(BUTT_HANDLE_R, INPUT);
 
-	// Setup systems
+	// Set up systems
 	sensorSetup();
 	motorSetup(); 
 	driverSetup();
@@ -89,7 +89,7 @@ void loop() {
 
 	// Safety stuff
 	unsigned long startSafetyTime = micros();
-	if (!handleZeroing()) {
+	if (!checkEndstops()) {
 		safetyTime = micros() - startSafetyTime;
 		totalLoopTime = micros() - timeLoopStart;
 		return;
