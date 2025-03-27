@@ -84,7 +84,7 @@ void handleCutting() {
 		return;
 	}
 
-	Serial.printf("goal:%.2f,%.2f, next:%.2f,%.2f\n", goal.x, goal.y, next.x, next.y);
+	// Serial.printf("goal:%.2f,%.2f, next:%.2f,%.2f\n", goal.x, goal.y, next.x, next.y);
 
 	// If we have not started the path, and the first point is behind us
 	// keep the tool raised and return. We wait here until the first point
@@ -129,7 +129,7 @@ void handleCutting() {
 	// if (handle_buttons_ok) timeLastDebounce = millis();
 	bool gantry_intersects = !isnan(desPos);
 	bool gantry_angle_ok = angleFrom(goal, next) > (angleThreshold);		// TODO: how is this working?
-	bool within_hole_tol = abs(signedDist(pose, goal)) < holeTolerance;
+	bool within_hole_tol = (abs(signedDist(pose, goal)) < holeTolerance) && (abs(desPosHole) < (xUsable/2));
 
 	// TODO: delete me
 	bool newChecks[4] = {handle_buttons_ok, gantry_intersects, goal_behind_router, gantry_angle_ok};

@@ -72,11 +72,11 @@ const float holeTolerance = 0.25;					// tolerance for hole positioning (mm)
 
 // Gantry geometry
 const float gantryLength = 100.0;				// usable length of x-gantry (mm)
-const float gantryLengthRouter = gantryLength;	// usable length of x-gantry with router (mm) (default=gantryLength, DW611=94)
+const float wallBuffer = 3.0;						// safety buffer between tool body and walls (mm)
+const float xUsable = gantryLength - 2*wallBuffer;	// usable length of x-gantry with router (mm) (default=gantryLength, DW611=94)
 const float xLimitOffset = 2.54;				// distance from wall of stepper when zeroed (mm)
 const float zLength = 34.0;						// usable length of z-gantry (mm)
 const float zLimitOffset = 2.13;				// distance from wall when zeroed (mm)
-const float wallBuffer = 3.0;						// safety buffer between tool body and walls (mm)
 
 // Timing constants
 const long unsigned debounceDelay = 50;			// the debounce time; increase if the output flickers
