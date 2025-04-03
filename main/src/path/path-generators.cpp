@@ -418,5 +418,5 @@ void makePresetPath() {
 	}
 
 	// Log the generated path
-	// logPath();
+	logPath();
 }

@@ -19,10 +19,29 @@ static bool firstCall = true;  // Track if this is a new sequence of debug calls
 void handleSerial() {
 	if (Serial.available()) {
 		char ch = Serial.read();
-		if (ch == 'd') {
-			debuggingOn ^= 1;
-		} else if (ch == 'p') {
-			plottingOn ^= 1;
+		switch (ch) {
+			case 'o':
+				outputOn ^= 1;
+				Serial.printf("Output to serial: %s\n", outputOn ? "ON" : "OFF");
+				break;
+			case 's':
+				stopwatchOn ^= 1;
+				Serial.printf("Stopwatch: %s\n", stopwatchOn ? "ON" : "OFF");
+				break;
+			case 'l':
+				outputSDOn ^= 1;
+				Serial.printf("Output to SD: %s\n", outputSDOn ? "ON" : "OFF");
+				break;
+			case 'd':
+				debuggingOn ^= 1;
+				Serial.printf("Debugging: %s\n", debuggingOn ? "ON" : "OFF");
+				break;
+			case 'p':
+				plottingOn ^= 1;
+				Serial.printf("Plotting: %s\n", plottingOn ? "ON" : "OFF");
+				break;
+			default:
+				break;
 		}
 	}
 }
@@ -346,6 +365,8 @@ void stopwatch() {
 		Serial.println(safetyTime);
 		Serial.print("Cutting Time: ");
 		Serial.println(cuttingTime);
+		Serial.print("SD Log Time: ");
+		Serial.println(SDLogTime);
 		Serial.println("=====================================");
 	}
 }
@@ -437,20 +458,23 @@ void logPath() {
 		}
 	}
 
-	// Log path data to SD card
-	if (!initializeLogFile()) {
-		return;
-	}
+	// Log path data to SD card if enabled
+	if (outputSDOn) {
+		if (!initializeLogFile()) {
+			return;
+		}
 
-	for (int i = 0; i < num_paths; i++) {
-		for (int j = 0; j < paths[current_path_idx].numPoints; j++) {
-			logFile.printf(
-				"PATH:%d,%f,%f,%f\n",
-				i,
-				paths[i].points[j].x,
-				paths[i].points[j].y,
-				paths[i].points[j].z
-			);
+		for (int i = 0; i < num_paths; i++) {
+			for (int j = 0; j < paths[current_path_idx].numPoints; j++) {
+				logFile.printf(
+					"PATH:%d,%f,%f,%f\n",
+					i,
+					paths[i].points[j].x,
+					paths[i].points[j].y,
+					paths[i].points[j].z
+				);
+			}
 		}
 	}
+
 }

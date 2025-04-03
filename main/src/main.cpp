@@ -49,9 +49,10 @@ void setup() {
 	Serial.print("Initializing SD card...");
 	if (!sd.begin(SdioConfig(FIFO_SDIO))) {
 		Serial.println("Initialization failed!");
-		return;
+		// return;
+	} else {
+		Serial.println("Initialization done.");
 	}
-	Serial.println("Initialization done.");
 
 	encoder.setClickHandler(onClickZeroMachineX);
 	encoder.setTripleClickHandler(onClickGoToSetThickness);

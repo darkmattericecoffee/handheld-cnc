@@ -54,6 +54,7 @@ bool plottingOn = false;			// plot values  (1 = yes; 0 = no)
 bool debuggingOn = false;			// print values (1 = yes; 0 = no)
 bool stopwatchOn = false;
 bool outputOn = false;				// output data to serial
+bool outputSDOn = true;				// output data to SD card
 int designOrCalibrate = 0;			// choose design or calibrate (0 or 1)
 int acceptCal = 0;					// accept calibration or not
 int designPreset = 0;				// choose the design 
@@ -68,6 +69,7 @@ long unsigned stepperTime = 0;
 long unsigned serialTime = 0;
 long unsigned safetyTime = 0;
 long unsigned cuttingTime = 0;
+long unsigned SDLogTime = 0;
 long unsigned timeLoopStart = 0;
 long unsigned timeLastDebounce = 0;
 long unsigned lastDraw = 0;
