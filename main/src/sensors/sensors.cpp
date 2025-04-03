@@ -173,6 +173,9 @@ void doSensing() {
 	if (plottingOn) {
 		sensorPlotting();
 	}
+
+	// Write to SD card
+
 }
 
 void doSensingLinear() {
@@ -317,7 +320,10 @@ void calibrate() {
 			}
 
 			while (state != CALIBRATION_ADVANCE) {
-				doSensingLinear();
+				if(micros() - timeLastPoll >= dt) {
+					doSensingLinear();
+				}
+
 				encoder.update();
 			}
 			
