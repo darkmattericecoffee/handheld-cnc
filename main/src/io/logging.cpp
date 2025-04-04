@@ -5,6 +5,13 @@
 #include "../math/geometry.h"
 
 #define LINE_BUFFER_SIZE 100
+// Constants for packet types
+#define PACKET_SENSORS 0x01
+#define PACKET_AUX     0x02
+// Packet headers and terminators
+#define PACKET_START   0xAA
+#define PACKET_END     0x55
+
 
 // Timing variables
 static long unsigned timeLastOutput = 0;
@@ -235,34 +242,6 @@ void parseGCodeFile(const String& sFilename) {
 }
 
 // Write ------------------------------------------------------
-void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos) {
-	if(millis() - timeLastOutput >= dtOutput) {
-		timeLastOutput = millis();
-
-		// Calculate tool and desired positions
-		float toolX = rPose.x + toolPos*cosf(rPose.yaw);
-		float toolY = rPose.y + toolPos*sinf(rPose.yaw);
-
-		float desX = rPose.x + desPos*cosf(rPose.yaw);
-		float desY = rPose.y + desPos*sinf(rPose.yaw);
-
-		Serial.printf(
-			"POS:%f,%f,%f,%f,%f,%f,%f,%f,%f,%i,%f\n",
-			rPose.x,
-			rPose.y,
-			rPose.yaw,
-			goal.x,
-			goal.y,
-			toolX,
-			toolY,
-			desX,
-			desY,
-			cutState,
-			toolPos
-		);
-	}
-}
-
 void debugging(Point point1, Point point2) {
 	// TODO: make this sequential timing work better
 	void* currentCaller = __builtin_return_address(0);
@@ -395,6 +374,84 @@ bool initializeLogFile() {
 	logFile.flush();
 	Serial.printf("Logging to file: %s\n", filename);
 	return true;
+}
+
+// Function to write header information
+void writeFileHeader(const char* designName, uint16_t numPaths) {
+	if (logFile) {
+		const char* firmwareVersion;;
+		// Copy strings safely
+		strncpy(firmwareVersion, FIRMWARE_VERSION, MAX_STRING_LENGTH);
+		firmwareVersion[MAX_STRING_LENGTH-1] = '\0'; // Ensure null termination
+		
+		strncpy(header.designName, designName, MAX_STRING_LENGTH);
+		header.designName[MAX_STRING_LENGTH-1] = '\0'; // Ensure null termination
+		
+		// TODO: add timestamp
+		
+		// Write the header to file
+		logFile.write((uint8_t*)&header, sizeof(FileHeader));
+		logFile.flush(); // Ensure header is written
+	}
+}
+
+// Write sensor data to SD card for datalogging
+void writeSensorData(SensorData sensorArray[4]) {
+	if (logFile) {
+		uint8_t header = PACKET_START;
+		logFile.write(&header, 1);
+		
+		SensorsPacket packet;
+		packet.packetType = PACKET_SENSORS;
+		packet.time = micros();
+		
+		// Copy all sensor data
+		for (int i = 0; i < 4; i++) {
+			packet.sensors[i] = sensorArray[i];
+		}
+		
+		// Write the entire packet
+		logFile.write((uint8_t*)&packet, sizeof(SensorsPacket));
+		
+		uint8_t footer = PACKET_END;
+		logFile.write(&footer, 1);
+
+		// Periodic flush
+		if (millis() - timeLastFlush >= 1000) {
+			logFile.flush();
+			timeLastFlush = millis();
+		}
+	}
+}
+
+// Function to write auxiliary data
+void writeAuxData(Point goal, float toolPos, float desPos) {
+	if (logFile) {
+		uint8_t header = PACKET_START;
+		logFile.write(&header, 1);
+		
+		AuxPacket packet;
+		packet.packetType = PACKET_AUX;
+		packet.time = micros();  // Current time
+		packet.pose = pose;
+		packet.curr_path_idx = current_path_idx;
+		packet.curr_point_idx = current_point_idx;
+		packet.goal = goal;
+		packet.toolPos = toolPos;
+		packet.desPos = desPos;
+		packet.cutState = cutState;
+		
+		logFile.write((uint8_t*)&packet, sizeof(AuxPacket));
+		
+		uint8_t footer = PACKET_END;
+		logFile.write(&footer, 1);
+		
+		// Periodic flush
+		if (millis() - timeLastFlush >= 1000) {
+			logFile.flush();
+			timeLastFlush = millis();
+		}
+	}
 }
 
 void outputSD(RouterPose rPose, Point goal, float toolPos, float desPos) {

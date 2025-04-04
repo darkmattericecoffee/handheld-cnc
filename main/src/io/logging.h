@@ -3,6 +3,31 @@
 
 #include "../types.h"
 
+// Struct definitions for your packets
+struct SensorData {
+	int16_t dx;
+	int16_t dy;
+	uint8_t sq;  // surface quality
+};
+
+struct SensorsPacket {
+	uint8_t packetType;    // Set to PACKET_SENSORS (0x01)
+	uint32_t time;         // microseconds since start
+	SensorData sensors[4]; // Data for all 4 sensors
+};
+
+struct AuxPacket {
+	uint8_t packetType;    // Set to PACKET_AUX (0x02)
+	uint32_t time;         // microseconds since start
+	RouterPose pose;
+	uint16_t curr_path_idx;
+	uint16_t curr_point_idx;
+	Point goal;
+	float toolPos;
+	float desPos;
+	int16_t cutState;
+};
+
 // Serial logging functions
 void handleSerial();
 void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos);
