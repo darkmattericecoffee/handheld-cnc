@@ -14,7 +14,7 @@
 void setup() {
 	Serial.begin(115200);  
 
-	if (outputOn) { while(!Serial); }
+	if (outputSerialOn) { while(!Serial); }
 	delay(100);
 
 	if (!screen->begin()) { Serial.println("screen->begin() failed!"); }
@@ -49,7 +49,7 @@ void setup() {
 	Serial.print("Initializing SD card...");
 	if (!sd.begin(SdioConfig(FIFO_SDIO))) {
 		Serial.println("Initialization failed!");
-		// return;
+		outputSDOn = false;
 	} else {
 		Serial.println("Initialization done.");
 	}

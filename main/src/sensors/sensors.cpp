@@ -4,6 +4,7 @@
 #include "../ui/display.h"
 #include "../ui/encoder.h"
 #include "../math/geometry.h"
+#include "../io/logging.h"
 #include <EEPROM.h>
 
 /*
@@ -83,16 +84,17 @@ void doSensing() {
 
 	// Collect sensor data
 	PMW3360_DATA data[ns];
+	SensorData logData[ns];
 	for (int i = 0; i < ns; i++) {
 		data[i] = sensors[i].readBurst();
 	}
 
 	// Process sensor data
 	for (int i = 0; i < ns; i++) {
+		float dx = -convTwosComp(data[i].dx);
+		float dy = convTwosComp(data[i].dy);
 		surfaceQuality[i] = data[i].SQUAL;
 		if (surfaceQuality[i] > 20) {
-			float dx = -convTwosComp(data[i].dx);
-			float dy = convTwosComp(data[i].dy);
 			measVel[0][i] = cal[i].x * (dx*cosf(cal[i].r) - dy*sinf(cal[i].r)) / sensingTime;
 			measVel[1][i] = cal[i].y * (dx*sinf(cal[i].r) + dy*cosf(cal[i].r)) / sensingTime;
 
@@ -102,6 +104,11 @@ void doSensing() {
 			measVel[0][i] = NAN;
 			measVel[1][i] = NAN;
 		}
+
+		// Store sensor data for logging
+		logData[i].dx = data[i].dx;
+		logData[i].dy = data[i].dy;
+		logData[i].sq = data[i].SQUAL;
 	}
 
 	// Calculate angular velocities
@@ -181,7 +188,9 @@ void doSensing() {
 	}
 
 	// Write to SD card
-
+	if (outputSDOn) {
+		writeSensorData(timeLastPoll, logData);
+	}
 }
 
 void doSensingLinear() {
@@ -191,12 +200,13 @@ void doSensingLinear() {
     // Collect sensor data (raw)
  
     PMW3360_DATA data[4];
-    for (int i = 0; i < 4; i++) {
+	// TODO: SensorData logData[ns];
+    for (int i = 0; i < ns; i++) {
       data[i] = sensors[i].readBurst();
       surfaceQuality[i] = data[i].SQUAL;
     }
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < ns; i++) {
       // Sensor velocity sensing
       // measVel[0][i] = -convTwosComp(data[i].dx);     // '-' convention is used to flip sensor's z axis
       measVel[0][i] = -convTwosComp(data[i].dx);
@@ -208,7 +218,7 @@ void doSensingLinear() {
     }
 
     // Sensor plotting
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < ns; i++) {
 		float angle = 0.0f;
 		if (abs(calPos[0][i]) > abs(calPos[1][i])) {
 			angle = atan2f(-calPos[1][i],calPos[0][i]);
@@ -219,13 +229,15 @@ void doSensingLinear() {
 		Serial.println();
 	}
 	Serial.println();
+
+	// TODO: add in calibration logging
 }
 
 void sensorPlotting() {
 	if(millis() - timeLastPlot >= dtPlot) {
 		timeLastPlot = millis();
 
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < ns; i++) {
 			Serial.printf("x_%i:%f,y_%i:%f",i,estPosSen[0][i],i,estPosSen[1][i]);
 			Serial.println();
 			Serial.printf("sq_%i:%d",i,surfaceQuality[i]);
@@ -309,7 +321,7 @@ void calibrate() {
 			state = CALIBRATION;
 			
 			// Flush sensor readings then reset
-			for (int i = 0; i < 4; i++) {
+			for (int i = 0; i < ns; i++) {
 				sensors[i].readBurst();
 				calPos[0][i] = 0.0f;
 				calPos[1][i] = 0.0f;

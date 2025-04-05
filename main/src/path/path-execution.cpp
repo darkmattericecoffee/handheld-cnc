@@ -37,7 +37,7 @@ void advance(Point goal, Point next, bool autoAdvance=false) {
 	if (direction(goal,next) * signedDist(pose,next) > 0 || autoAdvance) {
 		// If next point is behind router, it becomes the new goal.
 		current_point_idx++;
-		Serial.printf("On to point %i/%i\n", current_point_idx, paths[current_path_idx].numPoints);
+		// Serial.printf("On to point %i/%i\n", current_point_idx, paths[current_path_idx].numPoints);
 		// if (autoAdvance) Serial.println("Auto-advanced!");
 
 		bool lastPoint = false;
@@ -100,8 +100,8 @@ void handleCutting() {
 		// Update UI
 		updateUI(desPos, goal, next);
 
-		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos);
-		if (outputSDOn) outputSD(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos);
+		if (outputSerialOn) outputSerial(goal, stepperX.currentPosition()*1.0f/Conv, desPos);
+		if (outputSDOn) writeAuxData(goal, stepperX.currentPosition()*1.0f/Conv, desPos);
 		if (debuggingOn) debugging(goal, next);
 		// debugging("path_started:%i, goal_behind:%i\n", (int)path_started, (int)goal_behind);
 		return;
@@ -147,15 +147,8 @@ void handleCutting() {
 	// TODO: handle valid_sensors better (want to prompt re-zeroing if sensors are bad)
 	if (handle_buttons_ok && gantry_intersects && goal_behind_router && gantry_angle_ok && valid_sensors && paths[current_path_idx].feature == NORMAL) {
 		cutState = CUTTING;
-		// We are good to cut
-		stepperZ.moveTo(Conv*desZ);
-		stepperX.moveTo(Conv*desPos);
 
-		// Path logging
-		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos);
-		unsigned long startSDLogTime = micros();
-		if (outputSDOn) outputSD(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos);
-		SDLogTime = micros() - startSDLogTime;
+		actuate(desPos, desZ);
 
 		// Evaluate whether to move on to next point
 		advance(goal, next);
@@ -180,39 +173,39 @@ void handleCutting() {
 				}
 			}
 		} else {
-			stepperZ.setMaxSpeed(maxSpeedZ);	// TODO: (see below)
-			stepperZ.moveTo(Conv*restHeight);
-			stepperX.moveTo(Conv*desPosHole);
-
+			// Drill conditions are not met yet
 			cutState = NOT_CUT_READY;
 			plungeReady = false;		// TODO: make OO so that motor speed can be adjust automatically when flipped
+
+			desPos = desPosHole;
+			stepperZ.setMaxSpeed(maxSpeedZ);	// TODO: (see below)
+			actuate(desPos, restHeight);
 		}
 	} else if (gantry_intersects && gantry_angle_ok && valid_sensors){
 		// Conditions are good except for pressed buttons and the goal point being behind the router
 		cutState = CUT_READY;
-		// Stop cutting
-		stepperZ.moveTo(Conv*restHeight);
-		stepperX.moveTo(Conv*desPosClosest);
-
-		// Path logging
-		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
-		if (outputSDOn) outputSD(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
+		
+		// Retract
+		desPos = desPosClosest;
+		desZ = restHeight;
+		actuate(desPos, desZ);
 	} else {
+		// None of the conditions are met!
 		cutState = NOT_CUT_READY;
-		// Stop cutting
-		stepperZ.moveTo(Conv*restHeight);
-		stepperX.moveTo(Conv*desPosClosest);
-
-		// Path logging
-		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
-		if (outputSDOn) outputSD(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
+		
+		// Retract
+		desPos = desPosClosest;
+		desZ = restHeight;
+		actuate(desPos, desZ);
 	}
+
+	// Path logging
+	if (outputSerialOn) outputSerial(goal, stepperX.currentPosition()*1.0f/Conv, desPos);
+	if (outputSDOn)	writeAuxData(goal, stepperX.currentPosition()*1.0f/Conv, desPos);
+
+	// Debugging
+	if (debuggingOn) debugging(goal, next);
 
 	// Update UI
 	updateUI(desPos, goal, next);
-
-	// Debugging
-	if (debuggingOn) {
-		debugging(goal, next);
-	}
 }

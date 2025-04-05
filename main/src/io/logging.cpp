@@ -4,14 +4,18 @@
 #include <Arduino.h>
 #include "../math/geometry.h"
 
-#define LINE_BUFFER_SIZE 100
+#define PACKET_START		0xAA
+#define PACKET_END			0x55
 // Constants for packet types
-#define PACKET_SENSORS 0x01
-#define PACKET_AUX     0x02
-// Packet headers and terminators
-#define PACKET_START   0xAA
-#define PACKET_END     0x55
+#define PACKET_SENSORS		0x01
+#define PACKET_AUX			0x02
+// Header/identifier constants
+#define PACKET_HEADER		0xA0
+#define PACKET_DESIGN_INFO	0xA1
+#define PACKET_PATH			0xA2
+#define PACKET_PATH_POINT	0xA3
 
+char filename[MAX_STRING_LENGTH];
 
 // Timing variables
 static long unsigned timeLastOutput = 0;
@@ -19,8 +23,9 @@ static long unsigned timeLastOutputSD = 0;
 static long unsigned timeLastDebug = 0;
 static long unsigned timeLastClocked = 0;
 static long unsigned timeLastFlush = 0;
-static void* lastDebugCaller = nullptr;  // Store the address of the last debug call
-static bool firstCall = true;  // Track if this is a new sequence of debug calls
+static const long flushInterval = 1000;			// Interval to flush the SD card
+static void* lastDebugCaller = nullptr;		// Store the address of the last debug call
+static bool firstCall = true;				// Track if this is a new sequence of debug calls
 
 // Read -----------------------------------------------------
 void handleSerial() {
@@ -28,8 +33,8 @@ void handleSerial() {
 		char ch = Serial.read();
 		switch (ch) {
 			case 'o':
-				outputOn ^= 1;
-				Serial.printf("Output to serial: %s\n", outputOn ? "ON" : "OFF");
+				outputSerialOn ^= 1;
+				Serial.printf("Output to serial: %s\n", outputSerialOn ? "ON" : "OFF");
 				break;
 			case 's':
 				stopwatchOn ^= 1;
@@ -133,7 +138,7 @@ bool validCoordinate(const char* gLine) {
 }
 
 void parseGCodeFile(const String& sFilename) {
-	const char* filename = sFilename.c_str();
+	strncpy(filename, sFilename.c_str(), MAX_STRING_LENGTH);
 
 	FsFile file;
 	if (!file.open(filename, O_READ)) {
@@ -242,6 +247,34 @@ void parseGCodeFile(const String& sFilename) {
 }
 
 // Write ------------------------------------------------------
+void outputSerial(Point goal, float toolPos, float desPos) {
+	if(millis() - timeLastOutput >= dtOutput) {
+		timeLastOutput = millis();
+
+		// Calculate tool and desired positions
+		float toolX = pose.x + toolPos*cosf(pose.yaw);
+		float toolY = pose.y + toolPos*sinf(pose.yaw);
+
+		float desX = pose.x + desPos*cosf(pose.yaw);
+		float desY = pose.y + desPos*sinf(pose.yaw);
+
+		Serial.printf(
+			"POS:%f,%f,%f,%f,%f,%f,%f,%f,%f,%i,%f\n",
+			pose.x,
+			pose.y,
+			pose.yaw,
+			goal.x,
+			goal.y,
+			toolX,
+			toolY,
+			desX,
+			desY,
+			cutState,
+			toolPos
+		);
+	}
+}
+
 void debugging(Point point1, Point point2) {
 	// TODO: make this sequential timing work better
 	void* currentCaller = __builtin_return_address(0);
@@ -379,34 +412,69 @@ bool initializeLogFile() {
 // Function to write header information
 void writeFileHeader(const char* designName, uint16_t numPaths) {
 	if (logFile) {
-		const char* firmwareVersion;;
-		// Copy strings safely
-		strncpy(firmwareVersion, FIRMWARE_VERSION, MAX_STRING_LENGTH);
-		firmwareVersion[MAX_STRING_LENGTH-1] = '\0'; // Ensure null termination
+		FileHeader header;
+		header.packetType = PACKET_HEADER;
 		
+		// Copy strings safely
+		strncpy(header.firmwareVersion, FIRMWARE_VERSION, MAX_STRING_LENGTH);
+		header.firmwareVersion[MAX_STRING_LENGTH-1] = '\0'; // Ensure null termination
 		strncpy(header.designName, designName, MAX_STRING_LENGTH);
 		header.designName[MAX_STRING_LENGTH-1] = '\0'; // Ensure null termination
 		
-		// TODO: add timestamp
+		// TODO: add UNIX timestamp
+		header.numPaths = numPaths;
 		
 		// Write the header to file
 		logFile.write((uint8_t*)&header, sizeof(FileHeader));
-		logFile.flush(); // Ensure header is written
+		logFile.flush();
+
+		Serial.printf("Header written to file: %s\n", header.designName);
+	}
+}
+
+// Function to write path information
+void writePathInfo(uint16_t pathIndex, uint8_t featureType) {
+	if (logFile) {
+		PathInfo pathInfo;
+		pathInfo.packetType = PACKET_PATH;
+		pathInfo.pathIndex = pathIndex;
+		pathInfo.featureType = featureType;
+		// pathInfo.numPoints = numPoints;
+		// pathInfo.toolParams = toolParams;
+		
+		// Write the path info to file
+		logFile.write((uint8_t*)&pathInfo, sizeof(PathInfo));
+	}
+}
+
+// Function to write a single point in a path
+void writePathPoint(uint16_t pathIndex, uint16_t pointIndex, Point point) {
+	if (logFile) {
+		PathPoint pathPoint;
+		pathPoint.packetType = PACKET_PATH_POINT;
+		pathPoint.pathIndex = pathIndex;
+		pathPoint.pointIndex = pointIndex;
+		pathPoint.x = point.x;
+		pathPoint.y = point.y;
+		pathPoint.z = point.z;
+		
+		// Write the point to file
+		logFile.write((uint8_t*)&point, sizeof(PathPoint));
 	}
 }
 
 // Write sensor data to SD card for datalogging
-void writeSensorData(SensorData sensorArray[4]) {
+void writeSensorData(uint32_t time,  SensorData sensorArray[ns]) {
 	if (logFile) {
 		uint8_t header = PACKET_START;
 		logFile.write(&header, 1);
 		
 		SensorsPacket packet;
 		packet.packetType = PACKET_SENSORS;
-		packet.time = micros();
+		packet.time = time;
 		
 		// Copy all sensor data
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < ns; i++) {
 			packet.sensors[i] = sensorArray[i];
 		}
 		
@@ -417,72 +485,40 @@ void writeSensorData(SensorData sensorArray[4]) {
 		logFile.write(&footer, 1);
 
 		// Periodic flush
-		if (millis() - timeLastFlush >= 1000) {
+		if (millis() - timeLastFlush >= flushInterval) {
 			logFile.flush();
 			timeLastFlush = millis();
 		}
 	}
 }
 
-// Function to write auxiliary data
+// Write auxilliary data to SD card for datalogging
 void writeAuxData(Point goal, float toolPos, float desPos) {
-	if (logFile) {
-		uint8_t header = PACKET_START;
-		logFile.write(&header, 1);
-		
-		AuxPacket packet;
-		packet.packetType = PACKET_AUX;
-		packet.time = micros();  // Current time
-		packet.pose = pose;
-		packet.curr_path_idx = current_path_idx;
-		packet.curr_point_idx = current_point_idx;
-		packet.goal = goal;
-		packet.toolPos = toolPos;
-		packet.desPos = desPos;
-		packet.cutState = cutState;
-		
-		logFile.write((uint8_t*)&packet, sizeof(AuxPacket));
-		
-		uint8_t footer = PACKET_END;
-		logFile.write(&footer, 1);
-		
-		// Periodic flush
-		if (millis() - timeLastFlush >= 1000) {
-			logFile.flush();
-			timeLastFlush = millis();
-		}
-	}
-}
-
-void outputSD(RouterPose rPose, Point goal, float toolPos, float desPos) {
-	if(millis() - timeLastOutputSD >= dtOutputSD) {
+	if (millis() - timeLastOutputSD >= dtOutputSD) {
 		timeLastOutputSD = millis();
-
-		float toolX = rPose.x + toolPos*cosf(rPose.yaw);
-		float toolY = rPose.y + toolPos*sinf(rPose.yaw);
-
-		float desX = rPose.x + desPos*cosf(rPose.yaw);
-		float desY = rPose.y + desPos*sinf(rPose.yaw);
-
+		
 		if (logFile) {
-			// Write data in CSV format
-			logFile.printf(
-				"%f,%f,%f,%f,%f,%f,%f,%f,%f,%i,%f\n",
-				rPose.x,
-				rPose.y,
-				rPose.yaw,
-				goal.x,
-				goal.y,
-				toolX,
-				toolY,
-				desX,
-				desY,
-				cutState,
-				toolPos
-			);
+			uint8_t header = PACKET_START;
+			logFile.write(&header, 1);
 			
-			// Periodic flush to ensure data is written
-			if (millis() - timeLastFlush >= 1000) {
+			AuxPacket packet;
+			packet.packetType = PACKET_AUX;
+			packet.time = micros();  // Current time
+			packet.pose = pose;
+			packet.currPathIndex = current_path_idx;
+			packet.currPointIndex = current_point_idx;
+			packet.goal = goal;
+			packet.toolPos = toolPos;
+			packet.desPos = desPos;
+			packet.cutState = cutState;
+			
+			logFile.write((uint8_t*)&packet, sizeof(AuxPacket));
+			
+			uint8_t footer = PACKET_END;
+			logFile.write(&footer, 1);
+			
+			// Periodic flush
+			if (millis() - timeLastFlush >= flushInterval) {
 				logFile.flush();
 				timeLastFlush = millis();
 			}
@@ -500,38 +536,33 @@ void closeSDFile() {
 }
 
 void logPath() {
-	// Log path data to serial if enabled
-	if (outputOn) {
-		for (int i = 0; i < num_paths; i++) {
-			for (int j = 0; j < paths[current_path_idx].numPoints; j++) {
-				Serial.printf(
-					"PATH:%d,%f,%f,%f\n",
-					i,
-					paths[i].points[j].x,
-					paths[i].points[j].y,
-					paths[i].points[j].z
-				);
-			}
-		}
-	}
-
 	// Log path data to SD card if enabled
 	if (outputSDOn) {
 		if (!initializeLogFile()) {
+			Serial.println("Failed to initialize log file!");
 			return;
 		}
 
+		if (designType == PRESET) {
+			char designName[MAX_STRING_LENGTH];
+			sprintf(designName, "preset_%i", designPreset);
+			Serial.printf("Logging to preset design: %s\n", designName);
+			writeFileHeader(designName, num_paths);
+		} else {
+			writeFileHeader(filename, num_paths);
+		}
+		
+
 		for (int i = 0; i < num_paths; i++) {
-			for (int j = 0; j < paths[current_path_idx].numPoints; j++) {
-				logFile.printf(
-					"PATH:%d,%f,%f,%f\n",
-					i,
-					paths[i].points[j].x,
-					paths[i].points[j].y,
-					paths[i].points[j].z
-				);
+			// Write path information
+			writePathInfo(i, paths[i].feature);
+			for (int j = 0; j < paths[i].numPoints; j++) {
+				// Write each point in the path
+				writePathPoint(i, j, paths[i].points[j]);
 			}
 		}
+
+		if (logFile) logFile.flush();
 	}
 
 }

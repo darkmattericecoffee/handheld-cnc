@@ -61,7 +61,7 @@ extern int16_t centerY;
 extern bool plottingOn;
 extern bool debuggingOn;
 extern bool stopwatchOn;
-extern bool outputOn;
+extern bool outputSerialOn;
 extern bool outputSDOn;
 extern int designOrCalibrate;
 extern int acceptCal;

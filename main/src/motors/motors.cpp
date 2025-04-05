@@ -147,3 +147,9 @@ void workspaceZeroXY() {
 	// Reset router pose
 	pose = {0.0f};
 }
+
+// Instruct stepper movement
+void actuate(float desX, float desZ) {
+	stepperX.moveTo(Conv*desX);
+	stepperZ.moveTo(Conv*desZ);
+}

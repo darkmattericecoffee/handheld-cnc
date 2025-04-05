@@ -3,34 +3,65 @@
 
 #include "../types.h"
 
+#define LINE_BUFFER_SIZE	100
+#define MAX_STRING_LENGTH	32
+
+// Header information structure
+struct FileHeader {
+	uint8_t packetType;
+	char firmwareVersion[MAX_STRING_LENGTH];
+	char designName[MAX_STRING_LENGTH];
+	// uint32_t timestamp;			// UNIX timestamp when logging started
+	uint16_t numPaths;
+};
+
+// Path information structure
+struct PathInfo {
+	uint8_t packetType;
+	uint16_t pathIndex;
+	uint8_t featureType;
+	// uint16_t numPoints;
+	// uint8_t toolParams;			// Any tool-specific parameters
+};
+
+// Path point structure
+struct PathPoint {
+	uint8_t packetType;
+	uint16_t pathIndex;
+	uint16_t pointIndex;
+	float x;
+	float y;
+	float z;
+};
+
 // Struct definitions for your packets
 struct SensorData {
-	int16_t dx;
-	int16_t dy;
-	uint8_t sq;  // surface quality
+	int dx;
+	int dy;
+	byte sq;
 };
 
 struct SensorsPacket {
-	uint8_t packetType;    // Set to PACKET_SENSORS (0x01)
-	uint32_t time;         // microseconds since start
-	SensorData sensors[4]; // Data for all 4 sensors
+	uint8_t packetType;
+	uint32_t time;				// microseconds since start
+	SensorData sensors[ns];		// Data for all 4 sensors
 };
 
 struct AuxPacket {
-	uint8_t packetType;    // Set to PACKET_AUX (0x02)
-	uint32_t time;         // microseconds since start
+	uint8_t packetType;
+	uint32_t time;				// microseconds since start
 	RouterPose pose;
-	uint16_t curr_path_idx;
-	uint16_t curr_point_idx;
+	uint16_t currPathIndex;
+	uint16_t currPointIndex;
 	Point goal;
 	float toolPos;
 	float desPos;
-	int16_t cutState;
+	int8_t cutState;
 };
 
 // Serial logging functions
 void handleSerial();
-void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos);
+void outputSerial(Point goal, float toolPos, float desPos);
 
 // Debugging functions
 void debugging(Point point1, Point point2);
@@ -46,7 +77,11 @@ bool validCommand(const char* gLine);
 bool validCoordinate(const char* gLine);
 void parseGCodeFile(const String& sFilename);
 bool initializeLogFile();
-void outputSD(RouterPose rPose, Point goal, float toolPos, float desPos);
+void writeFileHeader(const char* designName, uint16_t numPaths);
+void writePathInfo(uint16_t pathIndex, uint8_t featureType);
+void writePathPoint(uint16_t pathIndex, uint16_t pointIndex, Point point);
+void writeSensorData(uint32_t time,  SensorData sensorArray[4]);
+void writeAuxData(Point goal, float toolPos, float desPos);
 void closeSDFile();
 void logPath();
 

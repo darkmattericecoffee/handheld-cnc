@@ -50,10 +50,10 @@ int16_t centerX = 0;
 int16_t centerY = 0;
 
 // Mode select
-bool plottingOn = false;			// plot values  (1 = yes; 0 = no)
-bool debuggingOn = false;			// print values (1 = yes; 0 = no)
+bool plottingOn = false;			// plot values
+bool debuggingOn = false;			// print debug statements
 bool stopwatchOn = false;
-bool outputOn = false;				// output data to serial
+bool outputSerialOn = false;		// output data to serial
 bool outputSDOn = true;				// output data to SD card
 int designOrCalibrate = 0;			// choose design or calibrate (0 or 1)
 int acceptCal = 0;					// accept calibration or not
