@@ -32,9 +32,9 @@ extern bool plungeReady;
 
 // Path data
 extern Path paths[MAX_PATHS];
-extern int num_paths;
-extern int current_path_idx;
-extern int current_point_idx;
+extern uint16_t num_paths;
+extern uint16_t current_path_idx;
+extern uint16_t current_point_idx;
 
 // SD stuff
 extern FsFile logFile;

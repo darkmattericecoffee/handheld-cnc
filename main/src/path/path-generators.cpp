@@ -321,61 +321,6 @@ void drillSquareGenerator() {
 	paths[0].feature = DRILL;
 }
 
-void parseNC(const char* filename) {
-	// TODO: maybe take some of this parseGCodeFile function
-	FsFile myFile = sd.open(filename);
-	if (!myFile) {
-		Serial.println("Failed to open file for reading");
-		return;
-	}
-
-	int idx = 0;
-	while (myFile.available()) {
-		String line = myFile.readStringUntil('\n');
-		int xPos = line.indexOf('X');
-		int yPos = line.indexOf('Y');
-		int zPos = line.indexOf('Z');
-		int spacePos = 0;
-		float x = 0;
-		float y = 0;
-		float z = 0;
-
-		if (xPos != -1 || yPos != -1 || zPos != -1) {
-			if (xPos == -1) {
-				x = paths[0].points[idx-1].x;
-			} else {
-				spacePos = line.indexOf(' ', xPos);
-				x = line.substring(xPos+1, spacePos).toFloat();
-			}
-			
-			if (yPos == -1) {
-				y = paths[0].points[idx-1].y;
-			} else {
-				spacePos = line.indexOf(' ', yPos);
-				if (spacePos == -1) {
-					spacePos = line.length();
-				}
-				y = line.substring(yPos+1, spacePos).toFloat();
-			}
-
-			if (zPos == -1) {
-				z = paths[0].points[idx-1].z;
-			} else {
-				spacePos = line.indexOf(' ', zPos);
-				if (spacePos == -1) {
-					spacePos = line.length();
-				}
-				z = line.substring(zPos+1, spacePos).toFloat();
-			}
-
-			paths[0].points[idx] = Point{x,y,z};
-			idx++;
-		}
-	}
-
-	myFile.close();
-}
-
 void makePresetPath() {
 	switch (designPreset) {
 		case 0:

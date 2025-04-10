@@ -22,9 +22,9 @@ bool plungeReady = false;
 
 // Path data
 Path paths[MAX_PATHS];
-int num_paths = 0;
-int current_path_idx = 0;
-int current_point_idx = 0;
+uint16_t num_paths = 0;
+uint16_t current_path_idx = 0;
+uint16_t current_point_idx = 0;
 
 // SD Stuff
 FsFile logFile;

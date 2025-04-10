@@ -97,6 +97,7 @@ void handleFileSelection() {
 		} else {
 			// Handle file selection
 			parseGCodeFile(selectedFile);
+			logPath();
 
 			state = DESIGN_SELECTED;
 			
@@ -138,7 +139,7 @@ bool validCoordinate(const char* gLine) {
 }
 
 void parseGCodeFile(const String& sFilename) {
-	strncpy(filename, sFilename.c_str(), MAX_STRING_LENGTH);
+	snprintf(filename, MAX_STRING_LENGTH, "%s", sFilename.c_str());
 
 	FsFile file;
 	if (!file.open(filename, O_READ)) {
@@ -395,7 +396,7 @@ bool initializeLogFile() {
 	
 	// Find next available file number
 	do {
-		sprintf(filename, "logFiles/LOG%03d.txt", fileNumber++);
+		sprintf(filename, "logFiles/LOG%03d.bin", fileNumber++);
 	} while (sd.exists(filename) && fileNumber < 1000);
 	
 	logFile = sd.open(filename, FILE_WRITE);
@@ -412,29 +413,30 @@ bool initializeLogFile() {
 // Function to write header information
 void writeFileHeader(const char* designName, uint16_t numPaths) {
 	if (logFile) {
-		FileHeader header;
-		header.packetType = PACKET_HEADER;
-		
-		// Copy strings safely
-		strncpy(header.firmwareVersion, FIRMWARE_VERSION, MAX_STRING_LENGTH);
-		header.firmwareVersion[MAX_STRING_LENGTH-1] = '\0'; // Ensure null termination
-		strncpy(header.designName, designName, MAX_STRING_LENGTH);
-		header.designName[MAX_STRING_LENGTH-1] = '\0'; // Ensure null termination
+		FileHeader fileHeader;
+		fileHeader.packetType = PACKET_HEADER;
+		strncpy(fileHeader.firmwareVersion, FIRMWARE_VERSION, MAX_STRING_LENGTH);
+		fileHeader.firmwareVersion[MAX_STRING_LENGTH-1] = '\0';			// Ensure null termination
+		strncpy(fileHeader.designName, designName, MAX_STRING_LENGTH);
+		fileHeader.designName[MAX_STRING_LENGTH-1] = '\0';				// Ensure null termination
 		
 		// TODO: add UNIX timestamp
-		header.numPaths = numPaths;
+		fileHeader.numPaths = numPaths;
 		
 		// Write the header to file
-		logFile.write((uint8_t*)&header, sizeof(FileHeader));
+		logFile.write((uint8_t*)&fileHeader, sizeof(FileHeader));
 		logFile.flush();
 
-		Serial.printf("Header written to file: %s\n", header.designName);
+		Serial.printf("Header written to file: %s\n", fileHeader.designName);
 	}
 }
 
 // Function to write path information
 void writePathInfo(uint16_t pathIndex, uint8_t featureType) {
 	if (logFile) {
+		// uint8_t header = PACKET_START;
+		// logFile.write(&header, 1);
+
 		PathInfo pathInfo;
 		pathInfo.packetType = PACKET_PATH;
 		pathInfo.pathIndex = pathIndex;
@@ -444,12 +446,18 @@ void writePathInfo(uint16_t pathIndex, uint8_t featureType) {
 		
 		// Write the path info to file
 		logFile.write((uint8_t*)&pathInfo, sizeof(PathInfo));
+
+		// uint8_t footer = PACKET_END;
+		// logFile.write(&footer, 1);
 	}
 }
 
 // Function to write a single point in a path
 void writePathPoint(uint16_t pathIndex, uint16_t pointIndex, Point point) {
 	if (logFile) {
+		// uint8_t header = PACKET_START;
+		// logFile.write(&header, 1);
+
 		PathPoint pathPoint;
 		pathPoint.packetType = PACKET_PATH_POINT;
 		pathPoint.pathIndex = pathIndex;
@@ -459,7 +467,10 @@ void writePathPoint(uint16_t pathIndex, uint16_t pointIndex, Point point) {
 		pathPoint.z = point.z;
 		
 		// Write the point to file
-		logFile.write((uint8_t*)&point, sizeof(PathPoint));
+		logFile.write((uint8_t*)&pathPoint, sizeof(PathPoint));
+
+		// uint8_t footer = PACKET_END;
+		// logFile.write(&footer, 1);
 	}
 }
 
