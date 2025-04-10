@@ -69,14 +69,16 @@ class BinaryLogDecoder:
 					else:
 						print(f"Unknown packet type: {packet_type_val}")
 						# Skip to next start marker
-						self._find_next_start_marker(f)
+						# self._find_next_start_marker(f)
+						f.read(1)  # Skip one byte to avoid infinite loop
 						
 				except EOFError:
 					break
 				except Exception as e:
 					print(f"Error decoding file: {e}")
 					# Try to recover and continue
-					self._find_next_start_marker(f)
+					# self._find_next_start_marker(f)
+					f.read(1)
 	
 	def _find_next_start_marker(self, f):
 		"""Find the next start marker in the file."""
@@ -121,7 +123,10 @@ class BinaryLogDecoder:
 	def _decode_path_info(self, f):
 		"""Decode path information."""
 		try:
-			packet_type = int.from_bytes(f.read(1), byteorder='little')
+			# packet_type = int.from_bytes(f.read(1), byteorder='little')
+			# TODO: remove need for manual skipping of bytes
+			f.read(1)  # Skip the packet type byte (why tho?)
+			f.read(1)  # Skip the padding byte (why tho?)
 			path_index = struct.unpack('<H', f.read(2))[0]  # uint16_t
 			feature_type = int.from_bytes(f.read(1), byteorder='little')
 			
@@ -141,13 +146,14 @@ class BinaryLogDecoder:
 		"""Decode a path point."""
 		try:
 			# packet_type = int.from_bytes(f.read(1), byteorder='little')
+			f.read(1)  # Skip the packet type byte (why tho?)
+			f.read(1)  # Skip the padding byte (why tho?)
 			path_index = struct.unpack('<H', f.read(2))[0]  # uint16_t
 			point_index = struct.unpack('<H', f.read(2))[0]  # uint16_t
-			
+			f.read(1)  # Skip the padding byte (why tho?)
+			f.read(1)  # Skip the padding byte (why tho?)
 			# Read point coordinates
-			x = struct.unpack('<f', f.read(4))[0]  # float
-			y = struct.unpack('<f', f.read(4))[0]  # float
-			z = struct.unpack('<f', f.read(4))[0]  # float
+			(x,y,z) = struct.unpack('fff', f.read(12))
 			
 			point = {
 				'path_index': path_index,
@@ -172,16 +178,16 @@ class BinaryLogDecoder:
 		"""Decode a sensor data packet."""
 		try:
 			# We've already read packetType in the caller
+			f.read(1)  # Skip the packet type byte (why tho?)
+			f.read(1)  # Skip the padding byte (why tho?)
 			time = struct.unpack('<I', f.read(4))[0]  # uint32_t
+			f.read(1)
 			
-			# Read sensor data for all sensors
-			num_sensors = len(self.design_info.get('num_sensors', [4]))  # Default to 4 if not specified
-			
+			num_sensors = 4
 			sensors = []
 			for i in range(num_sensors):
-				dx = struct.unpack('<i', f.read(4))[0]  # int
-				dy = struct.unpack('<i', f.read(4))[0]  # int
-				sq = int.from_bytes(f.read(1), byteorder='little')  # byte
+				#TODO: make this work for the raw int and byte sensor data instead
+				(dx, dy, sq) = struct.unpack('ffi', f.read(12))  # float x, y, sq
 				
 				sensors.append({
 					'dx': dx,
@@ -207,27 +213,13 @@ class BinaryLogDecoder:
 		try:
 			# We've already read packetType in the caller
 			time = struct.unpack('<I', f.read(4))[0]  # uint32_t
-			
-			# Read RouterPose
-			pose_x = struct.unpack('<f', f.read(4))[0]  # float
-			pose_y = struct.unpack('<f', f.read(4))[0]  # float
-			pose_yaw = struct.unpack('<f', f.read(4))[0]  # float
-			
-			# Read current path and point indices
+			(pose_x, pose_y, pose_yaw) = struct.unpack('fff', f.read(12))  # float x, y, z
 			curr_path_index = struct.unpack('<H', f.read(2))[0]  # uint16_t
 			curr_point_index = struct.unpack('<H', f.read(2))[0]  # uint16_t
-			
-			# Read goal point
-			goal_x = struct.unpack('<f', f.read(4))[0]  # float
-			goal_y = struct.unpack('<f', f.read(4))[0]  # float
-			goal_z = struct.unpack('<f', f.read(4))[0]  # float
-			
-			# Read remaining values
-			tool_pos = struct.unpack('<f', f.read(4))[0]  # float
-			des_pos = struct.unpack('<f', f.read(4))[0]  # float
+			(goal_x, goal_y, goal_z) = struct.unpack('fff', f.read(12))  # float x, y, z
+			(tool_pos,des_pos) = struct.unpack('ff', f.read(8))  # float x, y
 			cut_state = int.from_bytes(f.read(1), byteorder='little')  # int8_t
 			
-			# Read end marker
 			end_marker = int.from_bytes(f.read(1), byteorder='little')
 			if end_marker != PACKET_END:
 				print(f"Warning: Expected end marker (0x55), got {end_marker}")
@@ -418,7 +410,7 @@ class BinaryLogDecoder:
 if __name__ == "__main__":
 	# filename = input("Enter file name to decode: ")
 	# decoder = BinaryLogDecoder(filename)
-	decoder = BinaryLogDecoder("../logFiles/LOG009.bin")
+	decoder = BinaryLogDecoder("../logFiles/LOG015.bin")
 	decoder.decode_file()
 	
 	# Print summary information
