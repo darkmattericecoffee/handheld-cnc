@@ -106,8 +106,9 @@ void doSensing() {
 		}
 
 		// Store sensor data for logging
-		logData[i].dx = data[i].dx;
-		logData[i].dy = data[i].dy;
+		// TODO: store the raw int and byte data instead and do twosComp in the decoder
+		logData[i].dx = dx;
+		logData[i].dy = dy;
 		logData[i].sq = data[i].SQUAL;
 	}
 

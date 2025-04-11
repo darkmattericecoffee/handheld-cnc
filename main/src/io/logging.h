@@ -12,6 +12,7 @@ struct FileHeader {
 	char firmwareVersion[MAX_STRING_LENGTH];
 	char designName[MAX_STRING_LENGTH];
 	// uint32_t timestamp;			// UNIX timestamp when logging started
+	CalParams calParams[4];			// Calibration parameters
 	uint16_t numPaths;
 };
 
@@ -36,9 +37,9 @@ struct PathPoint {
 
 // Struct definitions for your packets
 struct SensorData {
-	int dx;
-	int dy;
-	byte sq;
+	float dx;
+	float dy;
+	int sq;
 };
 
 struct SensorsPacket {

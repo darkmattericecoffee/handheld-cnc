@@ -419,6 +419,10 @@ void writeFileHeader(const char* designName, uint16_t numPaths) {
 		fileHeader.firmwareVersion[MAX_STRING_LENGTH-1] = '\0';			// Ensure null termination
 		strncpy(fileHeader.designName, designName, MAX_STRING_LENGTH);
 		fileHeader.designName[MAX_STRING_LENGTH-1] = '\0';				// Ensure null termination
+
+		for (int i = 0; i < 4; i++) {
+			fileHeader.calParams[i] = cal[i];
+		}
 		
 		// TODO: add UNIX timestamp
 		fileHeader.numPaths = numPaths;

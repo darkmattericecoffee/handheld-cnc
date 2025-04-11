@@ -14,6 +14,11 @@ PACKET_SENSORS = 0x01
 PACKET_AUX = 0x02
 MAX_STRING_LENGTH = 32
 
+"""NOTE: The following decoder is based on the following firmware version"""
+working_version = "0.1.1"
+
+num_sensors = 4
+
 class CutState(IntEnum):
 	NOT_CUT_READY = 0
 	CUT_READY = 1
@@ -103,13 +108,26 @@ class BinaryLogDecoder:
 				return
 				
 			firmware_version = f.read(MAX_STRING_LENGTH).decode('utf-8').rstrip('\x00')
+			if firmware_version != working_version:
+				raise ValueError(f"Firmware version mismatch: expected {working_version}, got {firmware_version}")
 			design_name = f.read(MAX_STRING_LENGTH).decode('utf-8').rstrip('\x00')
 			f.read(1)  # Skip the padding byte
+			f.read(1)  # Skip the padding byte
+			f.read(1)  # Skip the padding byte
+			cal_params = []
+			for i in range(num_sensors):
+				(cx, cy, cr) = struct.unpack('fff', f.read(12))
+				cal_params.append({
+					'cx': cx,
+					'cy': cy,
+					'cr': cr
+				})
 			num_paths = struct.unpack('<H', f.read(2))[0]  # uint16_t
 			
 			self.design_info = {
 				'firmware_version': firmware_version,
 				'design_name': design_name,
+				'cal_params': cal_params,
 				'num_paths': num_paths
 			}
 
@@ -183,7 +201,6 @@ class BinaryLogDecoder:
 			time = struct.unpack('<I', f.read(4))[0]  # uint32_t
 			f.read(1)
 			
-			num_sensors = 4
 			sensors = []
 			for i in range(num_sensors):
 				#TODO: make this work for the raw int and byte sensor data instead
@@ -410,7 +427,7 @@ class BinaryLogDecoder:
 if __name__ == "__main__":
 	# filename = input("Enter file name to decode: ")
 	# decoder = BinaryLogDecoder(filename)
-	decoder = BinaryLogDecoder("../logFiles/LOG015.bin")
+	decoder = BinaryLogDecoder("../logFiles/LOG017.bin")
 	decoder.decode_file()
 	
 	# Print summary information
