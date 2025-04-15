@@ -15,11 +15,8 @@ void nullHandler(EncoderButton &eb) {
 // CLICK HANDLERS ----------------------------------------
 void onClickGoToSetThickness(EncoderButton &eb) {
 	// Close SD if open
-	if (logFile) {
-		logFile.flush();
-		logFile.close();
-		Serial.println("SD card file has been closed.");
-	}
+	closeSDFile();
+	Serial.println("SD card file has been closed.");
 
 	state = RESET;
 	encoderSetThickness();

@@ -70,7 +70,8 @@ class BinaryLogDecoder:
 						else:
 							print(f"Unknown packet type after start marker: {next_type}")
 							# Skip to next start marker
-							self._find_next_start_marker(f)
+							# self._find_next_start_marker(f)
+							f.read(1)  # Skip one byte to avoid infinite loop
 					else:
 						print(f"Unknown packet type: {packet_type_val}")
 						# Skip to next start marker
@@ -131,7 +132,8 @@ class BinaryLogDecoder:
 				'num_paths': num_paths
 			}
 
-			# f.read(1)  # Skip the padding byte
+			f.read(1)
+			f.read(1)
 			
 			print(f"File Header: {self.design_info}")
 			
@@ -143,10 +145,11 @@ class BinaryLogDecoder:
 		try:
 			# packet_type = int.from_bytes(f.read(1), byteorder='little')
 			# TODO: remove need for manual skipping of bytes
-			f.read(1)  # Skip the packet type byte (why tho?)
-			f.read(1)  # Skip the padding byte (why tho?)
+			f.read(1)
+			f.read(1)
 			path_index = struct.unpack('<H', f.read(2))[0]  # uint16_t
 			feature_type = int.from_bytes(f.read(1), byteorder='little')
+			f.read(1)
 			
 			path_info = {
 				'path_index': path_index,
@@ -164,12 +167,11 @@ class BinaryLogDecoder:
 		"""Decode a path point."""
 		try:
 			# packet_type = int.from_bytes(f.read(1), byteorder='little')
-			f.read(1)  # Skip the packet type byte (why tho?)
-			f.read(1)  # Skip the padding byte (why tho?)
-			path_index = struct.unpack('<H', f.read(2))[0]  # uint16_t
-			point_index = struct.unpack('<H', f.read(2))[0]  # uint16_t
-			f.read(1)  # Skip the padding byte (why tho?)
-			f.read(1)  # Skip the padding byte (why tho?)
+			f.read(1)
+			f.read(1)
+			(path_index, point_index) = struct.unpack('HH', f.read(4))  # uint16_t
+			f.read(1)
+			f.read(1)
 			# Read point coordinates
 			(x,y,z) = struct.unpack('fff', f.read(12))
 			
@@ -229,17 +231,23 @@ class BinaryLogDecoder:
 		"""Decode an auxiliary data packet."""
 		try:
 			# We've already read packetType in the caller
+			f.read(1)
+			f.read(1)
 			time = struct.unpack('<I', f.read(4))[0]  # uint32_t
-			(pose_x, pose_y, pose_yaw) = struct.unpack('fff', f.read(12))  # float x, y, z
-			curr_path_index = struct.unpack('<H', f.read(2))[0]  # uint16_t
-			curr_point_index = struct.unpack('<H', f.read(2))[0]  # uint16_t
-			(goal_x, goal_y, goal_z) = struct.unpack('fff', f.read(12))  # float x, y, z
-			(tool_pos,des_pos) = struct.unpack('ff', f.read(8))  # float x, y
-			cut_state = int.from_bytes(f.read(1), byteorder='little')  # int8_t
+			f.read(1)
+			(pose_x, pose_y, pose_yaw) = struct.unpack('fff', f.read(12))		# float x, y, z
+			curr_path_index = struct.unpack('<H', f.read(2))[0]					# uint16_t
+			curr_point_index = struct.unpack('<H', f.read(2))[0]				# uint16_t
+			(goal_x, goal_y, goal_z) = struct.unpack('fff', f.read(12))			# float x, y, z
+			(tool_pos,des_pos) = struct.unpack('ff', f.read(8))					# float x, y
+			cut_state = int.from_bytes(f.read(1), byteorder='little')			# int8_t
+			f.read(1)
+			f.read(1)
+			f.read(1)
 			
 			end_marker = int.from_bytes(f.read(1), byteorder='little')
 			if end_marker != PACKET_END:
-				print(f"Warning: Expected end marker (0x55), got {end_marker}")
+				print(f"Warning: Expected aux end marker (0x55), got {end_marker}")
 			
 			self.aux_data.append({
 				'time': time,
@@ -423,11 +431,32 @@ class BinaryLogDecoder:
 		plt.tight_layout()
 		plt.show()
 
+	def plot_time(self):
+		"""Plot time data."""
+		df_sens = self.get_sensor_dataframe()
+		df_aux = self.get_aux_dataframe()
+			
+		plt.figure(figsize=(12, 10))
+
+		dt_sens = df_sens['time'].diff()/1_000_000
+		dt_aux = df_aux['time'].diff()/1_000_000
+		
+		# Plot the machine position
+		plt.plot(df_sens['time']/1_000_000, dt_sens)
+		plt.plot(df_aux['time']/1_000_000, dt_aux)
+
+		plt.title('Sensor and Auxiliary Data Time Differences')
+		plt.xlabel('Time (seconds)')
+		plt.ylabel('Time Difference (seconds)')
+		plt.legend(['Sensor Data', 'Auxiliary Data'])
+		plt.grid(True)
+		plt.show()
+
 # Example usage
 if __name__ == "__main__":
 	# filename = input("Enter file name to decode: ")
 	# decoder = BinaryLogDecoder(filename)
-	decoder = BinaryLogDecoder("../logFiles/LOG017.bin")
+	decoder = BinaryLogDecoder("../logFiles/LOG018.bin")
 	decoder.decode_file()
 	
 	# Print summary information
@@ -448,6 +477,7 @@ if __name__ == "__main__":
 	# aux_df.to_csv("aux_data.csv", index=False)
 	
 	# Generate plots
-	decoder.plot_design()
-	decoder.plot_trajectory()
-	decoder.plot_sensor_data()
+	# decoder.plot_design()
+	# decoder.plot_trajectory()
+	# decoder.plot_sensor_data()
+	decoder.plot_time()

@@ -503,6 +503,7 @@ void writeSensorData(uint32_t time,  SensorData sensorArray[ns]) {
 		if (millis() - timeLastFlush >= flushInterval) {
 			logFile.flush();
 			timeLastFlush = millis();
+			// Serial.printf("%lu: flushed from sensor log\n", timeLastFlush);
 		}
 	}
 }
@@ -536,6 +537,7 @@ void writeAuxData(Point goal, float toolPos, float desPos) {
 			if (millis() - timeLastFlush >= flushInterval) {
 				logFile.flush();
 				timeLastFlush = millis();
+				// Serial.printf("%lu: flushed from aux log\n", timeLastFlush);
 			}
 		}
 	}

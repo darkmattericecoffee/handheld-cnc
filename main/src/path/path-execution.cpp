@@ -64,6 +64,10 @@ void advance(Point goal, Point next, bool autoAdvance=false) {
 				while (stepperZ.distanceToGo() != 0) {
 					stepperZ.run();
 				}
+
+				// Log data and close SD
+				closeSDFile();
+
 				Serial.println("All paths finished");
 				state = RESET;
 				encoderDesignType();

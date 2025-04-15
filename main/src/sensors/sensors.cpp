@@ -188,6 +188,9 @@ void doSensing() {
 		sensorPlotting();
 	}
 
+	if (sensingTime > 1000) {
+		Serial.printf("%lu: sensing time = %lu\n", millis(), sensingTime);
+	}
 	// Write to SD card
 	if (outputSDOn) {
 		writeSensorData(timeLastPoll, logData);
