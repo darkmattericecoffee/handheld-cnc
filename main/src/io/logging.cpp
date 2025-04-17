@@ -4,17 +4,6 @@
 #include <Arduino.h>
 #include "../math/geometry.h"
 
-#define PACKET_START		0xAA
-#define PACKET_END			0x55
-// Constants for packet types
-#define PACKET_SENSORS		0x01
-#define PACKET_AUX			0x02
-// Header/identifier constants
-#define PACKET_HEADER		0xA0
-#define PACKET_DESIGN_INFO	0xA1
-#define PACKET_PATH			0xA2
-#define PACKET_PATH_POINT	0xA3
-
 char filename[MAX_STRING_LENGTH];
 
 // Timing variables
@@ -22,8 +11,8 @@ static long unsigned timeLastOutput = 0;
 static long unsigned timeLastOutputSD = 0;
 static long unsigned timeLastDebug = 0;
 static long unsigned timeLastClocked = 0;
-static long unsigned timeLastFlush = 0;
-static const long flushInterval = 1000;			// Interval to flush the SD card
+elapsedMillis timeSinceFlush;
+static const long flushInterval = 10000;			// Interval to flush the SD card
 static void* lastDebugCaller = nullptr;		// Store the address of the last debug call
 static bool firstCall = true;				// Track if this is a new sequence of debug calls
 
@@ -247,7 +236,7 @@ void parseGCodeFile(const String& sFilename) {
 	file.close();
 }
 
-// Write ------------------------------------------------------
+// Write to Serial ------------------------------------------------------
 void outputSerial(Point goal, float toolPos, float desPos) {
 	if(millis() - timeLastOutput >= dtOutput) {
 		timeLastOutput = millis();
@@ -297,8 +286,9 @@ void debugging(Point point1, Point point2) {
 	timeLastDebug = millis();
 
 	// Print debug data
-	Serial.printf("x:%f, y:%f, theta:%f, dir:%i\n", pose.x, pose.y, pose.yaw * 180.0 / PI, direction(point1, point2));
-	Serial.printf("goal.x:%f,goal.y:%f,goal.z%f, next.x:%f,next.y:%f,next.z%f\n", point1.x, point1.y, point1.z, point2.x, point2.y, point2.z);
+	// print unsigned long time
+	Serial.printf("time:,%lu, x:%f, y:%f, theta:%f, dir:%i\n", filemicros/1'000'000, pose.x, pose.y, pose.yaw * 180.0 / PI, direction(point1, point2));
+	// Serial.printf("goal.x:%f,goal.y:%f,goal.z%f, next.x:%f,next.y:%f,next.z%f\n", point1.x, point1.y, point1.z, point2.x, point2.y, point2.z);
 
 	// Additional debug info can be uncommented as needed:
 	/*
@@ -384,6 +374,7 @@ void stopwatch() {
 	}
 }
 
+// Write to SD ------------------------------------------------------
 bool initializeLogFile() {
 	// Close any existing file first
 	if (logFile) {
@@ -404,6 +395,8 @@ bool initializeLogFile() {
 		Serial.println("Could not create log file!");
 		return false;
 	}
+
+	filemicros = 0;		// Reset the microseconds timer
 	
 	logFile.flush();
 	Serial.printf("Logging to file: %s\n", filename);
@@ -430,6 +423,7 @@ void writeFileHeader(const char* designName, uint16_t numPaths) {
 		// Write the header to file
 		logFile.write((uint8_t*)&fileHeader, sizeof(FileHeader));
 		logFile.flush();
+		timeSinceFlush = 0;
 
 		Serial.printf("Header written to file: %s\n", fileHeader.designName);
 	}
@@ -438,9 +432,6 @@ void writeFileHeader(const char* designName, uint16_t numPaths) {
 // Function to write path information
 void writePathInfo(uint16_t pathIndex, uint8_t featureType) {
 	if (logFile) {
-		// uint8_t header = PACKET_START;
-		// logFile.write(&header, 1);
-
 		PathInfo pathInfo;
 		pathInfo.packetType = PACKET_PATH;
 		pathInfo.pathIndex = pathIndex;
@@ -450,18 +441,12 @@ void writePathInfo(uint16_t pathIndex, uint8_t featureType) {
 		
 		// Write the path info to file
 		logFile.write((uint8_t*)&pathInfo, sizeof(PathInfo));
-
-		// uint8_t footer = PACKET_END;
-		// logFile.write(&footer, 1);
 	}
 }
 
 // Function to write a single point in a path
 void writePathPoint(uint16_t pathIndex, uint16_t pointIndex, Point point) {
 	if (logFile) {
-		// uint8_t header = PACKET_START;
-		// logFile.write(&header, 1);
-
 		PathPoint pathPoint;
 		pathPoint.packetType = PACKET_PATH_POINT;
 		pathPoint.pathIndex = pathIndex;
@@ -472,37 +457,30 @@ void writePathPoint(uint16_t pathIndex, uint16_t pointIndex, Point point) {
 		
 		// Write the point to file
 		logFile.write((uint8_t*)&pathPoint, sizeof(PathPoint));
-
-		// uint8_t footer = PACKET_END;
-		// logFile.write(&footer, 1);
 	}
 }
 
 // Write sensor data to SD card for datalogging
 void writeSensorData(uint32_t time,  SensorData sensorArray[ns]) {
 	if (logFile) {
-		uint8_t header = PACKET_START;
-		logFile.write(&header, 1);
-		
 		SensorsPacket packet;
+		packet.packetStart = PACKET_START;
 		packet.packetType = PACKET_SENSORS;
 		packet.time = time;
-		
-		// Copy all sensor data
-		for (int i = 0; i < ns; i++) {
-			packet.sensors[i] = sensorArray[i];
-		}
+		for (int i = 0; i < ns; i++) packet.sensors[i] = sensorArray[i];
+		packet.packetEnd = PACKET_END;
 		
 		// Write the entire packet
-		logFile.write((uint8_t*)&packet, sizeof(SensorsPacket));
-		
-		uint8_t footer = PACKET_END;
-		logFile.write(&footer, 1);
+		uint32_t packetSize = sizeof(SensorsPacket);
+		if (logFile.write((uint8_t*)&packet, packetSize) != packetSize) {
+			Serial.println("Failed to write sensor data to SD card!");
+			// return;
+		}
 
 		// Periodic flush
-		if (millis() - timeLastFlush >= flushInterval) {
+		if (timeSinceFlush >= flushInterval) {
 			logFile.flush();
-			timeLastFlush = millis();
+			timeSinceFlush = 0;
 			// Serial.printf("%lu: flushed from sensor log\n", timeLastFlush);
 		}
 	}
@@ -514,12 +492,10 @@ void writeAuxData(Point goal, float toolPos, float desPos) {
 		timeLastOutputSD = millis();
 		
 		if (logFile) {
-			uint8_t header = PACKET_START;
-			logFile.write(&header, 1);
-			
 			AuxPacket packet;
+			packet.packetStart = PACKET_START;
 			packet.packetType = PACKET_AUX;
-			packet.time = micros();  // Current time
+			packet.time = filemicros;
 			packet.pose = pose;
 			packet.currPathIndex = current_path_idx;
 			packet.currPointIndex = current_point_idx;
@@ -527,16 +503,19 @@ void writeAuxData(Point goal, float toolPos, float desPos) {
 			packet.toolPos = toolPos;
 			packet.desPos = desPos;
 			packet.cutState = cutState;
+			packet.packetEnd = PACKET_END;
 			
-			logFile.write((uint8_t*)&packet, sizeof(AuxPacket));
-			
-			uint8_t footer = PACKET_END;
-			logFile.write(&footer, 1);
+			// Write the entire packet
+			uint32_t packetSize = sizeof(AuxPacket);
+			if (logFile.write((uint8_t*)&packet, packetSize) != packetSize) {
+				Serial.println("Failed to write aux data to SD card!");
+				// return;
+			}
 			
 			// Periodic flush
-			if (millis() - timeLastFlush >= flushInterval) {
+			if (timeSinceFlush >= flushInterval) {
 				logFile.flush();
-				timeLastFlush = millis();
+				timeSinceFlush = 0;
 				// Serial.printf("%lu: flushed from aux log\n", timeLastFlush);
 			}
 		}

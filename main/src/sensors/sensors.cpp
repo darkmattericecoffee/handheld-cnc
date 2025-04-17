@@ -81,6 +81,7 @@ int16_t convTwosComp(int16_t value) {
 
 void doSensing() {
 	timeLastPoll = micros();
+	unsigned long logTime = filemicros;
 
 	// Collect sensor data
 	PMW3360_DATA data[ns];
@@ -188,12 +189,12 @@ void doSensing() {
 		sensorPlotting();
 	}
 
-	if (sensingTime > 1000) {
+	if (sensingTime > 1000 || sensingTime < 800) {
 		Serial.printf("%lu: sensing time = %lu\n", millis(), sensingTime);
 	}
 	// Write to SD card
 	if (outputSDOn) {
-		writeSensorData(timeLastPoll, logData);
+		writeSensorData(logTime, logData);
 	}
 }
 

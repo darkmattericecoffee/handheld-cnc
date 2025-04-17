@@ -3,8 +3,20 @@
 
 #include "../types.h"
 
+#define PACKET_START		0xAA
+#define PACKET_END			0x55
+// Constants for packet types
+#define PACKET_SENSORS		0x01
+#define PACKET_AUX			0x02
+// Header/identifier constants
+#define PACKET_HEADER		0xA0
+#define PACKET_DESIGN_INFO	0xA1
+#define PACKET_PATH			0xA2
+#define PACKET_PATH_POINT	0xA3
+
 #define LINE_BUFFER_SIZE	100
 #define MAX_STRING_LENGTH	32
+#define MAXBUFFER 			220000
 
 // Header information structure
 struct FileHeader {
@@ -43,12 +55,15 @@ struct SensorData {
 };
 
 struct SensorsPacket {
+	uint8_t packetStart;
 	uint8_t packetType;
 	uint32_t time;				// microseconds since start
 	SensorData sensors[ns];		// Data for all 4 sensors
+	uint8_t packetEnd;
 };
 
 struct AuxPacket {
+	uint8_t packetStart;
 	uint8_t packetType;
 	uint32_t time;				// microseconds since start
 	RouterPose pose;
@@ -58,6 +73,7 @@ struct AuxPacket {
 	float toolPos;
 	float desPos;
 	int8_t cutState;
+	uint8_t packetEnd;
 };
 
 // Serial logging functions

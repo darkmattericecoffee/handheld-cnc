@@ -83,6 +83,7 @@ extern long unsigned timeLastDebounce;
 extern long unsigned lastDraw;
 extern long unsigned timeLastPoll;
 extern long unsigned sensingTime;
+extern elapsedMicros filemicros;
 extern uint8_t iter;
 
 #endif

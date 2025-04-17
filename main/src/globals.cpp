@@ -75,4 +75,5 @@ long unsigned timeLastDebounce = 0;
 long unsigned lastDraw = 0;
 long unsigned timeLastPoll = 0;
 long unsigned sensingTime = 0;
+elapsedMicros filemicros;
 uint8_t iter = 0;

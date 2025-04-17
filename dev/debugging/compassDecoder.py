@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from enum import IntEnum
+import mplcursors
 
 # Constants to match your firmware
 PACKET_START = 0xAA
@@ -68,12 +69,14 @@ class BinaryLogDecoder:
 						elif next_type == PACKET_AUX:
 							self._decode_aux_packet(f)
 						else:
-							print(f"Unknown packet type after start marker: {next_type}")
+							byte_index = f.tell()
+							print(f"{byte_index} - Unknown packet type after start marker: {next_type}")
 							# Skip to next start marker
 							# self._find_next_start_marker(f)
 							f.read(1)  # Skip one byte to avoid infinite loop
 					else:
-						print(f"Unknown packet type: {packet_type_val}")
+						byte_index = f.tell()
+						print(f"{byte_index} - Unknown packet type: {packet_type_val}")
 						# Skip to next start marker
 						# self._find_next_start_marker(f)
 						f.read(1)  # Skip one byte to avoid infinite loop
@@ -198,10 +201,13 @@ class BinaryLogDecoder:
 		"""Decode a sensor data packet."""
 		try:
 			# We've already read packetType in the caller
-			f.read(1)  # Skip the packet type byte (why tho?)
-			f.read(1)  # Skip the padding byte (why tho?)
-			time = struct.unpack('<I', f.read(4))[0]  # uint32_t
+			# f.read(1)  # Skip the packet type byte (why tho?)
+			# f.read(1)  # Skip the padding byte (why tho?)
+			byte_index = f.tell()
 			f.read(1)
+			f.read(1)
+			time = struct.unpack('I', f.read(4))[0]  # uint32_t
+			#f.read(1)
 			
 			sensors = []
 			for i in range(num_sensors):
@@ -214,10 +220,18 @@ class BinaryLogDecoder:
 					'sq': sq
 				})
 			
+			#f.read(1)
+			#f.read(1)
+			
 			# Read end marker
 			end_marker = int.from_bytes(f.read(1), byteorder='little')
 			if end_marker != PACKET_END:
-				print(f"Warning: Expected end marker (0x55), got {end_marker}")
+				byte_index = f.tell()
+				print(f"{byte_index} - Warning: Expected end marker (0x55), got {end_marker}")
+
+			f.read(1)
+			f.read(1)
+			f.read(1)
 			
 			self.sensor_data.append({
 				'time': time,
@@ -231,23 +245,26 @@ class BinaryLogDecoder:
 		"""Decode an auxiliary data packet."""
 		try:
 			# We've already read packetType in the caller
+			byte_index = f.tell()
 			f.read(1)
 			f.read(1)
-			time = struct.unpack('<I', f.read(4))[0]  # uint32_t
-			f.read(1)
+			time = struct.unpack('I', f.read(4))[0]  # uint32_t
+			#f.read(1)
 			(pose_x, pose_y, pose_yaw) = struct.unpack('fff', f.read(12))		# float x, y, z
 			curr_path_index = struct.unpack('<H', f.read(2))[0]					# uint16_t
 			curr_point_index = struct.unpack('<H', f.read(2))[0]				# uint16_t
 			(goal_x, goal_y, goal_z) = struct.unpack('fff', f.read(12))			# float x, y, z
 			(tool_pos,des_pos) = struct.unpack('ff', f.read(8))					# float x, y
 			cut_state = int.from_bytes(f.read(1), byteorder='little')			# int8_t
-			f.read(1)
-			f.read(1)
-			f.read(1)
+			#f.read(1)
+			# f.read(1)
 			
 			end_marker = int.from_bytes(f.read(1), byteorder='little')
 			if end_marker != PACKET_END:
-				print(f"Warning: Expected aux end marker (0x55), got {end_marker}")
+				byte_index = f.tell()
+				print(f"{byte_index} - Warning: Expected aux end marker (0x55), got {end_marker}")
+			f.read(1)
+			f.read(1)
 			
 			self.aux_data.append({
 				'time': time,
@@ -395,36 +412,54 @@ class BinaryLogDecoder:
 			return
 			
 		# Convert time to seconds for better readability
-		df['time_sec'] = df['time'] / 1_000_000
-		
-		plt.figure(figsize=(14, 10))
-		
+		df['time_sec'] = df['time'] / 1_000
+
+		unique_sens_times = df['time_sec'].unique()
+		dt_sens = pd.Series(unique_sens_times).diff()
+				
 		# Create subplots for dx, dy, and sq
 		fig, axs = plt.subplots(3, 1, figsize=(14, 10), sharex=True)
+
+		# Create secondary axes for time differences
+		ax2_0 = axs[0].twinx()
+		ax2_1 = axs[1].twinx()
+		ax2_2 = axs[2].twinx()
 		
 		# Plot dx for each sensor
 		for sensor_id in df['sensor_id'].unique():
 			sensor_df = df[df['sensor_id'] == sensor_id]
 			axs[0].plot(sensor_df['time_sec'], sensor_df['dx'], label=f'Sensor {sensor_id}')
+		ax2_0.plot(unique_sens_times, dt_sens, label='Δt', color='grey', alpha=0.5)
 		axs[0].set_ylabel('dx')
-		axs[0].legend()
+		ax2_0.set_ylabel('Δt (ms)', color='red')
+		ax2_0.tick_params(axis='y', labelcolor='red')
+		axs[0].legend(loc='upper left')
+		ax2_0.legend(loc='upper right')
 		axs[0].grid(True)
 		
 		# Plot dy for each sensor
 		for sensor_id in df['sensor_id'].unique():
 			sensor_df = df[df['sensor_id'] == sensor_id]
 			axs[1].plot(sensor_df['time_sec'], sensor_df['dy'], label=f'Sensor {sensor_id}')
+		ax2_1.plot(unique_sens_times, dt_sens, label='Δt', color='grey', alpha=0.5)
 		axs[1].set_ylabel('dy')
-		axs[1].legend()
+		ax2_1.set_ylabel('Δt (ms)', color='red')
+		ax2_1.tick_params(axis='y', labelcolor='red')
+		axs[1].legend(loc='upper left')
+		ax2_1.legend(loc='upper right')
 		axs[1].grid(True)
 		
 		# Plot sq (surface quality) for each sensor
 		for sensor_id in df['sensor_id'].unique():
 			sensor_df = df[df['sensor_id'] == sensor_id]
 			axs[2].plot(sensor_df['time_sec'], sensor_df['sq'], label=f'Sensor {sensor_id}')
+		ax2_2.plot(unique_sens_times, dt_sens, label='Δt', color='grey', alpha=0.5)
 		axs[2].set_ylabel('Surface Quality')
-		axs[2].set_xlabel('Time (seconds)')
-		axs[2].legend()
+		ax2_2.set_ylabel('Δt (ms)', color='red')
+		ax2_2.tick_params(axis='y', labelcolor='red')
+		axs[2].set_xlabel('Time (ms)')
+		axs[2].legend(loc='upper left')
+		ax2_2.legend(loc='upper right')
 		axs[2].grid(True)
 		
 		plt.suptitle('Sensor Data Over Time')
@@ -433,22 +468,29 @@ class BinaryLogDecoder:
 
 	def plot_time(self):
 		"""Plot time data."""
+		# Get DataFrames
 		df_sens = self.get_sensor_dataframe()
 		df_aux = self.get_aux_dataframe()
-			
-		plt.figure(figsize=(12, 10))
+		
+		# Get unique timestamps for sensor data
+		unique_sens_times = df_sens['time'].unique()
+		
+		plt.figure(figsize=(12, 8))
 
-		dt_sens = df_sens['time'].diff()/1_000_000
-		dt_aux = df_aux['time'].diff()/1_000_000
+		# Calculate time differences using unique timestamps
+		dt_sens = pd.Series(unique_sens_times).diff()/1_000
+		dt_aux = df_aux['time'].diff()/1_000
 		
 		# Plot the machine position
-		plt.plot(df_sens['time']/1_000_000, dt_sens)
-		plt.plot(df_aux['time']/1_000_000, dt_aux)
+		scatter = plt.scatter(unique_sens_times/1_000, dt_sens, label='Sensor Data')
+		plt.scatter(df_aux['time']/1_000, dt_aux, label='Auxiliary Data')
+
+		mplcursors.cursor(hover=True)
 
 		plt.title('Sensor and Auxiliary Data Time Differences')
-		plt.xlabel('Time (seconds)')
-		plt.ylabel('Time Difference (seconds)')
-		plt.legend(['Sensor Data', 'Auxiliary Data'])
+		plt.xlabel('Time (ms)')
+		plt.ylabel('Time Difference (ms)')
+		plt.legend()
 		plt.grid(True)
 		plt.show()
 
@@ -456,7 +498,7 @@ class BinaryLogDecoder:
 if __name__ == "__main__":
 	# filename = input("Enter file name to decode: ")
 	# decoder = BinaryLogDecoder(filename)
-	decoder = BinaryLogDecoder("../logFiles/LOG018.bin")
+	decoder = BinaryLogDecoder("../logFiles/LOG034.bin")
 	decoder.decode_file()
 	
 	# Print summary information
@@ -478,6 +520,6 @@ if __name__ == "__main__":
 	
 	# Generate plots
 	# decoder.plot_design()
-	# decoder.plot_trajectory()
-	# decoder.plot_sensor_data()
+	decoder.plot_trajectory()
+	decoder.plot_sensor_data()
 	decoder.plot_time()
