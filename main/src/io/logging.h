@@ -57,8 +57,9 @@ struct SensorData {
 struct SensorsPacket {
 	uint8_t packetStart;
 	uint8_t packetType;
-	uint32_t time;				// microseconds since start
+	uint32_t time;				// time since start (us)
 	SensorData sensors[ns];		// Data for all 4 sensors
+	uint32_t dt;				// sensingTime (us)
 	uint8_t packetEnd;
 };
 
@@ -97,7 +98,7 @@ bool initializeLogFile();
 void writeFileHeader(const char* designName, uint16_t numPaths);
 void writePathInfo(uint16_t pathIndex, uint8_t featureType);
 void writePathPoint(uint16_t pathIndex, uint16_t pointIndex, Point point);
-void writeSensorData(uint32_t time,  SensorData sensorArray[4]);
+void writeSensorData(uint32_t time,  SensorData sensorArray[4], uint32_t dt);
 void writeAuxData(Point goal, float toolPos, float desPos);
 void closeSDFile();
 void logPath();

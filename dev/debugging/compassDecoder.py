@@ -1,5 +1,6 @@
 import struct
 import os
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from enum import IntEnum
@@ -220,6 +221,7 @@ class BinaryLogDecoder:
 					'sq': sq
 				})
 			
+			dt = struct.unpack('I', f.read(4))[0]  # uint32_t
 			#f.read(1)
 			#f.read(1)
 			
@@ -235,7 +237,8 @@ class BinaryLogDecoder:
 			
 			self.sensor_data.append({
 				'time': time,
-				'sensors': sensors
+				'sensors': sensors,
+				'dt': dt
 			})
 			
 		except Exception as e:
@@ -304,9 +307,11 @@ class BinaryLogDecoder:
 		flattened_data = []
 		for data_point in self.sensor_data:
 			time = data_point['time']
+			dt = data_point['dt']
 			for i, sensor in enumerate(data_point['sensors']):
 				flattened_data.append({
 					'time': time,
+					'dt': dt,
 					'sensor_id': i,
 					'dx': sensor['dx'],
 					'dy': sensor['dy'],
@@ -339,6 +344,126 @@ class BinaryLogDecoder:
 			})
 		
 		return pd.DataFrame(flattened_data)
+	
+	def process_sensor_data(self):
+		"""Process raw sensor data according to firmware logic."""
+		df = self.get_sensor_dataframe()
+		df_aux = self.get_aux_dataframe()
+		if df.empty:
+			print("No sensor data to process")
+			return pd.DataFrame()
+			
+		# Constants
+		ns = 4		# number of sensors
+		lx = 120	# spacing between sensors in x
+		ly = 140	# spacing between sensors in y
+
+		processed_data = []
+		last_pose = {'x': 0.0, 'y': 0.0, 'yaw': 0.0}  # Initial pose
+		cal_params = self.design_info['cal_params']
+		# Create interpolation function for tool position
+		tool_pos_interp = np.interp(
+			df['time'].unique(),
+			df_aux['time'],
+			df_aux['tool_pos']
+		)
+
+		sensor_offsets = np.array([
+			[lx, lx, -lx, -lx],     # x offsets
+			[-ly, ly, -ly, ly]      # y offsets
+		]) * 0.5
+		
+		# Process each unique timestamp
+		for ind, time in enumerate(df['time'].unique()):
+			time_df = df[df['time'] == time]
+			dt = time_df['dt'].iloc[0]				# dt is same for all sensors at this timestamp
+			tool_pos = tool_pos_interp[ind]
+			
+			# Arrays to store measurements
+			meas_vel = [[0.0] * 4, [0.0] * 4]		# 2x4 array for x,y velocities
+			est_ang_vel = [0.0] * 8					# 8 angular velocity calculations
+			est_vel = [[0.0] * ns, [0.0] * ns]		# Estimated velocities after rotation
+			
+			# Process each sensor's data
+			for i, row in time_df.iterrows():
+				sensor_id = int(row['sensor_id'])
+				dx = row['dx']  # Negative convention used to flip sensor's z axis
+				dy = row['dy']
+				sq = row['sq']
+				
+				# Apply calibration if surface quality is good enough
+				if sq > 20:
+					cal = cal_params[sensor_id]
+					meas_vel[0][sensor_id] = cal['cx'] * (dx*np.cos(cal['cr']) - dy*np.sin(cal['cr'])) / dt
+					meas_vel[1][sensor_id] = cal['cy'] * (dx*np.sin(cal['cr']) + dy*np.cos(cal['cr'])) / dt
+				else:
+					meas_vel[0][sensor_id] = float('nan')
+					meas_vel[1][sensor_id] = float('nan')
+			
+			V_meas = np.array(meas_vel)  # Shape will be (2,4)
+
+			# Calculate angular velocities using same equations as firmware
+			est_ang_vel[0] = (meas_vel[0][2] - meas_vel[0][0])/ly
+			est_ang_vel[1] = (meas_vel[0][2] - meas_vel[0][1])/ly
+			est_ang_vel[2] = (meas_vel[0][3] - meas_vel[0][0])/ly
+			est_ang_vel[3] = (meas_vel[0][3] - meas_vel[0][1])/ly
+			est_ang_vel[4] = (meas_vel[1][1] - meas_vel[1][0])/lx
+			est_ang_vel[5] = (meas_vel[1][1] - meas_vel[1][2])/lx
+			est_ang_vel[6] = (meas_vel[1][3] - meas_vel[1][0])/lx
+			est_ang_vel[7] = (meas_vel[1][3] - meas_vel[1][2])/lx
+			
+			# Average angular velocities (excluding NaN values)
+			valid_ang_vel = [v for v in est_ang_vel if not np.isnan(v)]
+			avg_ang_vel = np.mean(valid_ang_vel) if valid_ang_vel else float('nan')
+			
+			# Body position estimation
+			pose = last_pose.copy()
+			R = np.array([
+				[np.cos(pose['yaw']), -np.sin(pose['yaw'])],
+				[np.sin(pose['yaw']), np.cos(pose['yaw'])]
+			])
+			V_body = R @ V_meas + avg_ang_vel * (R @ sensor_offsets)
+			est_vel[0] = V_body[0]			# x velocities
+			est_vel[1] = V_body[1]			# y velocities
+
+			# Average linear velocities
+			valid_vels = [(est_vel[0][i], est_vel[1][i]) 
+						for i in range(ns) 
+						if not np.isnan(est_vel[0][i]) and not np.isnan(est_vel[1][i])]
+			
+			if valid_vels:
+				avg_vel_x = np.mean([v[0] for v in valid_vels])
+				avg_vel_y = np.mean([v[1] for v in valid_vels])
+				valid_sensors = True
+			else:
+				avg_vel_x = float('nan')
+				avg_vel_y = float('nan')
+				valid_sensors = False
+
+			# Integrate to get position and orientation
+			if valid_sensors:
+				pose['yaw'] += avg_ang_vel * dt
+				pose['x'] += avg_vel_x * dt
+				pose['y'] += avg_vel_y * dt
+				last_pose = pose.copy()
+			
+			tool_pos_x = pose['x'] + tool_pos * np.cos(pose['yaw'])
+			tool_pos_y = pose['y'] + tool_pos * np.sin(pose['yaw'])
+			
+			processed_data.append({
+				'time': time,
+				'dt': dt,
+				'pose_x': pose['x'],
+				'pose_y': pose['y'],
+				'pose_yaw': pose['yaw'],
+				'ang_vel': avg_ang_vel,
+				'vel_x': avg_vel_x,
+				'vel_y': avg_vel_y,
+				'tool_pos_x': tool_pos_x,
+				'tool_pos_y': tool_pos_y
+			})	
+		
+		return pd.DataFrame(processed_data)
 	
 	def plot_design(self):
 		"""Plot the design points."""
@@ -374,6 +499,10 @@ class BinaryLogDecoder:
 	def plot_trajectory(self):
 		"""Plot the machine trajectory."""
 		df = self.get_aux_dataframe()
+		df_processed = self.process_sensor_data()
+		if df_processed.empty:
+			print("No processed sensor data to plot")
+			return
 		if df.empty:
 			print("No auxiliary data to plot")
 			return
@@ -381,7 +510,8 @@ class BinaryLogDecoder:
 		plt.figure(figsize=(12, 10))
 		
 		# Plot the machine position
-		plt.plot(df['pose_x'], df['pose_y'], '-b', label='Machine Pose')
+		plt.plot(df['pose_x'], df['pose_y'], '-b', label='Machine Pose (Aux)')
+		plt.plot(df_processed['pose_x'], df_processed['pose_y'], '--r', alpha=0.7, label='Machine Pose (Processed)')
 		
 		# Highlight different cut states with different colors
 		cut_states = df['cut_state'].unique()
@@ -478,11 +608,13 @@ class BinaryLogDecoder:
 		plt.figure(figsize=(12, 8))
 
 		# Calculate time differences using unique timestamps
-		dt_sens = pd.Series(unique_sens_times).diff()/1_000
+		dt_sens_diff = pd.Series(unique_sens_times).diff()/1_000
+		dt_sens = [data['dt']/1_000 for data in self.sensor_data]
 		dt_aux = df_aux['time'].diff()/1_000
 		
 		# Plot the machine position
-		scatter = plt.scatter(unique_sens_times/1_000, dt_sens, label='Sensor Data')
+		plt.plot(unique_sens_times/1_000, dt_sens_diff, label='Sensor Diff Data')
+		plt.plot(unique_sens_times/1_000, dt_sens, label='Sensor dt Data', linestyle='--')
 		plt.scatter(df_aux['time']/1_000, dt_aux, label='Auxiliary Data')
 
 		mplcursors.cursor(hover=True)
@@ -498,7 +630,7 @@ class BinaryLogDecoder:
 if __name__ == "__main__":
 	# filename = input("Enter file name to decode: ")
 	# decoder = BinaryLogDecoder(filename)
-	decoder = BinaryLogDecoder("../logFiles/LOG034.bin")
+	decoder = BinaryLogDecoder("../logFiles/LOG039.bin")
 	decoder.decode_file()
 	
 	# Print summary information

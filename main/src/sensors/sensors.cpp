@@ -20,8 +20,6 @@ Angle signage: +CCW
 static long unsigned timeLastPlot = 0;
 
 // Additional tracking variables
-static float estPosSen[2][4] = {{0.0f,0.0f,0.0f,0.0f},
-							   {0.0f,0.0f,0.0f,0.0f}};
 static int surfaceQuality[4] = {0,0,0,0};
 static float estVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
 							{0.0f,0.0f,0.0f,0.0f}};
@@ -80,6 +78,11 @@ int16_t convTwosComp(int16_t value) {
 }
 
 void doSensing() {
+	// TODO: fix how sensingTime is implemented. Currently, on the first iteration, sensingTime
+	// 	is incredibly large because timeLastPoll is either 0 or set from a while ago. This usually
+	// 	isn't a huge issue because the router starts from rest, but there are certain cases where
+	//  this isn't true.
+	sensingTime = micros() - timeLastPoll;
 	timeLastPoll = micros();
 	unsigned long logTime = filemicros;
 
@@ -98,10 +101,8 @@ void doSensing() {
 		if (surfaceQuality[i] > 20) {
 			measVel[0][i] = cal[i].x * (dx*cosf(cal[i].r) - dy*sinf(cal[i].r)) / sensingTime;
 			measVel[1][i] = cal[i].y * (dx*sinf(cal[i].r) + dy*cosf(cal[i].r)) / sensingTime;
-
-			estPosSen[0][i] = estPosSen[0][i] + measVel[0][i]*sensingTime;
-			estPosSen[1][i] = estPosSen[1][i] + measVel[1][i]*sensingTime;
 		} else {
+			// TODO: why are we evaluating the sensor validity below instead of here?
 			measVel[0][i] = NAN;
 			measVel[1][i] = NAN;
 		}
@@ -126,24 +127,26 @@ void doSensing() {
 	// Average angular velocities
 	float sumAngVel = 0.0f;
 	float estAngVel1 = 0.0f;
-	int valalScalars = 0;
+	int num_good_calcs = 0;				// number of measurements that are valid
 	for (int i = 0; i < 8; i++) {
+		// filter out bad measurements
 		if (!isnan(estAngVel[i])) {
 			sumAngVel = sumAngVel + estAngVel[i];
-			valalScalars++;
+			num_good_calcs++;
 		}
 	}
 
-	if (valalScalars == 0) {
+	if (num_good_calcs == 0) {
 		// Serial.print("Sensors are poo-poo!");
 		valid_sensors = false;
 		return;
 	} else {
 		valid_sensors = true;
-		estAngVel1 = sumAngVel / valalScalars;
+		estAngVel1 = sumAngVel / num_good_calcs;
 	}
 
 	// Body position estimation
+	// TODO: turn this into "matrix" math
 	estVel[0][0] = measVel[0][0]*cosf(pose.yaw)-measVel[1][0]*sinf(pose.yaw) + 0.5*estAngVel1*(lx*cosf(pose.yaw)-(ly)*sinf(pose.yaw));
 	estVel[0][1] = measVel[0][1]*cosf(pose.yaw)-measVel[1][1]*sinf(pose.yaw) + 0.5*estAngVel1*(lx*cosf(pose.yaw)+(ly)*sinf(pose.yaw));
 	estVel[0][2] = measVel[0][2]*cosf(pose.yaw)-measVel[1][2]*sinf(pose.yaw) + 0.5*estAngVel1*(-lx*cosf(pose.yaw)-(ly)*sinf(pose.yaw));
@@ -157,15 +160,16 @@ void doSensing() {
 	float sumVelX = 0.0f;
 	float sumVelY = 0.0f;
 	float estVel1[2] = {0.0f, 0.0f};
-	valalScalars = 0;
+	num_good_calcs = 0;
 	for (int i = 0; i<ns; i++) {
+		// filter out bad measurements
 		if (!isnan(estVel[0][i]) && !isnan(estVel[1][i])) {
 			sumVelX = sumVelX + estVel[0][i];
 			sumVelY = sumVelY + estVel[1][i];
-			valalScalars++;
+			num_good_calcs++;
 		}
 	}
-	if (valalScalars == 0) {
+	if (num_good_calcs == 0) {
 		// TODO: make this prompt a re-zeroing
 		// Serial.print("Sensors are poo-poo!");
 		valid_sensors = false;
@@ -184,17 +188,12 @@ void doSensing() {
 	pose.x = pose.x + estVel1[0]*sensingTime;
 	pose.y = pose.y + estVel1[1]*sensingTime;
 
-	// Sensor plotting
-	if (plottingOn) {
-		sensorPlotting();
-	}
-
 	if (sensingTime > 1000 || sensingTime < 800) {
 		Serial.printf("%lu: sensing time = %lu\n", millis(), sensingTime);
 	}
 	// Write to SD card
 	if (outputSDOn) {
-		writeSensorData(logTime, logData);
+		writeSensorData(logTime, logData, sensingTime);
 	}
 }
 
@@ -243,8 +242,9 @@ void sensorPlotting() {
 		timeLastPlot = millis();
 
 		for (int i = 0; i < ns; i++) {
-			Serial.printf("x_%i:%f,y_%i:%f",i,estPosSen[0][i],i,estPosSen[1][i]);
-			Serial.println();
+			// NOTE: indiviudal sensor plotting is now done in calibration
+			// Serial.printf("x_%i:%f,y_%i:%f",i,estPosSen[0][i],i,estPosSen[1][i]);
+			// Serial.println();
 			Serial.printf("sq_%i:%d",i,surfaceQuality[i]);
 			Serial.println();
 		}

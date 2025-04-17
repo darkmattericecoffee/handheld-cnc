@@ -64,10 +64,9 @@ void loop() {
 
 	// Sensing
 	unsigned long startSensingTime = micros();
-    if(micros() - timeLastPoll >= dt) {
-        sensingTime = micros() - timeLastPoll;
-        doSensing();
-    }
+	if(micros() - timeLastPoll >= dt) {
+		doSensing();
+	}
 	sensingTime_debug = micros() - startSensingTime;
 
 	// Run steppers

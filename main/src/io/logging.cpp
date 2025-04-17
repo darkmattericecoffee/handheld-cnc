@@ -461,13 +461,14 @@ void writePathPoint(uint16_t pathIndex, uint16_t pointIndex, Point point) {
 }
 
 // Write sensor data to SD card for datalogging
-void writeSensorData(uint32_t time,  SensorData sensorArray[ns]) {
+void writeSensorData(uint32_t time,  SensorData sensorArray[ns], uint32_t dt) {
 	if (logFile) {
 		SensorsPacket packet;
 		packet.packetStart = PACKET_START;
 		packet.packetType = PACKET_SENSORS;
 		packet.time = time;
 		for (int i = 0; i < ns; i++) packet.sensors[i] = sensorArray[i];
+		packet.dt = dt;
 		packet.packetEnd = PACKET_END;
 		
 		// Write the entire packet
