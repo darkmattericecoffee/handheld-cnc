@@ -12,7 +12,6 @@ void squareGeneratorWave();
 void squareGeneratorMake();
 void drillSquareGenerator();
 void makePresetPath();
-void parseNC(const char* filename);
 
 // Path properties
 extern const float sinAmp;

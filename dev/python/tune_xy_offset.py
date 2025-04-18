@@ -8,6 +8,7 @@ from matplotlib.animation import FuncAnimation
 import matplotlib.colors as mcolors
 from matplotlib.collections import LineCollection
 from matplotlib.widgets import Slider
+from pathlib import Path
 
 TARGET_PATH_X = 0
 TARGET_PATH_Y = 1
@@ -28,7 +29,10 @@ GANTRY_LENGTH_MM = 106.0
 
 PLOT_PADDING = GANTRY_LENGTH_MM/2 + 10.0
 
-with open('../../../logFiles/logFile_45.txt') as f:
+script_dir = Path(__file__).parent
+log_file_path = script_dir / 'example' / 'logFile_example.txt'
+
+with open(log_file_path) as f:
     lines = f.readlines()
     
     target_paths = np.array(
@@ -46,7 +50,7 @@ with open('../../../logFiles/logFile_45.txt') as f:
 
     actual_path = actual_path[np.insert(np.any(np.diff(actual_path, axis=0) != 0, axis=1), 0, True)]
 
-matplotlib.rcParams['figure.figsize'] = [16, 16]
+matplotlib.rcParams['figure.figsize'] = [14, 10]
 
 cutting_status = actual_path[:, ACTUAL_PATH_CUTTING].astype(int) == 1
 

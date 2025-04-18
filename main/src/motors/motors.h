@@ -10,5 +10,6 @@ void stopStepperZ();
 void machineZeroX();
 void workspaceZeroZ();
 void workspaceZeroXY();
+void actuate(float desX, float desZ);
 
 #endif

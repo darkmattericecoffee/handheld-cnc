@@ -22,9 +22,9 @@ bool plungeReady = false;
 
 // Path data
 Path paths[MAX_PATHS];
-int num_paths = 0;
-int current_path_idx = 0;
-int current_point_idx = 0;
+uint16_t num_paths = 0;
+uint16_t current_path_idx = 0;
+uint16_t current_point_idx = 0;
 
 // SD Stuff
 FsFile logFile;
@@ -50,10 +50,11 @@ int16_t centerX = 0;
 int16_t centerY = 0;
 
 // Mode select
-bool plottingOn = false;			// plot values  (1 = yes; 0 = no)
-bool debuggingOn = false;			// print values (1 = yes; 0 = no)
+bool plottingOn = false;			// plot values
+bool debuggingOn = false;			// print debug statements
 bool stopwatchOn = false;
-bool outputOn = false;				// output data to serial
+bool outputSerialOn = false;		// output data to serial
+bool outputSDOn = true;				// output data to SD card
 int designOrCalibrate = 0;			// choose design or calibrate (0 or 1)
 int acceptCal = 0;					// accept calibration or not
 int designPreset = 0;				// choose the design 
@@ -68,9 +69,11 @@ long unsigned stepperTime = 0;
 long unsigned serialTime = 0;
 long unsigned safetyTime = 0;
 long unsigned cuttingTime = 0;
+long unsigned SDLogTime = 0;
 long unsigned timeLoopStart = 0;
 long unsigned timeLastDebounce = 0;
 long unsigned lastDraw = 0;
 long unsigned timeLastPoll = 0;
 long unsigned sensingTime = 0;
+elapsedMicros filemicros;
 uint8_t iter = 0;

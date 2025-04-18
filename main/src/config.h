@@ -59,7 +59,7 @@ const float maxSpeedX = 140.0*Conv;				// max velocity X motor can move at (step
 const float maxSpeedZ = 180.0*Conv;				// max velocity Z motor can move at (step/s)
 const float maxAccelX = 2000.0*Conv;				// x max acceleration (step/s^2)
 const float maxAccelZ = 3000.0*Conv;			// z max acceleration (step/s^2)
-const float retract = 5;						// distance to retract (mm)
+const float retract = 2;						// distance to retract on zeroing procedure (mm)
 const float zeroSpeed_0 = 20.0 * Conv;			// zeroing speed (step/s)
 const float zeroSpeed_1 = 4.0 * Conv;			// secondary zeroing speed (step/s)
 const float zeroAccel = 200.0 * Conv;			// zeroing acceleration (step/s^2)
@@ -81,10 +81,10 @@ const float zLimitOffset = 2.13;				// distance from wall when zeroed (mm)
 // Timing constants
 const long unsigned debounceDelay = 50;			// the debounce time; increase if the output flickers
 const long unsigned dtDebug = 500;				// (ms)
-const long unsigned dtStopwatch = 500;				// time interval for loop timing (ms)
+const long unsigned dtStopwatch = 500;			// time interval for loop timing (ms)
 const long unsigned dtPlot = 50;				// (ms)
 const long unsigned dtOutput = 20;				// (ms)
-const long unsigned dtOutputSD = 10;			// (ms)
+const long unsigned dtOutputSD = 10;			// time interval for auxiliary SD logging (ms)
 const long unsigned dt = 900;					// length of sensor timestep (us)(freq = 1,000,000/timestepPoll [Hz])
 
 #endif

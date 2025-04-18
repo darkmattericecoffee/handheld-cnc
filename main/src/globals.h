@@ -32,9 +32,9 @@ extern bool plungeReady;
 
 // Path data
 extern Path paths[MAX_PATHS];
-extern int num_paths;
-extern int current_path_idx;
-extern int current_point_idx;
+extern uint16_t num_paths;
+extern uint16_t current_path_idx;
+extern uint16_t current_point_idx;
 
 // SD stuff
 extern FsFile logFile;
@@ -61,7 +61,8 @@ extern int16_t centerY;
 extern bool plottingOn;
 extern bool debuggingOn;
 extern bool stopwatchOn;
-extern bool outputOn;
+extern bool outputSerialOn;
+extern bool outputSDOn;
 extern int designOrCalibrate;
 extern int acceptCal;
 extern int designPreset;
@@ -76,11 +77,13 @@ extern long unsigned stepperTime;
 extern long unsigned serialTime;
 extern long unsigned safetyTime;
 extern long unsigned cuttingTime;
+extern long unsigned SDLogTime;
 extern long unsigned timeLoopStart;
 extern long unsigned timeLastDebounce;
 extern long unsigned lastDraw;
 extern long unsigned timeLastPoll;
 extern long unsigned sensingTime;
+extern elapsedMicros filemicros;
 extern uint8_t iter;
 
 #endif
