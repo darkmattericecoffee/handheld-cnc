@@ -346,6 +346,11 @@ class BinaryLogDecoder:
 		return pd.DataFrame(flattened_data)
 	
 	def process_sensor_data(self):
+		# TODO: add inputs for modifying sensor attributes
+		#	- sensor offsets
+		#	- sensor calibration
+		#	- low pass filter
+		#	- sensor fusion
 		"""Process raw sensor data according to firmware logic."""
 		df = self.get_sensor_dataframe()
 		df_aux = self.get_aux_dataframe()
