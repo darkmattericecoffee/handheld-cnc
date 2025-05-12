@@ -1,5 +1,4 @@
 #include "path-generators.h"
-
 // Path properties
 const float sinAmp = 5.0;
 const float sinPeriod = 50.0;
@@ -19,6 +18,7 @@ void lineGenerator() {
 	}
 
 	path.numPoints = num_points;
+	path.points[num_points-1].z = restHeight;
 }
 
 void sinGenerator() {
@@ -36,6 +36,7 @@ void sinGenerator() {
 	}
 
 	path.numPoints = num_points;
+	path.points[num_points-1].z = restHeight;
 }
 
 void zigZagGenerator() {
@@ -58,6 +59,7 @@ void zigZagGenerator() {
 	}
 	
 	path.numPoints = num_points;
+	path.points[num_points-1].z = restHeight;
 }
 
 void doubleLineGenerator() {
@@ -67,16 +69,17 @@ void doubleLineGenerator() {
 
 	for (int i = 0; i < num_points; i++) {
 		float scale = (float)i / (num_points - 1);
+		float zVal = (i == num_points - 1 || i == 0) ? restHeight : -matThickness;
 		path.points[i] = Point{
 			x: -20.0,
 			y: length * scale,
-			z: -matThickness,
+			z: zVal,
 			feature: NORMAL
 		};
 		path.points[i+num_points] = Point{
 			x: 20.0,
 			y: length * (1 - scale),
-			z: -matThickness,
+			z: zVal,
 			feature: NORMAL
 		};
 	}
@@ -88,15 +91,17 @@ void circleGenerator() {
 	int num_points = 4000;
 	float r = 30.0;
 	Point center = Point{x: 0.0, y: 50.0, z: -matThickness};
-	float theta;
 
-	for (int i = 0; i < num_points; i++) {
-		theta = (float)i/num_points*(2*PI);
+	path.points[0] = Point{x: 0.0, y: 0.0, z: restHeight};
+
+	for (int i = 1; i < num_points; i++) {
+		float theta = (float)i/(num_points-1)*(2*PI);
+		float zVal = (i == num_points - 1 || i == 1) ? restHeight : -matThickness;
 		
 		path.points[i] = Point{
-			x: center.x + r*cosf(theta),
-			y: center.y + r*sinf(theta),
-			z: -matThickness,
+			x: center.x + r*cosf(theta - PI/2),
+			y: center.y + r*sinf(theta - PI/2),
+			z: zVal,
 			feature: NORMAL
 		};
 	}
@@ -118,10 +123,11 @@ void diamondGenerator() {
 		for (int i = 0; i < num_points; i++) {
 			int xIndex = (i >= num_points / 2) ? (num_points - 1 - i) : i;
 			int yIndex = p == 1 ? (num_points - 1 - i) : i;
+			float zVal = (i == num_points - 1 || i == 0) ? restHeight : -matThickness;
 			path.points[i + p*num_points] = Point{
 				x: dirs[p] * xIndex * x_increment,
 				y: yIndex * y_increment,
-				z: -matThickness
+				z: zVal
 			};
 		}
 	}
@@ -142,7 +148,8 @@ void squareGeneratorSine() {
 	for (int i = 0; i < num_points; ++i) {
 		float y = (segment_length) * (float)i / (num_points - 1);
 		float x = sinAmp * sinf((TWO_PI/sinPeriod)*y);
-		path.points[i] = Point{x, y, -engrave_depth};
+		float zVal = (i == num_points - 1 || i == 0) ? restHeight : -matThickness;
+		path.points[i] = Point{x, y, zVal};
 	}
 
 	// Calculate the x and y increments based on the angle
@@ -154,17 +161,18 @@ void squareGeneratorSine() {
 		for (int i = 0; i < num_points; i++) {
 			int xIndex = (i >= num_points / 2) ? (num_points - 1 - i) : i;
 			int yIndex = p == 1 ? (num_points - 1 - i) : i;
+			float zVal = (i == num_points - 1 || i == 0) ? restHeight : -matThickness;
 			if (p == 0) {
 				path.points[i + (p + 1)*num_points] = Point{
 					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
-					z: -matThickness
+					z: zVal
 				};
 			} else {
 				path.points[i + (p + 1)*num_points] = Point{
 					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
-					z: -matThickness
+					z: zVal
 				};
 			}
 		}
@@ -183,6 +191,7 @@ void squareGeneratorMake() {
 	int num_points = 1000;
 	float x = 0.0f;
 	float y = 0.0f;
+	float zVal = 0.0f;
 	float start_y = 0.0f;
 	float angle = 45;
 	float angle_rad = angle * (M_PI / 180.0);
@@ -199,7 +208,8 @@ void squareGeneratorMake() {
 	for (int i = 0; i < num_points; ++i) {
 		y = start_y + (make_length) * (float)i / (num_points - 1);
 		x = -make_length/2;
-		path.points[i] = Point{x, y, -engrave_depth};
+		zVal = (i == num_points - 1 || i == 0) ? restHeight : -matThickness;
+		path.points[i] = Point{x, y, zVal};
 	}
 
 	// Generate left M slanted
@@ -207,7 +217,8 @@ void squareGeneratorMake() {
 	for (int i = 0; i < num_points; ++i) {
 		y = start_y - (make_length) * (float)i / (num_points - 1);
 		x = -make_length/2 + (make_length * 3/8) * (float)i / (num_points - 1);
-		path.points[i + num_points] = Point{x, y, -engrave_depth};
+		zVal = (i == num_points - 1 || i == 0) ? restHeight : -engrave_depth;
+		path.points[i + num_points] = Point{x, y, zVal};
 	}
 
 	// Generate right M slanted
@@ -215,7 +226,8 @@ void squareGeneratorMake() {
 	for (int i = 0; i < num_points; ++i) {
 		y = start_y + (make_length) * (float)i / (num_points - 1);
 		x = -make_length/2 + (make_length * 3/8) + (make_length * 3/8) * (float)i / (num_points - 1);
-		path.points[i + 2*num_points] = Point{x, y, -engrave_depth};
+		zVal = (i == num_points - 1 || i == 0) ? restHeight : -engrave_depth;
+		path.points[i + 2*num_points] = Point{x, y, zVal};
 	}
 
 	// Generate right M vertical
@@ -223,7 +235,8 @@ void squareGeneratorMake() {
 	for (int i = 0; i < num_points; ++i) {
 		y = start_y - (make_length) * (float)i / (num_points - 1);
 		x = make_length*1/4;
-		path.points[i + 3*num_points] = Point{x, y, -engrave_depth};
+		zVal = (i == num_points - 1 || i == 0) ? restHeight : -engrave_depth;
+		path.points[i + 3*num_points] = Point{x, y, zVal};
 	}
 
 	// Generate colon
@@ -233,8 +246,9 @@ void squareGeneratorMake() {
 	for (int i = 0; i < num_points; ++i) {
 		y = start_y + (colon_length) * (float)i / (num_points - 1);
 		x = make_length/2;
+		zVal = (i == num_points - 1 || i == 0) ? restHeight : -engrave_depth;
 		if (y - start_y <= dot_length || y - start_y > colon_length - dot_length) {
-			path.points[i + 4*num_points] = Point{x, y, -engrave_depth};
+			path.points[i + 4*num_points] = Point{x, y, zVal};
 		} else {
 			path.points[i + 4*num_points] = Point{x, y, restHeight};
 		}
@@ -249,17 +263,18 @@ void squareGeneratorMake() {
 		for (int i = 0; i < num_points; i++) {
 			int xIndex = (i >= num_points / 2) ? (num_points - 1 - i) : i;
 			int yIndex = p == 1 ? (num_points - 1 - i) : i;
+			zVal = (i == num_points - 1 || i == 0) ? restHeight : -matThickness;
 			if (p == 0) {
 				path.points[i + 6*num_points] = Point{
 					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
-					z: -matThickness
+					z: zVal
 				};
 			} else {
 				path.points[i + 5*num_points] = Point{
 					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
-					z: -matThickness
+					z: zVal
 				};
 			}
 		}
@@ -271,6 +286,7 @@ void squareGeneratorMake() {
 
 void drillSquareGenerator() {
 	// Generate a drill cycle that starts at (0,0) and does a square pattern
+	// TODO: modify this to work with new version
 	float l = 50.0f;
 
 	path.points[0] = Point{x: 0.0f, y: 0.0f, z: -matThickness, feature: DRILL};
