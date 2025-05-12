@@ -148,7 +148,7 @@ void squareGeneratorSine() {
 	for (int i = 0; i < num_points; ++i) {
 		float y = (segment_length) * (float)i / (num_points - 1);
 		float x = sinAmp * sinf((TWO_PI/sinPeriod)*y);
-		float zVal = (i == num_points - 1 || i == 0) ? restHeight : -matThickness;
+		float zVal = (i == num_points - 1 || i == 0) ? restHeight : -engrave_depth;
 		path.points[i] = Point{x, y, zVal};
 	}
 
@@ -163,13 +163,13 @@ void squareGeneratorSine() {
 			int yIndex = p == 1 ? (num_points - 1 - i) : i;
 			float zVal = (i == num_points - 1 || i == 0) ? restHeight : -matThickness;
 			if (p == 0) {
-				path.points[i + (p + 1)*num_points] = Point{
+				path.points[i + (2)*num_points] = Point{
 					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
 					z: zVal
 				};
 			} else {
-				path.points[i + (p + 1)*num_points] = Point{
+				path.points[i + (1)*num_points] = Point{
 					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
 					z: zVal

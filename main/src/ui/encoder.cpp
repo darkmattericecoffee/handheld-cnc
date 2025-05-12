@@ -1,5 +1,9 @@
 #include "encoder.h"
 
+// #define NUM_DESIGNS 		9
+#define NUM_DESIGNS 		8
+
+
 void nullHandler(EncoderButton &eb) {
 	Serial.println("null handler called");
 	return;
