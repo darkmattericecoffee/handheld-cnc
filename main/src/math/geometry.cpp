@@ -96,10 +96,10 @@ float desPosIntersect(RouterPose rPose, Point point3, Point point4) {
 	// rPose is the current pose of the router.
 	
 	// Calculate gantry endpoints
-	float x1 = rPose.x - (cosf(rPose.yaw) * gantryLengthRouter / 2);
-	float y1 = rPose.y - (sinf(rPose.yaw) * gantryLengthRouter / 2);
-	float x2 = rPose.x + (cosf(rPose.yaw) * gantryLengthRouter / 2);
-	float y2 = rPose.y + (sinf(rPose.yaw) * gantryLengthRouter / 2);
+	float x1 = rPose.x - (cosf(rPose.yaw) * xRange / 2);
+	float y1 = rPose.y - (sinf(rPose.yaw) * xRange / 2);
+	float x2 = rPose.x + (cosf(rPose.yaw) * xRange / 2);
+	float y2 = rPose.y + (sinf(rPose.yaw) * xRange / 2);
 	
 	// Calculate intersection using line-line intersection formula
 	float den = (x1 - x2) * (point3.y - point4.y) - (y1 - y2) * (point3.x - point4.x);
@@ -136,16 +136,16 @@ float desPosClosestToIntersect(RouterPose rPose, Point point3, Point point4) {
 	// that gets the tool closest to intersecting the line.
 	
 	// Calculate gantry endpoints
-	float x1 = rPose.x - (cosf(rPose.yaw) * gantryLengthRouter / 2);
-	float y1 = rPose.y - (sinf(rPose.yaw) * gantryLengthRouter / 2);
-	float x2 = rPose.x + (cosf(rPose.yaw) * gantryLengthRouter / 2);
-	float y2 = rPose.y + (sinf(rPose.yaw) * gantryLengthRouter / 2);
+	float x1 = rPose.x - (cosf(rPose.yaw) * xRange / 2);
+	float y1 = rPose.y - (sinf(rPose.yaw) * xRange / 2);
+	float x2 = rPose.x + (cosf(rPose.yaw) * xRange / 2);
+	float y2 = rPose.y + (sinf(rPose.yaw) * xRange / 2);
 	
 	float den = (x1 - x2) * (point3.y - point4.y) - (y1 - y2) * (point3.x - point4.x);
 
 	// Check for parallel lines (denominator is zero)
 	if (den == 0) {
-		return stepperX.currentPosition() * 1.0f / Conv;
+		return stepperR.currentPosition() * 1.0f / Conv;			// TODO: make this make sense
 	}
 
 	float t = ((x1 - point3.x) * (point3.y - point4.y) - (y1 - point3.y) * (point3.x - point4.x)) / den;
@@ -159,7 +159,7 @@ float desPosClosestToIntersect(RouterPose rPose, Point point3, Point point4) {
 	float dy = y - rPose.y;
 
 	float desiredPos = dx * cosf(rPose.yaw) + dy * sinf(rPose.yaw);
-	float maxPos = (gantryLengthRouter / 2.0) - wallBuffer;
+	float maxPos = (xRange / 2.0) - wallBuffer;
 
 	return clamp(desiredPos, -maxPos, maxPos);
 }
@@ -171,7 +171,7 @@ float desPosSimple(RouterPose rPose, Point goal) {
 	float desiredPos = (dX + tanf(rPose.yaw) * dY) * cosf(rPose.yaw);
 	// This can also be written as:
 	// return dX * cosf(rPose.yaw) + dY * sinf(rPose.yaw);
-	float maxPos = (gantryLengthRouter / 2.0) - wallBuffer;
+	float maxPos = (xRange / 2.0) - wallBuffer;
 
 	return clamp(desiredPos, -maxPos, maxPos);
 }

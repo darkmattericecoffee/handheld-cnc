@@ -6,7 +6,7 @@
 // State values
 typedef enum State {
 	POWER_ON,
-	MACHINE_X_ZERO,
+	MACHINE_XY_ZERO,
 	WORKSPACE_Z_ZERO,
 	THICKNESS_SET,
 	DOC_SELECTED,
@@ -47,6 +47,54 @@ typedef struct RouterPose {
 	float yaw;			// orientation
 	// Future additions like velocity, acceleration, etc.
 } RouterPose;
+
+class Position {
+	public:
+		Position(float x = 0.0f, float y = 0.0f, float z = 0.0f) : x(x), y(y), z(z) {
+			clamp();
+		}
+	
+		void set(float newX, float newY, float newZ) {
+			x = newX;
+			y = newY;
+			z = newZ;
+			clamp();
+		}
+	
+		void setX(float newX) {
+			x = newX;
+			clamp();
+		}
+	
+		void setY(float newY) {
+			y = newY;
+			clamp();
+		}
+	
+		void setZ(float newZ) {
+			z = newZ;
+			clamp();
+		}
+	
+		float getX() const { return x; }
+		float getY() const { return y; }
+		float getZ() const { return z; }
+	
+	private:
+		float x, y, z;
+	
+		void clamp() {
+			x = constrainValue(x, -xRange / 2, xRange / 2);
+			y = constrainValue(y, -yRange / 2, yRange / 2);
+			z = constrainValue(z, 0, zRange);
+		}
+	
+		float constrainValue(float value, float min, float max) {
+			if (value < min) return min;
+			if (value > max) return max;
+			return value;
+		}
+};
 
 // Calibration parameters
 typedef struct CalParams {

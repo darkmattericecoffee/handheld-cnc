@@ -24,15 +24,15 @@ void onClickGoToSetThickness(EncoderButton &eb) {
 void onClickResetState(EncoderButton &eb) {
 	drawCenteredText("Zero Machine X", 2);
 	state = POWER_ON;
-	encoder.setClickHandler(onClickZeroMachineX);
+	encoder.setClickHandler(onClickZeroMachineXY);
 }
 
-void onClickZeroMachineX(EncoderButton &eb) {
-	drawCenteredText("Zeroing Machine X...", 2);
-	machineZeroX();
-	state = MACHINE_X_ZERO;
+void onClickZeroMachineXY(EncoderButton &eb) {
+	drawCenteredText("Zeroing Machine XY...", 2);
+	machineZeroXY();
+	state = MACHINE_XY_ZERO;
 	drawCenteredText("Zero Workspace Z", 2);
-	encoder.setClickHandler(onClickZeroWorkspaceZ);
+	// encoder.setClickHandler(onClickZeroWorkspaceZ);
 }
 
 void onClickZeroWorkspaceZ(EncoderButton &eb) {

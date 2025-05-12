@@ -2,12 +2,15 @@
 #include "config.h"
 
 // Initialize hardware objects
-AccelStepper stepperX(motorInterfaceType, MOT_STEP_X, MOT_DIR_X);
+AccelStepper stepperR(motorInterfaceType, MOT_STEP_R, MOT_DIR_R);
+AccelStepper stepperL(motorInterfaceType, MOT_STEP_L, MOT_DIR_L);
 AccelStepper stepperZ(motorInterfaceType, MOT_STEP_Z, MOT_DIR_Z);
-TMC2209Stepper driverX(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS_X);
+TMC2209Stepper driverR(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS_R);
+TMC2209Stepper driverL(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS_L);
 TMC2209Stepper driverZ(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS_Z);
+Position desPos;
 PMW3360 sensors[4];
-EncoderButton encoder(ENCODER_PIN_A, ENCODER_PIN_B, ENCODER_BUTTON_PIN);
+EncoderButton encoder(ENCODER_PIN_A, ENCODER_PIN_B, ENCODER_BUTT);
 Arduino_DataBus *bus = new Arduino_HWSPI(TFT_DC, TFT_CS, &SPI1);
 Arduino_GFX *screen = new Arduino_GC9A01(bus, TFT_RST, 0, true);
 SdFat sd;

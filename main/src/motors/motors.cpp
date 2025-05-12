@@ -4,22 +4,31 @@
 
 void motorSetup() {
 	// Set up motors
-	pinMode(MOT_EN_X, OUTPUT);
+	pinMode(MOT_EN_R, OUTPUT);
+	pinMode(MOT_EN_L, OUTPUT);
 	pinMode(MOT_EN_Z, OUTPUT);
 
 	// Enable motors
-	digitalWrite(MOT_EN_X, LOW);
+	digitalWrite(MOT_EN_R, LOW);
+	digitalWrite(MOT_EN_L, LOW);
 	digitalWrite(MOT_EN_Z, LOW);
 
 	delay(100);
+
 	disableStepperZ();
+	// disableStepperRL();
 
 	// Set motor properties
-	stepperX.setMinPulseWidth(stepPulseWidth);
-	stepperX.setMaxSpeed(zeroSpeed_0);
-	stepperX.setAcceleration(zeroAccel);
-	stepperX.setCurrentPosition(0);
-	
+	stepperR.setMinPulseWidth(stepPulseWidth);
+	stepperR.setMaxSpeed(zeroSpeed_0);
+	stepperR.setAcceleration(zeroAccel);
+	stepperR.setCurrentPosition(0);
+
+	stepperL.setMinPulseWidth(stepPulseWidth);
+	stepperL.setMaxSpeed(zeroSpeed_0);
+	stepperL.setAcceleration(zeroAccel);
+	stepperL.setCurrentPosition(0);
+
 	stepperZ.setMinPulseWidth(stepPulseWidth);
 	stepperZ.setMaxSpeed(zeroSpeed_0);
 	stepperZ.setAcceleration(zeroAccel);
@@ -30,25 +39,25 @@ void driverSetup() {
 	SERIAL_PORT.begin(115200);
 	delay(100);
 
-	driverX.begin();
-	driverX.toff(5);
-	driverZ.begin();
-	driverZ.toff(5);
+	driverR.begin(); driverR.toff(5);
+	driverL.begin(); driverL.toff(5);
+	driverZ.begin(); driverZ.toff(5);
 
-	driverX.rms_current(maxCurrent_RMS);
+	driverR.rms_current(maxCurrent_RMS);
+	driverL.rms_current(maxCurrent_RMS);
 	driverZ.rms_current(maxCurrent_RMS);
 	
-	if (uSteps > 1) {
-		driverX.microsteps(uSteps);
-		driverZ.microsteps(uSteps);
-	} else {
-		driverX.microsteps(0);
-		driverZ.microsteps(0);
-	}
+	driverR.microsteps(uSteps);
+	driverL.microsteps(uSteps);
+	driverZ.microsteps(uSteps);
 
-	driverX.pwm_autoscale(true);
-	driverX.en_spreadCycle(false);
-	driverX.TPWMTHRS(0x753);
+	driverR.pwm_autoscale(true);
+	driverR.en_spreadCycle(false);
+	driverR.TPWMTHRS(0x753);
+
+	driverL.pwm_autoscale(true);
+	driverL.en_spreadCycle(false);
+	driverL.TPWMTHRS(0x753);
 	
 	driverZ.pwm_autoscale(true);
 	driverZ.en_spreadCycle(false);
@@ -59,13 +68,23 @@ void enableStepperZ() {
 	digitalWrite(MOT_EN_Z, LOW);
 }
 
+void enableStepperRL() {
+	digitalWrite(MOT_EN_R, LOW);
+	digitalWrite(MOT_EN_L, LOW);
+}
+
 void disableStepperZ() {
 	digitalWrite(MOT_EN_Z, HIGH);
 }
 
+void disableStepperRL() {
+	digitalWrite(MOT_EN_R, HIGH);
+	digitalWrite(MOT_EN_L, HIGH);
+}
+
 void stopStepperX() {
-	stepperX.setSpeed(0);
-	stepperX.runSpeed();
+	stepperR.setSpeed(0);
+	stepperL.runSpeed();
 }
 
 void stopStepperZ() {
@@ -73,33 +92,11 @@ void stopStepperZ() {
 	stepperZ.runSpeed();
 }
 
-void machineZeroX() {
-	stepperX.setSpeed(zeroSpeed_0);
-	while (digitalRead(LIMIT_MACH_X0) == HIGH) {
-		stepperX.runSpeed();
-	}
-
-	stepperX.move(-Conv*retract);
-	while (stepperX.distanceToGo() != 0) {
-		stepperX.run();
-	}
-
-	stepperX.setSpeed(zeroSpeed_1);
-	while (digitalRead(LIMIT_MACH_X0) == HIGH) {
-		stepperX.runSpeed();
-	}
-
-	stepperX.setMaxSpeed(maxSpeedX/2);
-	stepperX.setAcceleration(maxAccelX/2);
-
-	stepperX.move(-Conv*((gantryLength/2) - xLimitOffset));
-	while (stepperX.distanceToGo() != 0) {
-		stepperX.run();
-	}
-
-	stepperX.setMaxSpeed(maxSpeedX);
-	stepperX.setAcceleration(maxAccelX);
-	stepperX.setCurrentPosition(0);
+void machineZeroXY() {
+	// TODO: adjust this zeroing procedure
+	// This zeroing process is just using the zeroing plug for now (no limit switches)
+	pose = {0.0f};
+	enableStepperRL();
 }
 
 void workspaceZeroZ() {
@@ -134,9 +131,12 @@ void workspaceZeroZ() {
 }
 
 void workspaceZeroXY() {
-	stepperX.moveTo(0);
-	while (stepperX.distanceToGo() != 0) {
-		stepperX.run();
+	desPos.set(0.0f, 0.0f, 0.0f);
+	actuate(desPos);
+
+	while (stepperR.distanceToGo() != 0 && stepperL.distanceToGo() != 0) {
+		stepperR.run();
+		stepperL.run();
 	}
 
 	stepperZ.moveTo(Conv*restHeight);
@@ -146,4 +146,13 @@ void workspaceZeroXY() {
 
 	// Reset router pose
 	pose = {0.0f};
+}
+
+void actuate(Position pos) {
+	// actuate coreXY system
+	float a = pos.getX() + pos.getY();
+	float b = pos.getX() - pos.getY();
+	stepperR.moveTo(a * ConvBelt);
+	stepperL.moveTo(b * ConvBelt);
+	stepperZ.moveTo(pos.getZ() * Conv);
 }

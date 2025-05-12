@@ -12,11 +12,14 @@
 #include <EncoderButton.h>
 
 // Global object declarations
-extern AccelStepper stepperX;
+extern AccelStepper stepperR;
+extern AccelStepper stepperL;
 extern AccelStepper stepperZ;
-extern TMC2209Stepper driverX;
+extern TMC2209Stepper driverR;
+extern TMC2209Stepper driverL;
 extern TMC2209Stepper driverZ;
 extern PMW3360 sensors[4];
+extern Position desPos;
 extern EncoderButton encoder;
 extern Arduino_GFX *screen;
 extern SdFat sd;

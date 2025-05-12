@@ -53,9 +53,9 @@ void setup() {
 	}
 	Serial.println("Initialization done.");
 
-	encoder.setClickHandler(onClickZeroMachineX);
+	encoder.setClickHandler(onClickZeroMachineXY);
 	encoder.setTripleClickHandler(onClickGoToSetThickness);
-	onClickResetState(encoder);
+	// onClickResetState(encoder);
 }
 
 void loop() {
@@ -71,7 +71,8 @@ void loop() {
 
 	// Run steppers
 	unsigned long startStepperTime = micros();
-	stepperX.run();
+	stepperR.run();
+	stepperL.run();
 	stepperZ.run();
 	encoder.update();
 	stepperTime = micros() - startStepperTime;
@@ -82,14 +83,14 @@ void loop() {
 	serialTime = micros() - startSerialTime;
 
 	// --Break here until we are ready to cut--
-	if (state != READY) {
-		totalLoopTime = micros() - timeLoopStart;
-		return;
-	}
+	// if (state != READY) {
+	// 	totalLoopTime = micros() - timeLoopStart;
+	// 	return;
+	// }
 
 	// Safety stuff
 	unsigned long startSafetyTime = micros();
-	if (!handleZeroing()) {
+	if (!checkEndstops()) {
 		safetyTime = micros() - startSafetyTime;
 		totalLoopTime = micros() - timeLoopStart;
 		return;
@@ -98,7 +99,8 @@ void loop() {
 
 	// Cutting
 	unsigned long startCuttingTime = micros();
-	handleCutting();
+	handleChickenHead();
+	// handleCutting();
 	cuttingTime = micros() - startCuttingTime;
 
 	totalLoopTime = micros() - timeLoopStart;

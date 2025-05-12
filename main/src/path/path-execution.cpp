@@ -9,7 +9,7 @@
 
 bool prevChecks[4] = {false};
 
-bool handleZeroing() {
+bool checkEndstops() {
 	if (digitalRead(LIMIT_MACH_X0) == LOW) {
 		stopStepperX();
 		stepperZ.moveTo(Conv*restHeight);
@@ -71,10 +71,24 @@ void advance(Point goal, Point next, bool autoAdvance=false) {
 	}
 }
 
+void handleChickenHead() {
+	// If the chicken head is pressed...lol jk
+	// Using the pose information, I want to move the router so that it is always kept at (0,0,0)
+	float xDes = -(pose.x*cosf(pose.yaw)+pose.y*sinf(pose.yaw));
+	float yDes = pose.x*sinf(pose.yaw)-pose.y*cosf(pose.yaw);
+
+	Serial.println("Chicken");
+
+	desPos.set(xDes, yDes, 0.0f);
+	actuate(desPos);
+}
+
 void handleCutting() {
+	// TODO: work this out for 3D
 	// Start of cutting Logic
 	Point goal = paths[current_path_idx].points[current_point_idx];
 	Point next = paths[current_path_idx].points[current_point_idx + 1];
+	float desiredPos = 0.0f;
 
 	// TODO: handle this case better
 	if (goal.x == next.x && goal.y == next.y) {
@@ -90,15 +104,15 @@ void handleCutting() {
 	if (!path_started && goal_behind_router) {
 		cutState = NOT_CUT_READY;
 		// Move tool closest to intersect with cutting path
-		float desPos = desPosClosestToIntersect(pose, goal, next);
+		desiredPos = desPosClosestToIntersect(pose, goal, next);
 		
-		stepperX.moveTo(Conv*desPos);
+		actuate(desPos);			// TODO: make this actually work
 
 		// Update UI
-		updateUI(desPos, goal, next);
+		updateUI(desiredPos, goal, next);
 
-		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos);
-		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos);
+		// if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desiredPos);
+		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desiredPos);
 		if (debuggingOn) {
 			debugging(goal, next);
 		}
@@ -110,7 +124,7 @@ void handleCutting() {
 	path_started = true;
 
 	// Desired position if we intersect
-	float desPos = desPosIntersect(pose, goal, next);
+	desiredPos = desPosIntersect(pose, goal, next);			// TODO: make this not redundant
 	float desZ = (matThickness == 0 && designType == FROM_FILE) ? (goal.z - paths[current_path_idx].minZ) : goal.z;			// if matThickness is set to 0 (drawing), then don't pierce!
 	// Desired position if we do not intersect
 	float desPosClosest = desPosClosestToIntersect(pose, goal, next);
@@ -124,7 +138,7 @@ void handleCutting() {
 	// bool handle_buttons_ok = (digitalRead(BUTT_HANDLE_L) == LOW && digitalRead(BUTT_HANDLE_R) == LOW) || 
 	// 					   ((millis() - timeLastDebounce) < debounceDelay);
 	// if (handle_buttons_ok) timeLastDebounce = millis();
-	bool gantry_intersects = !isnan(desPos);
+	bool gantry_intersects = !isnan(desiredPos);
 	bool gantry_angle_ok = angleFrom(goal, next) > (angleThreshold);		// TODO: how is this working?
 	bool within_hole_tol = abs(signedDist(pose, goal)) < holeTolerance;
 
@@ -147,12 +161,13 @@ void handleCutting() {
 	if (handle_buttons_ok && gantry_intersects && goal_behind_router && gantry_angle_ok && valid_sensors && paths[current_path_idx].feature == NORMAL) {
 		cutState = CUTTING;
 		// We are good to cut
-		stepperZ.moveTo(Conv*desZ);
-		stepperX.moveTo(Conv*desPos);
+		// stepperZ.moveTo(Conv*desZ);
+		// stepperX.moveTo(Conv*desiredPos);
+		actuate(desPos);			// TODO: make this actually work
 
 		// Path logging
-		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPos);
-		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPos);
+		// if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desiredPos);
+		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desiredPos);
 
 		// Evaluate whether to move on to next point
 		advance(goal, next);
@@ -178,8 +193,9 @@ void handleCutting() {
 			}
 		} else {
 			stepperZ.setMaxSpeed(maxSpeedZ);	// TODO: (see below)
-			stepperZ.moveTo(Conv*restHeight);
-			stepperX.moveTo(Conv*desPosHole);
+			// stepperZ.moveTo(Conv*restHeight);
+			// stepperX.moveTo(Conv*desPosHole);
+			actuate(desPos);			// TODO: make this actually work
 
 			cutState = NOT_CUT_READY;
 			plungeReady = false;		// TODO: make OO so that motor speed can be adjust automatically when flipped
@@ -188,25 +204,27 @@ void handleCutting() {
 		// Conditions are good except for pressed buttons and the goal point being behind the router
 		cutState = CUT_READY;
 		// Stop cutting
-		stepperZ.moveTo(Conv*restHeight);
-		stepperX.moveTo(Conv*desPosClosest);
+		// stepperZ.moveTo(Conv*restHeight);
+		// stepperX.moveTo(Conv*desPosClosest);
+		actuate(desPos);			// TODO: make this actually work
 
 		// Path logging
-		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
+		// if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
 		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
 	} else {
 		cutState = NOT_CUT_READY;
 		// Stop cutting
-		stepperZ.moveTo(Conv*restHeight);
-		stepperX.moveTo(Conv*desPosClosest);
+		// stepperZ.moveTo(Conv*restHeight);
+		// stepperX.moveTo(Conv*desPosClosest);
+		actuate(desPos);			// TODO: make this actually work
 
 		// Path logging
-		if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
+		// if (outputOn) outputSerial(pose, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
 		// outputSD(estPos[0], estPos[1], estYaw, goal, stepperX.currentPosition()*1.0f/Conv, desPosClosest);
 	}
 
 	// Update UI
-	updateUI(desPos, goal, next);
+	updateUI(desiredPos, goal, next);
 
 	// Debugging
 	if (debuggingOn) {
