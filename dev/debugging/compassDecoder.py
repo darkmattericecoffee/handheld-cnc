@@ -408,14 +408,14 @@ class BinaryLogDecoder:
 			V_meas = np.array(meas_vel)  # Shape will be (2,4)
 
 			# Calculate angular velocities using same equations as firmware
-			est_ang_vel[0] = (meas_vel[0][2] - meas_vel[0][0])/ly
-			est_ang_vel[1] = (meas_vel[0][2] - meas_vel[0][1])/ly
-			est_ang_vel[2] = (meas_vel[0][3] - meas_vel[0][0])/ly
-			est_ang_vel[3] = (meas_vel[0][3] - meas_vel[0][1])/ly
-			est_ang_vel[4] = (meas_vel[1][1] - meas_vel[1][0])/lx
-			est_ang_vel[5] = (meas_vel[1][1] - meas_vel[1][2])/lx
-			est_ang_vel[6] = (meas_vel[1][3] - meas_vel[1][0])/lx
-			est_ang_vel[7] = (meas_vel[1][3] - meas_vel[1][2])/lx
+			est_ang_vel[0] = (meas_vel[0][2] - meas_vel[0][0])/ly	# sensor [0 - 2 -] (comparing x velocities)
+			est_ang_vel[1] = (meas_vel[0][2] - meas_vel[0][1])/ly	# sensor [- 1 2 -]
+			est_ang_vel[2] = (meas_vel[0][3] - meas_vel[0][0])/ly	# sensor [0 - - 3]
+			est_ang_vel[3] = (meas_vel[0][3] - meas_vel[0][1])/ly	# sensor [- 1 - 3]
+			est_ang_vel[4] = (meas_vel[1][1] - meas_vel[1][0])/lx	# sensor [0 1 - -] (comparing y velocities)
+			est_ang_vel[5] = (meas_vel[1][1] - meas_vel[1][2])/lx	# sensor [- 1 2 -]
+			est_ang_vel[6] = (meas_vel[1][3] - meas_vel[1][0])/lx	# sensor [0 - - 3]
+			est_ang_vel[7] = (meas_vel[1][3] - meas_vel[1][2])/lx	# sensor [- - 2 3]
 			
 			# Average angular velocities (excluding NaN values)
 			valid_ang_vel = [v for v in est_ang_vel if not np.isnan(v)]
@@ -461,6 +461,7 @@ class BinaryLogDecoder:
 				'pose_x': pose['x'],
 				'pose_y': pose['y'],
 				'pose_yaw': pose['yaw'],
+				'ang_vel_array': est_ang_vel,
 				'ang_vel': avg_ang_vel,
 				'vel_x': avg_vel_x,
 				'vel_y': avg_vel_y,
@@ -515,33 +516,52 @@ class BinaryLogDecoder:
 		plt.figure(figsize=(12, 10))
 		
 		# Plot the machine position
-		plt.plot(df['pose_x'], df['pose_y'], '-b', label='Machine Pose (Aux)')
-		plt.plot(df_processed['pose_x'], df_processed['pose_y'], '--r', alpha=0.7, label='Machine Pose (Processed)')
+		ax1 = plt.subplot(1,2,1)
+		ax1.plot(df['pose_x'], df['pose_y'], '-b', label='Machine Pose (Aux)')
+		ax1.plot(df_processed['pose_x'], df_processed['pose_y'], '--r', alpha=0.7, label='Machine Pose (Processed)')
 		
 		# Highlight different cut states with different colors
 		cut_states = df['cut_state'].unique()
 		for state in cut_states:
 			state_df = df[df['cut_state'] == state]
-			plt.scatter(state_df['pose_x'], state_df['pose_y'], label=state, alpha=0.7)
+			ax1.scatter(state_df['pose_x'], state_df['pose_y'], label=state, alpha=0.7)
 		
 		# Plot the design points if available
 		design_df = self.get_design_dataframe()
 		if not design_df.empty:
 			for path_idx in design_df['path_index'].unique():
 				path_df = design_df[design_df['path_index'] == path_idx]
-				plt.plot(path_df['x'], path_df['y'], '--k', alpha=0.5)
+				ax1.plot(path_df['x'], path_df['y'], '--k', alpha=0.5)
 		
-		plt.title('Machine Trajectory')
-		plt.xlabel('X')
-		plt.ylabel('Y')
-		plt.legend()
-		plt.grid(True)
-		plt.axis('equal')
+		ax1.set_title('Machine Trajectory')
+		ax1.set_xlabel('X')
+		ax1.set_ylabel('Y')
+		ax1.legend()
+		ax1.grid(True)
+		ax1.axis('equal')
+
+		ax2 = plt.subplot(2,2,2)
+		ax2.plot(df['time']/1_000, df['pose_x'], label='Pose X (Aux)')
+		ax2.plot(df_processed['time']/1_000, df_processed['pose_x'], '--r', alpha=0.7, label='Pose X (Processed)')
+		ax2.set_ylabel('Pose X')
+		ax2.set_xlabel('Time (ms)')
+		ax2.legend()
+		ax2.grid(True)
+
+		ax3 = plt.subplot(2,2,4)
+		ax3.plot(df['time']/1_000, df['pose_y'], label='Pose Y (Aux)')
+		ax3.plot(df_processed['time']/1_000, df_processed['pose_y'], '--r', alpha=0.7, label='Pose Y (Processed)')
+		ax3.set_ylabel('Pose Y')
+		ax3.set_xlabel('Time (ms)')
+		ax3.legend()
+		ax3.grid(True)
+
 		plt.show()
 	
 	def plot_sensor_data(self):
 		"""Plot sensor data over time."""
 		df = self.get_sensor_dataframe()
+		df_processed = self.process_sensor_data()
 		if df.empty:
 			print("No sensor data to plot")
 			return
@@ -553,7 +573,7 @@ class BinaryLogDecoder:
 		dt_sens = pd.Series(unique_sens_times).diff()
 				
 		# Create subplots for dx, dy, and sq
-		fig, axs = plt.subplots(3, 1, figsize=(14, 10), sharex=True)
+		fig, axs = plt.subplots(4, 1, figsize=(14, 10), sharex=True)
 
 		# Create secondary axes for time differences
 		ax2_0 = axs[0].twinx()
@@ -596,6 +616,24 @@ class BinaryLogDecoder:
 		axs[2].legend(loc='upper left')
 		ax2_2.legend(loc='upper right')
 		axs[2].grid(True)
+
+		# Plot angular velocities
+		labels = [
+			'[0-2] x', '[1-2] x', '[0-3] x', '[1-3] x',  # x velocity comparisons
+			'[0-1] y', '[1-2] y', '[0-3] y', '[2-3] y'   # y velocity comparisons
+		]
+		for i in range(8):
+			# Get ang_vel_array for each timestamp
+			ang_vels = [data['ang_vel_array'][i] for data in df_processed.to_dict('records')]
+			axs[3].plot(df_processed['time']/1_000, ang_vels, label=labels[i], alpha=0.7)
+
+		# Plot average angular velocity
+		axs[3].plot(df_processed['time']/1_000, df_processed['ang_vel'], 
+					'k--', label='Average', linewidth=2)
+		axs[3].set_ylabel('Angular Velocity')
+		axs[3].set_xlabel('Time (ms)')
+		axs[3].legend(loc='upper left')
+		axs[3].grid(True)
 		
 		plt.suptitle('Sensor Data Over Time')
 		plt.tight_layout()
@@ -635,7 +673,7 @@ class BinaryLogDecoder:
 if __name__ == "__main__":
 	# filename = input("Enter file name to decode: ")
 	# decoder = BinaryLogDecoder(filename)
-	decoder = BinaryLogDecoder("../logFiles/LOG039.bin")
+	decoder = BinaryLogDecoder("../logFiles/tanju/LOG003.bin")
 	decoder.decode_file()
 	
 	# Print summary information
