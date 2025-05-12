@@ -94,6 +94,7 @@ void handleCutting(long deltaTime) {
 	updateUI(desPos);
 
 	// Path logging
+	// TODO: make this more clean (without pass by reference)
 	float toolX, toolY, toolZ;
 	motorToCartesian(toolX, toolY, toolZ);
 	if (outputSDOn)	writeAuxData(goal, toolX, toolY, toolZ, desPos);

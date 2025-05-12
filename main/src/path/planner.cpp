@@ -1,7 +1,8 @@
 #include "planner.h"
 
 // Load gCode path (pre-processed into a vector of GCodePoints)
-void TrajectoryGenerator::setPath() {
+void TrajectoryGenerator::resetPath(Point& goal) {
+	goal = Point{0.0, 0.0, 0.0};
 	segmentTime = 0.0;
 	currentTime = 0.0;
 	current_point_idx = 0;
@@ -61,11 +62,14 @@ void TrajectoryGenerator::update(long deltaTime, Point& goal) {
 
 	// // Make sure tool is raised after path is finished
 	// while (stepperZ.distanceToGo() != 0) stepperZ.run();
+	
+	// Reset the path accordingly
+	// TODO: make this more clean/robust and remove redudant resets
+	resetPath(goal);
 
 	// Log data and close SD
 	closeSDFile();
 
-	Serial.println("All paths finished");
 	state = POWER_ON;
 	encoderDesignType();
 }

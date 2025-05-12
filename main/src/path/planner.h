@@ -10,7 +10,7 @@
 class TrajectoryGenerator {
 	public:
 		// Load a pre-processed gCode path
-		void setPath();
+		void resetPath(Point& goal);
 	
 		// Update desired position based on elapsed time
 		void update(long deltaTime, Point& goal);
