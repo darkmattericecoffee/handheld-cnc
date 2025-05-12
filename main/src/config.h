@@ -74,7 +74,8 @@ const float retract = 5;						// distance to retract (mm)
 const float zeroSpeed_0 = 20.0 * Conv;			// zeroing speed (step/s)
 const float zeroSpeed_1 = 4.0 * Conv;			// secondary zeroing speed (step/s)
 const float zeroAccel = 200.0 * Conv;			// zeroing acceleration (step/s^2)
-const float holeFeedrate = 5.0*Conv; 			// default hole feedrate (step/s)		TODO: make this modifiable
+const float holeFeedrate = 5.0 * Conv; 			// default hole feedrate (step/s)		TODO: make this modifiable (and change units to mm)
+const float trackSpeed = 5.0 * Conv;			// speed of tracking (step/s)			TODO: make this modifiable (and change units to mm)
 
 // Material properties
 const float maxThickness = 15.0;				// upper bound of thickness knob (mm)

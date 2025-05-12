@@ -49,6 +49,9 @@ typedef struct RouterPose {
 } RouterPose;
 
 class Position {
+	// This is a class to represent a 3D position for the tool to move to (in the router's BFF coordinate system)
+	// The position is clamped to the workspace limits
+
 	public:
 		Position(float x = 0.0f, float y = 0.0f, float z = 0.0f) : x(x), y(y), z(z) {
 			clamp();
