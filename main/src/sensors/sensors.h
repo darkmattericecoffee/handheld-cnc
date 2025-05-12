@@ -1,7 +1,12 @@
 #ifndef SENSORS_H
 #define SENSORS_H
 
-#include <Arduino.h>
+#include <EEPROM.h>
+#include "../config.h"
+#include "../globals.h"
+#include "../ui/display.h"
+#include "../ui/encoder.h"
+#include "../math/geometry.h"
 
 void sensorSetup();
 void doSensing();

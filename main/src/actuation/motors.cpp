@@ -1,6 +1,4 @@
 #include "motors.h"
-#include "../config.h"
-#include "../globals.h"
 
 void motorSetup() {
 	// Set up motors
@@ -16,7 +14,7 @@ void motorSetup() {
 	delay(100);
 
 	disableStepperZ();
-	// disableStepperRL();
+	disableStepperRL();
 
 	// Set motor properties
 	stepperR.setMinPulseWidth(stepPulseWidth);
@@ -132,7 +130,7 @@ void workspaceZeroZ() {
 
 void workspaceZeroXY() {
 	desPos.set(0.0f, 0.0f, 0.0f);
-	actuate(desPos);
+	cartesianToMotor(desPos);
 
 	while (stepperR.distanceToGo() != 0 && stepperL.distanceToGo() != 0) {
 		stepperR.run();
@@ -148,7 +146,7 @@ void workspaceZeroXY() {
 	pose = {0.0f};
 }
 
-void actuate(Position pos) {
+void cartesianToMotor(Position pos) {
 	// actuate coreXY system
 	float a = pos.getX() + pos.getY();
 	float b = pos.getX() - pos.getY();

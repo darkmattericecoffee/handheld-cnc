@@ -1,14 +1,18 @@
 #ifndef LOGGING_H
 #define LOGGING_H
 
+#include <Arduino.h>
 #include "../types.h"
+#include "../config.h"
+#include "../globals.h"
+#include "../math/geometry.h"
 
 // Serial logging functions
 void handleSerial();
 void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos);
 
 // Debugging functions
-void debugging(Point point1, Point point2);
+void debugging(Point point1);
 void debugging(const char* format, ...);
 void debugging(const __FlashStringHelper* format, ...);
 void stopwatch();

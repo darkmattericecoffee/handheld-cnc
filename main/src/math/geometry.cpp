@@ -1,7 +1,4 @@
 #include "geometry.h"
-#include "../globals.h"
-#include "../config.h"
-#include <Arduino.h>
 
 float myDist(float x1, float y1, float x2, float y2) {
 	// Calculate the Euclidean distance between two points
@@ -33,7 +30,7 @@ float principalAngleRad(float x) {
 	return x;
 }
 
-float mapF(long x, float in_min, float in_max, float out_min, float out_max) {
+float mapF(float x, float in_min, float in_max, float out_min, float out_max) {
 	// Maps a float value from one range to another
 	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }

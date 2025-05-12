@@ -2,14 +2,14 @@
 #define GLOBALS_H
 
 #include <Arduino.h>
-#include "config.h"
-#include "types.h"
 #include <AccelStepper.h>
 #include <TMCStepper.h>
 #include <PMW3360.h>
 #include <SdFat.h>
 #include <Arduino_GFX_Library.h>
 #include <EncoderButton.h>
+#include "config.h"
+#include "types.h"
 
 // Global object declarations
 extern AccelStepper stepperR;
@@ -34,9 +34,9 @@ extern DesignType designType;
 extern bool plungeReady;
 
 // Path data
-extern Path paths[MAX_PATHS];
-extern int num_paths;
-extern int current_path_idx;
+extern Path path;
+// extern int num_paths;
+// extern int current_path_idx;
 extern int current_point_idx;
 
 // SD stuff
@@ -55,11 +55,6 @@ extern float calPos[2][4];
 // Calibration data
 extern CalParams cal[4];
 extern float selfCal[2][3];
-
-// Display variables
-extern int16_t radius;
-extern int16_t centerX;
-extern int16_t centerY;
 
 // Mode flags
 extern bool plottingOn;
@@ -85,6 +80,7 @@ extern long unsigned timeLastDebounce;
 extern long unsigned lastDraw;
 extern long unsigned timeLastPoll;
 extern long unsigned sensingTime;
+extern elapsedMicros runTimer;
 extern uint8_t iter;
 
 #endif

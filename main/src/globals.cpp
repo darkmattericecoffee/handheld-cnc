@@ -1,5 +1,4 @@
 #include "globals.h"
-#include "config.h"
 
 // Initialize hardware objects
 AccelStepper stepperR(motorInterfaceType, MOT_STEP_R, MOT_DIR_R);
@@ -24,9 +23,9 @@ DesignType designType = PRESET;
 bool plungeReady = false;
 
 // Path data
-Path paths[MAX_PATHS];
-int num_paths = 0;
-int current_path_idx = 0;
+Path path;
+// int num_paths = 0;
+// int current_path_idx = 0;
 int current_point_idx = 0;
 
 // SD Stuff
@@ -48,11 +47,6 @@ float calPos[2][4] = {{0.0f,0.0f,0.0f,0.0f},
 CalParams cal[4];
 float selfCal[2][3] = {{1.0f,0.997606f,0.989168f},
 						{1.0f,1.004717f,1.000850f}};				// (UNUSED)
-
-// Display variables
-int16_t radius = 0;
-int16_t centerX = 0;
-int16_t centerY = 0;
 
 // Mode select
 bool plottingOn = false;			// plot values  (1 = yes; 0 = no)
@@ -78,4 +72,5 @@ long unsigned timeLastDebounce = 0;
 long unsigned lastDraw = 0;
 long unsigned timeLastPoll = 0;
 long unsigned sensingTime = 0;
+elapsedMicros runTimer;
 uint8_t iter = 0;

@@ -1,8 +1,4 @@
 #include "path-generators.h"
-#include "../config.h"
-#include "../globals.h"
-#include "../io/logging.h"
-#include <Arduino.h>
 
 // Path properties
 const float sinAmp = 5.0;
@@ -11,142 +7,118 @@ const float pathMax_y = 100.0;
 const float circleDiameter = 800.0;
 
 void lineGenerator() {
+	int num_points = 1000;
 	// Generate line path to cut
-	for (int i = 0; i < MAX_POINTS; i++) {
-		paths[0].points[i] = Point{
+	for (int i = 0; i < num_points; i++) {
+		path.points[i] = Point{
 			x: 0,
-			y: (pathMax_y) * (float)i / (MAX_POINTS - 1),
-			z: -matThickness
+			y: (pathMax_y) * (float)i / (num_points - 1),
+			z: -matThickness,
+			feature: NORMAL
 		};
 	}
 
-	num_paths = 1;
-	paths[0].numPoints = MAX_POINTS;
-	paths[0].feature = NORMAL;
+	path.numPoints = num_points;
 }
 
 void sinGenerator() {
+	int num_points = 1000;
 	// Generate sine path to cut
-	for (int i = 0; i < MAX_POINTS; ++i) {
-		float y = (pathMax_y) * (float)i / (MAX_POINTS - 1);
+	for (int i = 0; i < num_points; ++i) {
+		float y = (pathMax_y) * (float)i / (num_points - 1);
 		float x = sinAmp * sinf((TWO_PI/sinPeriod)*y);
-		paths[0].points[i] = Point{
+		path.points[i] = Point{
 			x: x,
 			y: y,
-			z: -matThickness
+			z: -matThickness,
+			feature: NORMAL
 		};
 	}
 
-	num_paths = 1;
-	paths[0].numPoints = MAX_POINTS;
-	paths[0].feature = NORMAL;
+	path.numPoints = num_points;
 }
 
 void zigZagGenerator() {
+	int num_points = 1000;
 	float zigSize = 40;
 
-	for (int i = 0; i < MAX_POINTS; ++i) {
-		float y = (pathMax_y) * (float)i / (MAX_POINTS - 1);
+	for (int i = 0; i < num_points; ++i) {
+		float y = (pathMax_y) * (float)i / (num_points - 1);
 		float x = fmod(y, zigSize);
 		if (x > (zigSize / 2)) {
 			x = zigSize - x;
 		}
 		
-		paths[0].points[i] = Point{
+		path.points[i] = Point{
 			x: x,
 			y: y,
-			z: -matThickness
+			z: -matThickness,
+			feature: NORMAL
 		};
 	}
 	
-	num_paths = 1;
-	paths[0].numPoints = MAX_POINTS;
-	paths[0].feature = NORMAL;
+	path.numPoints = num_points;
 }
 
 void doubleLineGenerator() {
 	// One line going up at x = -20 and one line going down at x = 20
+	int num_points = 1000;
 	float length = 100.0;
 
-	for (int i = 0; i < MAX_POINTS; i++) {
-		float scale = (float)i / (MAX_POINTS - 1);
-		paths[0].points[i] = Point{
+	for (int i = 0; i < num_points; i++) {
+		float scale = (float)i / (num_points - 1);
+		path.points[i] = Point{
 			x: -20.0,
 			y: length * scale,
-			z: -matThickness
+			z: -matThickness,
+			feature: NORMAL
 		};
-		paths[1].points[i] = Point{
+		path.points[i+num_points] = Point{
 			x: 20.0,
 			y: length * (1 - scale),
-			z: -matThickness
+			z: -matThickness,
+			feature: NORMAL
 		};
 	}
 
-	num_paths = 2;
-	for (int i = 0; i < num_paths; i++){
-		paths[i].numPoints = MAX_POINTS;
-		paths[i].feature = NORMAL;
-	}
+	path.numPoints = 2 * num_points;
 }
 
 void circleGenerator() {
+	int num_points = 4000;
 	float r = 30.0;
 	Point center = Point{x: 0.0, y: 50.0, z: -matThickness};
 	float theta;
 
-	for (int i = 0; i < MAX_POINTS; i++) {
-		theta = (float)i/MAX_POINTS*PI/2;
+	for (int i = 0; i < num_points; i++) {
+		theta = (float)i/num_points*(2*PI);
 		
-		// Q4: 270->360
-		paths[0].points[i] = Point{
-			x: center.x + r*cosf(3*PI/2 + theta),
-			y: center.y + r*sinf(3*PI/2 + theta),
-			z: -matThickness
-		};
-
-		// Q2: 90->180
-		paths[1].points[i] = Point{
-			x: center.x + r*cosf(PI/2 + theta),
-			y: center.y + r*sinf(PI/2 + theta),
-			z: -matThickness
-		};
-
-		// Q3: 270->180
-		paths[2].points[i] = Point{
-			x: center.x + r*cosf(3*PI/2 - theta),
-			y: center.y + r*sinf(3*PI/2 - theta),
-			z: -matThickness
-		};
-
-		// Q1: 90->0 
-		paths[3].points[i] = Point{
-			x: center.x + r*cosf(PI/2 - theta),
-			y: center.y + r*sinf(PI/2 - theta),
-			z: -matThickness
+		path.points[i] = Point{
+			x: center.x + r*cosf(theta),
+			y: center.y + r*sinf(theta),
+			z: -matThickness,
+			feature: NORMAL
 		};
 	}
 
-	num_paths = 4;
-	for (int i = 0; i < num_paths; i++){
-		paths[i].numPoints = MAX_POINTS;
-		paths[i].feature = NORMAL;
-	}
+	path.numPoints = num_points;
 }
 
 void diamondGenerator() {
+	int num_points = 1000;
 	float angle = 60;
 	float angle_rad = angle * (M_PI / 180.0);
 	float segment_length = 100.0;
 	int dirs[2] = {1, -1};
 
-	float y_increment = segment_length / (MAX_POINTS - 1);
+	float y_increment = segment_length / (num_points - 1);
 	float x_increment = y_increment / tan(angle_rad);
 
 	for (int p = 0; p < 2; p++) {
-		for (int i = 0; i < MAX_POINTS; i++) {
-			int xIndex = (i >= MAX_POINTS / 2) ? (MAX_POINTS - 1 - i) : i;
-			int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
-			paths[p].points[i] = Point{
+		for (int i = 0; i < num_points; i++) {
+			int xIndex = (i >= num_points / 2) ? (num_points - 1 - i) : i;
+			int yIndex = p == 1 ? (num_points - 1 - i) : i;
+			path.points[i + p*num_points] = Point{
 				x: dirs[p] * xIndex * x_increment,
 				y: yIndex * y_increment,
 				z: -matThickness
@@ -154,14 +126,12 @@ void diamondGenerator() {
 		}
 	}
 
-	num_paths = 2;
-	for (int i = 0; i < num_paths; i++){
-		paths[i].numPoints = MAX_POINTS;
-		paths[i].feature = NORMAL;
-	}
+	path.numPoints = 2 * num_points;
+
 }
 
 void squareGeneratorSine() {
+	int num_points = 1000;
 	float angle = 45;
 	float angle_rad = angle * (M_PI / 180.0);
 	float segment_length = 100.0;
@@ -169,29 +139,29 @@ void squareGeneratorSine() {
 	int dirs[3] = {1, -1, 1};
 
 	// Generate design engraving
-	for (int i = 0; i < MAX_POINTS; ++i) {
-		float y = (segment_length) * (float)i / (MAX_POINTS - 1);
+	for (int i = 0; i < num_points; ++i) {
+		float y = (segment_length) * (float)i / (num_points - 1);
 		float x = sinAmp * sinf((TWO_PI/sinPeriod)*y);
-		paths[0].points[i] = Point{x, y, -engrave_depth};
+		path.points[i] = Point{x, y, -engrave_depth};
 	}
 
 	// Calculate the x and y increments based on the angle
-	float y_increment = segment_length / (MAX_POINTS - 1);
+	float y_increment = segment_length / (num_points - 1);
 	float x_increment = y_increment / tan(angle_rad);
 
 	// Generate diamond path to cut
 	for (int p = 0; p < 2; p++) {
-		for (int i = 0; i < MAX_POINTS; i++) {
-			int xIndex = (i >= MAX_POINTS / 2) ? (MAX_POINTS - 1 - i) : i;
-			int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
+		for (int i = 0; i < num_points; i++) {
+			int xIndex = (i >= num_points / 2) ? (num_points - 1 - i) : i;
+			int yIndex = p == 1 ? (num_points - 1 - i) : i;
 			if (p == 0) {
-				paths[2].points[i] = Point{
+				path.points[i + (p + 1)*num_points] = Point{
 					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
 					z: -matThickness
 				};
 			} else {
-				paths[1].points[i] = Point{
+				path.points[i + (p + 1)*num_points] = Point{
 					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
 					z: -matThickness
@@ -200,11 +170,7 @@ void squareGeneratorSine() {
 		}
 	}
 
-	num_paths = 3;
-	for (int i = 0; i < num_paths; i++){
-		paths[i].numPoints = MAX_POINTS;
-		paths[i].feature = NORMAL;
-	}
+	path.numPoints = 3 * num_points;
 }
 
 void squareGeneratorWave() {
@@ -214,6 +180,7 @@ void squareGeneratorWave() {
 }
 
 void squareGeneratorMake() {
+	int num_points = 1000;
 	float x = 0.0f;
 	float y = 0.0f;
 	float start_y = 0.0f;
@@ -229,67 +196,67 @@ void squareGeneratorMake() {
 
 	// Generate left M vertical
 	start_y = (segment_length/2) - (make_length/2);
-	for (int i = 0; i < MAX_POINTS; ++i) {
-		y = start_y + (make_length) * (float)i / (MAX_POINTS - 1);
+	for (int i = 0; i < num_points; ++i) {
+		y = start_y + (make_length) * (float)i / (num_points - 1);
 		x = -make_length/2;
-		paths[0].points[i] = Point{x, y, -engrave_depth};
+		path.points[i] = Point{x, y, -engrave_depth};
 	}
 
 	// Generate left M slanted
 	start_y = (segment_length/2) + (make_length/2);
-	for (int i = 0; i < MAX_POINTS; ++i) {
-		y = start_y - (make_length) * (float)i / (MAX_POINTS - 1);
-		x = -make_length/2 + (make_length * 3/8) * (float)i / (MAX_POINTS - 1);
-		paths[1].points[i] = Point{x, y, -engrave_depth};
+	for (int i = 0; i < num_points; ++i) {
+		y = start_y - (make_length) * (float)i / (num_points - 1);
+		x = -make_length/2 + (make_length * 3/8) * (float)i / (num_points - 1);
+		path.points[i + num_points] = Point{x, y, -engrave_depth};
 	}
 
 	// Generate right M slanted
 	start_y = (segment_length/2) - (make_length/2);
-	for (int i = 0; i < MAX_POINTS; ++i) {
-		y = start_y + (make_length) * (float)i / (MAX_POINTS - 1);
-		x = -make_length/2 + (make_length * 3/8) + (make_length * 3/8) * (float)i / (MAX_POINTS - 1);
-		paths[2].points[i] = Point{x, y, -engrave_depth};
+	for (int i = 0; i < num_points; ++i) {
+		y = start_y + (make_length) * (float)i / (num_points - 1);
+		x = -make_length/2 + (make_length * 3/8) + (make_length * 3/8) * (float)i / (num_points - 1);
+		path.points[i + 2*num_points] = Point{x, y, -engrave_depth};
 	}
 
 	// Generate right M vertical
 	start_y = (segment_length/2) + (make_length/2);
-	for (int i = 0; i < MAX_POINTS; ++i) {
-		y = start_y - (make_length) * (float)i / (MAX_POINTS - 1);
+	for (int i = 0; i < num_points; ++i) {
+		y = start_y - (make_length) * (float)i / (num_points - 1);
 		x = make_length*1/4;
-		paths[3].points[i] = Point{x, y, -engrave_depth};
+		path.points[i + 3*num_points] = Point{x, y, -engrave_depth};
 	}
 
 	// Generate colon
 	start_y = (segment_length/2) - (colon_length/2);
 	float dot_ratio = 0.2;
 	float dot_length = dot_ratio * colon_length;
-	for (int i = 0; i < MAX_POINTS; ++i) {
-		y = start_y + (colon_length) * (float)i / (MAX_POINTS - 1);
+	for (int i = 0; i < num_points; ++i) {
+		y = start_y + (colon_length) * (float)i / (num_points - 1);
 		x = make_length/2;
 		if (y - start_y <= dot_length || y - start_y > colon_length - dot_length) {
-			paths[4].points[i] = Point{x, y, -engrave_depth};
+			path.points[i + 4*num_points] = Point{x, y, -engrave_depth};
 		} else {
-			paths[4].points[i] = Point{x, y, restHeight};
+			path.points[i + 4*num_points] = Point{x, y, restHeight};
 		}
 	}
 
 	// Calculate the x and y increments based on the angle
-	float y_increment = segment_length / (MAX_POINTS - 1);
+	float y_increment = segment_length / (num_points - 1);
 	float x_increment = y_increment / tan(angle_rad);
 
 	// Generate diamond path to cut
 	for (int p = 0; p < 2; p++) {
-		for (int i = 0; i < MAX_POINTS; i++) {
-			int xIndex = (i >= MAX_POINTS / 2) ? (MAX_POINTS - 1 - i) : i;
-			int yIndex = p == 1 ? (MAX_POINTS - 1 - i) : i;
+		for (int i = 0; i < num_points; i++) {
+			int xIndex = (i >= num_points / 2) ? (num_points - 1 - i) : i;
+			int yIndex = p == 1 ? (num_points - 1 - i) : i;
 			if (p == 0) {
-				paths[6].points[i] = Point{
+				path.points[i + 6*num_points] = Point{
 					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
 					z: -matThickness
 				};
 			} else {
-				paths[5].points[i] = Point{
+				path.points[i + 5*num_points] = Point{
 					x: dirs[p] * xIndex * x_increment,
 					y: yIndex * y_increment,
 					z: -matThickness
@@ -298,82 +265,22 @@ void squareGeneratorMake() {
 		}
 	}
 
-	num_paths = 7;
-	for (int i = 0; i < num_paths; i++){
-		paths[i].numPoints = MAX_POINTS;
-		paths[i].feature = NORMAL;
-	}
+	int num_paths = 7;
+	path.numPoints = num_paths * num_points;
 }
 
 void drillSquareGenerator() {
 	// Generate a drill cycle that starts at (0,0) and does a square pattern
 	float l = 50.0f;
 
-	paths[0].points[0] = Point{x: 0.0f, y: 0.0f, z: -matThickness};
-	paths[0].points[1] = Point{x: l, y: l, z: -matThickness};
-	paths[0].points[2] = Point{x: -l, y: l, z: -matThickness};
-	paths[0].points[3] = Point{x: -l, y: -l, z: -matThickness};
-	paths[0].points[4] = Point{x: l, y: -l, z: -matThickness};
-	paths[0].points[5] = Point{x: 0.0f, y: 0.0f, z: -matThickness};
+	path.points[0] = Point{x: 0.0f, y: 0.0f, z: -matThickness, feature: DRILL};
+	path.points[1] = Point{x: l, y: l, z: -matThickness, feature: DRILL};
+	path.points[2] = Point{x: -l, y: l, z: -matThickness, feature: DRILL};
+	path.points[3] = Point{x: -l, y: -l, z: -matThickness, feature: DRILL};
+	path.points[4] = Point{x: l, y: -l, z: -matThickness, feature: DRILL};
+	path.points[5] = Point{x: 0.0f, y: 0.0f, z: -matThickness, feature: DRILL};
 
-	num_paths = 1;
-	paths[0].numPoints = 6;
-	paths[0].feature = DRILL;
-}
-
-void parseNC(const char* filename) {
-	// TODO: maybe take some of this parseGCodeFile function
-	FsFile myFile = sd.open(filename);
-	if (!myFile) {
-		Serial.println("Failed to open file for reading");
-		return;
-	}
-
-	int idx = 0;
-	while (myFile.available()) {
-		String line = myFile.readStringUntil('\n');
-		int xPos = line.indexOf('X');
-		int yPos = line.indexOf('Y');
-		int zPos = line.indexOf('Z');
-		int spacePos = 0;
-		float x = 0;
-		float y = 0;
-		float z = 0;
-
-		if (xPos != -1 || yPos != -1 || zPos != -1) {
-			if (xPos == -1) {
-				x = paths[0].points[idx-1].x;
-			} else {
-				spacePos = line.indexOf(' ', xPos);
-				x = line.substring(xPos+1, spacePos).toFloat();
-			}
-			
-			if (yPos == -1) {
-				y = paths[0].points[idx-1].y;
-			} else {
-				spacePos = line.indexOf(' ', yPos);
-				if (spacePos == -1) {
-					spacePos = line.length();
-				}
-				y = line.substring(yPos+1, spacePos).toFloat();
-			}
-
-			if (zPos == -1) {
-				z = paths[0].points[idx-1].z;
-			} else {
-				spacePos = line.indexOf(' ', zPos);
-				if (spacePos == -1) {
-					spacePos = line.length();
-				}
-				z = line.substring(zPos+1, spacePos).toFloat();
-			}
-
-			paths[0].points[idx] = Point{x,y,z};
-			idx++;
-		}
-	}
-
-	myFile.close();
+	path.numPoints = 6;
 }
 
 void makePresetPath() {

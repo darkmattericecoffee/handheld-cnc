@@ -108,17 +108,18 @@ typedef struct CalParams {
 
 // Coordinate
 typedef struct Point {
-	float x;
-	float y;
-	float z;
+	float x;				// target position (mm)
+	float y;				// target position (mm)
+	float z;				// target position (mm)
+	float f = feedrate;		// feedrate (mm/s)
+	Feature feature = NORMAL;	// type of feature
 } Point;
 
 // Path
 typedef struct Path {
 	// TODO: add other properties such as angle, etc. (more info in notebook)
 	Point points[MAX_POINTS] = {NAN};
-	Feature feature = NORMAL;
-	int numPoints = 0;
+	int numPoints = MAX_POINTS;
 	float minZ = 0.0f;
 } Path;
 

@@ -2,6 +2,13 @@
 #define ENCODER_CALLBACKS_H
 
 #include <EncoderButton.h>
+#include "../config.h"
+#include "../globals.h"
+#include "../actuation/motors.h"
+#include "display.h"
+#include "../path/path-generators.h"
+#include "../io/logging.h"
+#include "../sensors/sensors.h"
 
 // Basic handlers
 void nullHandler(EncoderButton &eb);
@@ -25,7 +32,6 @@ void onEncoderUpdateDesign(EncoderButton &eb);
 void onClickMakePath(EncoderButton &eb);
 
 // Path execution handlers
-void onClickExecutePath(EncoderButton &eb);
 
 // Calibration handlers
 void onClickCalibrationAdvance(EncoderButton &eb);

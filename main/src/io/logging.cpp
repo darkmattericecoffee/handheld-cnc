@@ -1,8 +1,4 @@
 #include "logging.h"
-#include "../config.h"
-#include "../globals.h"
-#include <Arduino.h>
-#include "../math/geometry.h"
 
 #define LINE_BUFFER_SIZE 100
 
@@ -116,47 +112,43 @@ void parseGCodeFile(const String& sFilename) {
 	Serial.print("Filename: ");
 	Serial.println(filename);
 
-	// Reset paths
-	for (int i = 0; i < MAX_PATHS; i++) {
-		paths[i].feature = NORMAL;
-		paths[i].numPoints = 0;
-		
-		// Reset all points in the path
-		for (int j = 0; j < MAX_POINTS; j++) {
-			paths[i].points[j] = {0.0f};
-		}
+	// Reset path
+	// TODO: make the feature part of the point object instead of the path object
+	// path.feature = NORMAL;
+	path.numPoints = 0;
+	
+	// Reset all points in the path
+	for (int j = 0; j < MAX_POINTS; j++) {
+		path.points[j] = {0.0f};
+		path.points[j].feature = NORMAL;
 	}
 
-	int currentPathIndex = -1;
 	char line[LINE_BUFFER_SIZE];
-	Path* currentPath = &paths[0];
+	Path* activePath = &path;
 	bool activeFeature = false;
 	Point lastPoint = {0};
-	num_paths = 0;
 
 	while (file.fgets(line, sizeof(line))) {
 		bool hasNewCoordinate = false;
 
 		// Check for new path command
 		if (strncmp(line, "M800", 4) == 0) {
-			if (currentPathIndex < MAX_PATHS) {
-				activeFeature = true;
-				currentPathIndex++;
-				currentPath = &paths[currentPathIndex];
-				lastPoint = {0};
-				currentPath->minZ = 0.0f;
-				
-				// Parse the M800 parameters
-				char* ptr = line;
-				while (*ptr) {
-					// if (*ptr == 'D') currentPath->direction = atoi(ptr + 1);		// direction not needed anymore
-					// if (*ptr == 'F') currentPath->feature = (Feature)atoi(ptr + 1);		// feauture not used
-					// if (*ptr == 'A') currentPath->angle = atof(ptr + 1);
-					ptr++;
-				}
-				num_paths++;
-				Serial.printf("New Path%i!\n", currentPathIndex);
+			// TODO: handle different kinds of features
+			activeFeature = true;
+			lastPoint = {0};
+			activePath->minZ = 0.0f;
+			
+			// Parse the M800 parameters
+			char* ptr = line;
+			while (*ptr) {
+				// if (*ptr == 'D') activePath->direction = atoi(ptr + 1);		// direction not needed anymore
+				// if (*ptr == 'F') activePath->feature = (Feature)atoi(ptr + 1);		// feauture not used
+				// if (*ptr == 'A') activePath->angle = atof(ptr + 1);
+				ptr++;
 			}
+			// num_paths++;
+			Serial.printf("New Feature!\n");
+			// }
 			continue;
 		}
 
@@ -174,11 +166,12 @@ void parseGCodeFile(const String& sFilename) {
 			char* ptr = line;
 			
 			// Parse X, Y, Z coordinates from line
+			// TODO: needs some work
 			while (*ptr) {
 				if (*ptr == 'G') {
 					// TODO: make this cleaner and more universal
 					if (atof(ptr+1) == 98) {
-						currentPath->feature = DRILL;
+						newPoint.feature = DRILL;
 					}
 				}
 				if (*ptr == 'X') {
@@ -192,19 +185,20 @@ void parseGCodeFile(const String& sFilename) {
 				if (*ptr == 'Z') {
 					newPoint.z = atof(ptr + 1);
 					hasNewCoordinate = true;
-					if (newPoint.z < currentPath->minZ) {
-						currentPath->minZ = newPoint.z;			// TODO: maybe not necessary
-						Serial.printf("Minimum z = %f", currentPath->minZ);
+					if (newPoint.z < activePath->minZ) {
+						activePath->minZ = newPoint.z;			// TODO: maybe not necessary
+						Serial.printf("Minimum z = %f", activePath->minZ);
 					}
 				}
-				// TODO: For holes - parse feedrate (F) and retract height (R)
+				// TODO: parse feedrate (F) and, for holes, retract height (R)
+				newPoint.f = feedrate;
 				ptr++;
 			}
 
 			// Add point to current path if there's space
-			if (hasNewCoordinate && currentPath->numPoints < MAX_POINTS) {
-				currentPath->points[currentPath->numPoints] = newPoint;
-				currentPath->numPoints++;
+			if (hasNewCoordinate && activePath->numPoints < MAX_POINTS) {
+				activePath->points[activePath->numPoints] = newPoint;
+				activePath->numPoints++;
 				Serial.printf("Point: X(%f), Y(%f), Z(%f)\n", newPoint.x, newPoint.y, newPoint.z);
 			}
 
@@ -244,7 +238,7 @@ void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos) {
 	}
 }
 
-void debugging(Point point1, Point point2) {
+void debugging(Point point1) {
 	// TODO: make this sequential timing work better
 	void* currentCaller = __builtin_return_address(0);
     if(millis() - timeLastDebug < dtDebug) {
@@ -265,8 +259,9 @@ void debugging(Point point1, Point point2) {
 	timeLastDebug = millis();
 
 	// Print debug data
-	Serial.printf("x:%f, y:%f, theta:%f, dir:%i\n", pose.x, pose.y, pose.yaw * 180.0 / PI, direction(point1, point2));
-	Serial.printf("goal.x:%f,goal.y:%f,goal.z%f, next.x:%f,next.y:%f,next.z%f\n", point1.x, point1.y, point1.z, point2.x, point2.y, point2.z);
+	Serial.printf("x:%f, y:%f, theta:%f\n", pose.x, pose.y, pose.yaw * 180.0 / PI);
+	Serial.printf("idx:%i, goal.x:%f,goal.y:%f,goal.z:%f\n", current_point_idx, point1.x, point1.y, point1.z);
+	Serial.printf("desPos.x:%f,desPos.y:%f,desPos.z:%f\n", desPos.getX(), desPos.getY(), desPos.getZ());
 
 	// Additional debug info can be uncommented as needed:
 	/*
@@ -424,16 +419,13 @@ void closeSDFile() {
 void logPath() {
 	// Log path data to serial if enabled
 	if (outputOn) {
-		for (int i = 0; i < num_paths; i++) {
-			for (int j = 0; j < paths[current_path_idx].numPoints; j++) {
-				Serial.printf(
-					"PATH:%d,%f,%f,%f\n",
-					i,
-					paths[i].points[j].x,
-					paths[i].points[j].y,
-					paths[i].points[j].z
-				);
-			}
+		for (int j = 0; j < path.numPoints; j++) {
+			Serial.printf(
+				"PATH:%f,%f,%f\n",
+				path.points[j].x,
+				path.points[j].y,
+				path.points[j].z
+			);
 		}
 	}
 
@@ -442,15 +434,12 @@ void logPath() {
 		return;
 	}
 
-	for (int i = 0; i < num_paths; i++) {
-		for (int j = 0; j < paths[current_path_idx].numPoints; j++) {
-			logFile.printf(
-				"PATH:%d,%f,%f,%f\n",
-				i,
-				paths[i].points[j].x,
-				paths[i].points[j].y,
-				paths[i].points[j].z
-			);
-		}
+	for (int j = 0; j < path.numPoints; j++) {
+		logFile.printf(
+			"PATH:%d,%f,%f,%f\n",
+			path.points[j].x,
+			path.points[j].y,
+			path.points[j].z
+		);
 	}
 }

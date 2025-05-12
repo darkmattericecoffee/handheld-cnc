@@ -1,6 +1,10 @@
 #ifndef PATH_GENERATORS_H
 #define PATH_GENERATORS_H
 
+#include "../config.h"
+#include "../globals.h"
+#include "../io/logging.h"
+
 void lineGenerator();
 void sinGenerator();
 void zigZagGenerator();
@@ -12,7 +16,6 @@ void squareGeneratorWave();
 void squareGeneratorMake();
 void drillSquareGenerator();
 void makePresetPath();
-void parseNC(const char* filename);
 
 // Path properties
 extern const float sinAmp;

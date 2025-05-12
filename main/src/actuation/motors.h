@@ -1,6 +1,10 @@
 #ifndef MOTORS_H
 #define MOTORS_H
-#include "types.h"
+
+#include "../types.h"
+#include "../config.h"
+#include "../globals.h"
+#include "actuator.h"
 
 void motorSetup();
 void driverSetup();
@@ -13,6 +17,6 @@ void stopStepperZ();
 void machineZeroXY();
 void workspaceZeroZ();
 void workspaceZeroXY();
-void actuate(Position pos);
+void cartesianToMotor(Position pos);
 
 #endif

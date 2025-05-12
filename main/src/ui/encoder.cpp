@@ -1,11 +1,4 @@
 #include "encoder.h"
-#include "../config.h"
-#include "../globals.h"
-#include "../motors/motors.h"
-#include "display.h"
-#include "../path/path-generators.h"
-#include "../io/logging.h"
-#include "../sensors/sensors.h"
 
 void nullHandler(EncoderButton &eb) {
 	Serial.println("null handler called");
@@ -22,7 +15,7 @@ void onClickGoToSetThickness(EncoderButton &eb) {
 }
 
 void onClickResetState(EncoderButton &eb) {
-	drawCenteredText("Zero Machine X", 2);
+	drawCenteredText("Zero Machine XY", 2);
 	state = POWER_ON;
 	encoder.setClickHandler(onClickZeroMachineXY);
 }
@@ -32,12 +25,12 @@ void onClickZeroMachineXY(EncoderButton &eb) {
 	machineZeroXY();
 	state = MACHINE_XY_ZERO;
 	drawCenteredText("Zero Workspace Z", 2);
-	// encoder.setClickHandler(onClickZeroWorkspaceZ);
+	encoder.setClickHandler(onClickZeroWorkspaceZ);
 }
 
 void onClickZeroWorkspaceZ(EncoderButton &eb) {
 	drawCenteredText("Zeroing Workspace Z...", 2);
-	workspaceZeroZ();
+	// workspaceZeroZ();
 	state = WORKSPACE_Z_ZERO;
 	encoderSetThickness();
 }
@@ -78,13 +71,6 @@ void onClickMakePath(EncoderButton &eb) {
 			updateFileList();
 			listFiles();
 		}
-	}
-}
-
-void onClickExecutePath(EncoderButton &eb) {
-	if (paths[current_path_idx].feature == DRILL) {
-		Serial.println("Plunge ready!");
-		plungeReady = true;
 	}
 }
 
@@ -203,13 +189,12 @@ void encoderDesignSelect() {
 
 	// Reset cutting path
 	path_started = false;
-	current_path_idx = 0;
 	current_point_idx = 0;
 
 	state = READY;
 	cutState = NOT_CUT_READY;
 	encoder.setEncoderHandler(nullHandler);
-	encoder.setClickHandler(onClickExecutePath);
+	encoder.setClickHandler(nullHandler);
 
 	screen->fillScreen(BLACK);
 	drawFixedUI();
@@ -231,13 +216,12 @@ void encoderZeroWorkspaceXY() {
 	if (!path_started) {
 		// Reset cutting path
 		path_started = false;
-		current_path_idx = 0;
 		current_point_idx = 0;
 	}
 
 	state = READY;
 	encoder.setEncoderHandler(nullHandler);
-	encoder.setClickHandler(onClickExecutePath);
+	encoder.setClickHandler(nullHandler);
 
 	screen->fillScreen(BLACK);
 	drawFixedUI();
