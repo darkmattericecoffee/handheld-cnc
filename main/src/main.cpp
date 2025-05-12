@@ -86,6 +86,7 @@ void loop() {
 	// Cutting
 	// handleChickenHead();
 	if (runTimer >= dtControl) {
+		// TODO: tighten this control loop
 		runTimer = 0;
 		handleCutting(dtControl);		// TODO: make deltaTime a variable
 	}

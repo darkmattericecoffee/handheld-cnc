@@ -26,6 +26,11 @@ void TrajectoryGenerator::update(long deltaTime, Point& goal) {
 				pow(path.points[current_point_idx + 1].y - path.points[current_point_idx].y, 2) +
 				pow(path.points[current_point_idx + 1].z - path.points[current_point_idx].z, 2)
 			);
+			if (segmentDistance == 0.0) {
+				Serial.println("Segment distance is zero");
+				current_point_idx++;
+				return;
+			}
 			// This is the time at which the segment will be completed
 			segmentTime = segmentDistance / feedrate;
 			// Serial.printf("tCurr:%f, tSeg:%f, f:%f\n", currentTime, segmentTime, feedrate);

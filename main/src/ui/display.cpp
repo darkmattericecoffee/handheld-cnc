@@ -335,16 +335,14 @@ void drawUI(Position desPosition, uint8_t i) {
 			lastTargetCircleX = centerX + dx;
 			lastTargetCircleY = centerY + dy;
 
-			if (path.points[current_point_idx].feature != DRILL){
-				if (cutState == NOT_CUT_READY) {
-					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, RED);
-				} else if (cutState == CUT_READY) {
-					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, YELLOW);
-				} else {
-					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GREEN);
-				}
-				
+			if (cutState == NOT_CUT_READY) {
+				screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, RED);
+			} else if (cutState == CUT_READY) {
+				screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, YELLOW);
+			} else {
+				screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GREEN);
 			}
+				
 			break;
 	}
 }

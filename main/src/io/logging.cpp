@@ -134,21 +134,8 @@ void parseGCodeFile(const String& sFilename) {
 		// Check for new path command
 		if (strncmp(line, "M800", 4) == 0) {
 			// TODO: handle different kinds of features
+			// NOTE: M800 is unnecessary for the new version
 			activeFeature = true;
-			lastPoint = {0};
-			activePath->minZ = 0.0f;
-			
-			// Parse the M800 parameters
-			char* ptr = line;
-			while (*ptr) {
-				// if (*ptr == 'D') activePath->direction = atoi(ptr + 1);		// direction not needed anymore
-				// if (*ptr == 'F') activePath->feature = (Feature)atoi(ptr + 1);		// feauture not used
-				// if (*ptr == 'A') activePath->angle = atof(ptr + 1);
-				ptr++;
-			}
-			// num_paths++;
-			Serial.printf("New Feature!\n");
-			// }
 			continue;
 		}
 
@@ -168,38 +155,68 @@ void parseGCodeFile(const String& sFilename) {
 			// Parse X, Y, Z coordinates from line
 			// TODO: needs some work
 			while (*ptr) {
-				if (*ptr == 'G') {
+				switch (*ptr) {
+				case 'G':
 					// TODO: make this cleaner and more universal
-					if (atof(ptr+1) == 98) {
-						newPoint.feature = DRILL;
-					}
-				}
-				if (*ptr == 'X') {
+					if (atof(ptr+1) == 98) newPoint.feature = DRILL;
+					else if (atof(ptr+1) == 0) newPoint.feature = NORMAL;
+					else if (atof(ptr+1) == 1) newPoint.feature = NORMAL;
+					else if (atof(ptr+1) == 80) newPoint.feature = NORMAL; 		// G80 cancels current command (used in drill cycle)
+					break;
+				case 'X':
 					newPoint.x = atof(ptr + 1);
 					hasNewCoordinate = true;
-				}
-				if (*ptr == 'Y') {
+					break;
+				case 'Y':
 					newPoint.y = atof(ptr + 1);
 					hasNewCoordinate = true;
-				}
-				if (*ptr == 'Z') {
+					break;
+				case 'Z':
 					newPoint.z = atof(ptr + 1);
 					hasNewCoordinate = true;
 					if (newPoint.z < activePath->minZ) {
 						activePath->minZ = newPoint.z;			// TODO: maybe not necessary
 						Serial.printf("Minimum z = %f", activePath->minZ);
 					}
-				}
+					if (newPoint.z > 4.0) {
+						// TODO: this is bandaid for shitty gcode! Remove this
+						newPoint.z = 4.0;
+					}
+					break;
 				// TODO: parse feedrate (F) and, for holes, retract height (R)
+				// case 'F':
+				// 	newPoint.f = atof(ptr + 1);
+				// 	break;
+				// case 'R':
+				}
 				newPoint.f = feedrate;
 				ptr++;
 			}
 
 			// Add point to current path if there's space
 			if (hasNewCoordinate && activePath->numPoints < MAX_POINTS) {
-				activePath->points[activePath->numPoints] = newPoint;
-				activePath->numPoints++;
-				Serial.printf("Point: X(%f), Y(%f), Z(%f)\n", newPoint.x, newPoint.y, newPoint.z);
+				if (newPoint.feature != DRILL) {
+					// Add a normal point
+					activePath->points[activePath->numPoints] = newPoint;
+					activePath->numPoints++;
+					Serial.printf("Point: X(%f), Y(%f), Z(%f)\n", newPoint.x, newPoint.y, newPoint.z);
+				} else if (activePath->numPoints + 2 < MAX_POINTS){
+					// Make a drill cycle
+					// TODO: make this cleaner and more universal for drill cycles
+					float zVals[3] = {restHeight, newPoint.z, restHeight};
+					for (int i = 0; i < 3; i++) {
+						activePath->points[activePath->numPoints] = newPoint;
+						activePath->points[activePath->numPoints].z = zVals[i];
+						activePath->numPoints++;
+						Serial.printf("Point: X(%f), Y(%f), Z(%f)\n", newPoint.x, newPoint.y, zVals[i]);
+					}
+				} else {
+					Serial.println("Path is full!");
+					break;
+				}
+			} else if (activePath->numPoints >= MAX_POINTS) {
+				Serial.println("Path is full!");
+				break;
 			}
 
 			lastPoint = newPoint;
