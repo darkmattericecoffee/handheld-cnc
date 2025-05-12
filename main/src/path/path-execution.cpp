@@ -91,11 +91,13 @@ void handleCutting(long deltaTime) {
 	}
 
 	// Update UI
-	// TODO: update this for 3D
 	updateUI(desPos);
 
+	// Path logging
+	float toolX, toolY, toolZ;
+	motorToCartesian(toolX, toolY, toolZ);
+	if (outputSDOn)	writeAuxData(goal, toolX, toolY, toolZ, desPos);
+
 	// Debugging
-	if (debuggingOn) {
-		debugging(goal, desPos);
-	}
+	if (debuggingOn) debugging(goal, desPos);
 }

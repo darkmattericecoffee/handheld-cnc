@@ -49,7 +49,8 @@ float selfCal[2][3] = {{1.0f,0.997606f,0.989168f},
 bool plottingOn = false;			// plot values  (1 = yes; 0 = no)
 bool debuggingOn = false;			// print values (1 = yes; 0 = no)
 bool stopwatchOn = false;
-bool outputOn = false;				// output data to serial
+bool outputSerialOn = false;				// output data to serial
+bool outputSDOn = false;				// output data to SD card
 int designOrCalibrate = 0;			// choose design or calibrate (0 or 1)
 int acceptCal = 0;					// accept calibration or not
 int designPreset = 0;				// choose the design 
@@ -70,4 +71,5 @@ long unsigned lastDraw = 0;
 long unsigned timeLastPoll = 0;
 long unsigned sensingTime = 0;
 elapsedMicros runTimer;
+elapsedMicros filemicros;
 uint8_t iter = 0;

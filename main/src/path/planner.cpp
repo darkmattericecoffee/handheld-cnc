@@ -27,7 +27,7 @@ void TrajectoryGenerator::update(long deltaTime, Point& goal) {
 				pow(path.points[current_point_idx + 1].z - path.points[current_point_idx].z, 2)
 			);
 			if (segmentDistance == 0.0) {
-				Serial.println("Segment distance is zero");
+				// Serial.println("Segment distance is zero");
 				current_point_idx++;
 				return;
 			}
@@ -37,6 +37,7 @@ void TrajectoryGenerator::update(long deltaTime, Point& goal) {
 	
 			if (currentTime <= segmentTime) {
 				// Linear interpolation within the segment
+				// TODO: handle arc movements
 				float t = currentTime / segmentTime;
 				goal.x = path.points[current_point_idx].x + t * (path.points[current_point_idx + 1].x - path.points[current_point_idx].x);
 				goal.y = path.points[current_point_idx].y + t * (path.points[current_point_idx + 1].y - path.points[current_point_idx].y);

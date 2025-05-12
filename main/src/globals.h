@@ -57,7 +57,8 @@ extern float selfCal[2][3];
 extern bool plottingOn;
 extern bool debuggingOn;
 extern bool stopwatchOn;
-extern bool outputOn;
+extern bool outputSerialOn;
+extern bool outputSDOn;
 extern int designOrCalibrate;
 extern int acceptCal;
 extern int designPreset;
@@ -78,6 +79,7 @@ extern long unsigned lastDraw;
 extern long unsigned timeLastPoll;
 extern long unsigned sensingTime;
 extern elapsedMicros runTimer;
+extern elapsedMicros filemicros;
 extern uint8_t iter;
 
 #endif

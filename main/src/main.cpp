@@ -14,7 +14,7 @@
 void setup() {
 	Serial.begin(115200);  
 
-	if (outputOn) { while(!Serial); }
+	if (outputSerialOn) { while(!Serial); }
 	delay(100);
 
 	if (!screen->begin()) { Serial.println("screen->begin() failed!"); }
