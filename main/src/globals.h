@@ -19,7 +19,6 @@ extern TMC2209Stepper driverR;
 extern TMC2209Stepper driverL;
 extern TMC2209Stepper driverZ;
 extern PMW3360 sensors[4];
-extern Position desPos;
 extern EncoderButton encoder;
 extern Arduino_GFX *screen;
 extern SdFat sd;
@@ -27,7 +26,7 @@ extern SdFat sd;
 // State variables
 extern State state;
 extern CutState cutState;
-extern bool path_started;
+extern bool running;
 extern bool valid_sensors;
 extern float motorPosX;
 extern DesignType designType;
@@ -35,8 +34,6 @@ extern bool plungeReady;
 
 // Path data
 extern Path path;
-// extern int num_paths;
-// extern int current_path_idx;
 extern int current_point_idx;
 
 // SD stuff

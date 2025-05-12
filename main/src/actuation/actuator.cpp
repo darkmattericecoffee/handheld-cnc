@@ -1,7 +1,7 @@
 #include "actuator.h"
 
-ActuationController::ActuationController() 
-    : pidX(1.0, 0.1, 0.01), pidY(1.0, 0.1, 0.01), pidZ(1.0, 0.1, 0.01) {
+ActuationController::ActuationController(Position &dp)
+    : desPos(&dp), pidX(1.0, 0.1, 0.01), pidY(1.0, 0.1, 0.01), pidZ(1.0, 0.1, 0.01) {
 }
 
 // Compute actuator adjustments (call in control loop)
@@ -25,7 +25,5 @@ void ActuationController::update(
 	// desPos.setZ(pidZ.compute(errZ_global, deltaTime));		// TODO: does this need to be implemented differently?
 
 	// Normal control (without PID)
-	desPos.setX(errX_local);
-	desPos.setY(errY_local);
-	desPos.setZ(errZ_global);								// TODO: does this need to be implemented differently?
+	validMotion = desPos->set(errX_local, errY_local, errZ_global);
 }

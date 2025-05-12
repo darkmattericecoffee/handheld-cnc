@@ -318,7 +318,7 @@ void drawUI(Position desPosition, uint8_t i) {
 	float windowSize = rectangleWidth - 2*padding;
 	
 	float dx = mapF(desPosition.getX(), -xRange/2, xRange/2, -windowSize/2, windowSize/2);
-	float dy = mapF(desPosition.getY(), -yRange/2, yRange/2, -windowSize/2, windowSize/2);
+	float dy = -mapF(desPosition.getY(), -yRange/2, yRange/2, -windowSize/2, windowSize/2);
 
 	switch (i%6) {
 		case 0:
@@ -353,7 +353,7 @@ void updateUI(Position desPosition) {
 	if ((millis()-lastDraw) > 15) {
 		iter = (iter + 1)%3;
 		// unsigned long now = micros();
-		// motorPosX = stepperX.currentPosition()*1.0f/Conv;
+		// motorPosX = stepperX.currentPosition()*1.0f/ConvLead;
 		drawUI(desPosition, iter);
 		// Serial.printf("draw %d took %i us\n", iter, micros()-now);
 		lastDraw = millis();

@@ -30,7 +30,7 @@ void onClickZeroMachineXY(EncoderButton &eb) {
 
 void onClickZeroWorkspaceZ(EncoderButton &eb) {
 	drawCenteredText("Zeroing Workspace Z...", 2);
-	// workspaceZeroZ();
+	workspaceZeroZ();
 	state = WORKSPACE_Z_ZERO;
 	encoderSetThickness();
 }
@@ -188,7 +188,7 @@ void encoderDesignSelect() {
 	workspaceZeroXY();
 
 	// Reset cutting path
-	path_started = false;
+	running = true;
 	current_point_idx = 0;
 
 	state = READY;
@@ -213,9 +213,10 @@ void encoderZeroWorkspaceXY() {
 		encoder.update();
 	}
 
-	if (!path_started) {
+	if (!running) {
+		// TODO: look into this. Not really sure the use case here. Maybe re-zeroing mid cut?
 		// Reset cutting path
-		path_started = false;
+		running = true;
 		current_point_idx = 0;
 	}
 

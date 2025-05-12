@@ -4,6 +4,8 @@
 #include "../config.h"
 #include "../globals.h"
 #include "../types.h"
+#include "../io/logging.h"
+#include "../ui/encoder.h"
 
 class TrajectoryGenerator {
 	public:

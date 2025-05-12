@@ -5,6 +5,7 @@
 #include "../config.h"
 #include "../globals.h"
 #include "../math/geometry.h"
+#include "../actuation/actuator.h"
 
 const int displayLines = 7;
 const int centerLine = 3;

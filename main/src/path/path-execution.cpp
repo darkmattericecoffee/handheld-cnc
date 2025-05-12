@@ -1,14 +1,16 @@
 #include "path-execution.h"
 
-TrajectoryGenerator trajectory;
-ActuationController actuator;
-
+Point goal;
+Position desPos;
 bool prevChecks[4] = {false};
+
+TrajectoryGenerator trajectory;
+ActuationController actuator(desPos);
 
 bool checkEndstops() {
 	if (digitalRead(LIMIT_MACH_X0) == LOW) {
 		stopStepperX();
-		stepperZ.moveTo(Conv*restHeight);
+		stepperZ.moveTo(ConvLead*restHeight);
 		while (stepperZ.distanceToGo() != 0) {
 			stepperZ.run();
 		}
@@ -43,11 +45,7 @@ void handleChickenHead() {
 void handleCutting(long deltaTime) {
 	// TODO: work this out for 3D
 	// Start of cutting Logic
-	Point goal;
 	trajectory.update(deltaTime, goal);			// update goal point
-
-	// If we get here start the path
-	path_started = true;
 
 	// Update the desired position (local actuator frame)
 	actuator.update(deltaTime, goal, pose);	
@@ -76,14 +74,16 @@ void handleCutting(long deltaTime) {
 
 	// TODO: handle valid_sensors better (want to prompt re-zeroing if sensors are bad)
 	// if (handle_buttons_ok && valid_sensors && path.points[current_point_idx].feature == NORMAL) {
-	if (valid_sensors && path.points[current_point_idx].feature == NORMAL) {
-
+	if (valid_sensors && path.points[current_point_idx].feature == NORMAL && actuator.validMotion) {
+		running = true;
 		cutState = CUTTING;
 		
 		cartesianToMotor(desPos);
 	} else {
+		running = false;
 		cutState = NOT_CUT_READY;
-		// TODO: add pause logic
+
+		stepperZ.moveTo(ConvLead*restHeight);
 	}
 
 	// Update UI
@@ -92,6 +92,6 @@ void handleCutting(long deltaTime) {
 
 	// Debugging
 	if (debuggingOn) {
-		debugging(goal);
+		debugging(goal, desPos);
 	}
 }

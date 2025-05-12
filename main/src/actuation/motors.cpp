@@ -1,5 +1,7 @@
 #include "motors.h"
 
+float maxHeight = 0.0f;
+
 void motorSetup() {
 	// Set up motors
 	pinMode(MOT_EN_R, OUTPUT);
@@ -18,19 +20,20 @@ void motorSetup() {
 
 	// Set motor properties
 	stepperR.setMinPulseWidth(stepPulseWidth);
-	stepperR.setMaxSpeed(zeroSpeed_0);
-	stepperR.setAcceleration(zeroAccel);
+	stepperR.setMaxSpeed(zeroSpeed_0 * ConvBelt);
+	stepperR.setAcceleration(zeroAccel * ConvBelt);
 	stepperR.setCurrentPosition(0);
 
 	stepperL.setMinPulseWidth(stepPulseWidth);
-	stepperL.setMaxSpeed(zeroSpeed_0);
-	stepperL.setAcceleration(zeroAccel);
+	stepperL.setMaxSpeed(zeroSpeed_0 * ConvBelt);
+	stepperL.setAcceleration(zeroAccel * ConvBelt);
 	stepperL.setCurrentPosition(0);
 
 	stepperZ.setMinPulseWidth(stepPulseWidth);
-	stepperZ.setMaxSpeed(zeroSpeed_0);
-	stepperZ.setAcceleration(zeroAccel);
+	stepperZ.setMaxSpeed(zeroSpeed_0 * ConvLead);
+	stepperZ.setAcceleration(zeroAccel * ConvLead);
 	stepperZ.setCurrentPosition(0);
+	stepperZ.setPinsInverted(true, false, false);		// Invert Z motor direction
 }
 
 void driverSetup() {
@@ -91,35 +94,130 @@ void stopStepperZ() {
 }
 
 void machineZeroXY() {
-	// TODO: adjust this zeroing procedure
-	// This zeroing process is just using the zeroing plug for now (no limit switches)
-	pose = {0.0f};
+	// Do the homing cycles for the XY axes
+	// The X axis limit switch is on the left side of the machine (-X)
+	// The Y axis limit switch is on the back of the machine (+Y)
+	// TODO: add mask property for different limit switch configurations
+	int limitDirectionX = -1;
+	int limitDirectionY = 1;
+
+	// Enable motors
 	enableStepperRL();
+	// stepperR.setCurrentPosition(0);			// NOTE: for calculating xOffset
+	// stepperL.setCurrentPosition(0);
+
+	// X axis homing (negative direction)
+	stepperR.setSpeed(zeroSpeed_0 * ConvBelt * limitDirectionX);
+	stepperL.setSpeed(zeroSpeed_0 * ConvBelt * limitDirectionX);
+	while (digitalRead(LIMIT_MACH_X0) == HIGH) {
+		stepperR.runSpeed();
+		stepperL.runSpeed();
+	}
+
+	stepperR.move(-retract * ConvBelt * limitDirectionX);
+	stepperL.move(-retract * ConvBelt * limitDirectionX);
+	while (stepperR.distanceToGo() != 0 && stepperL.distanceToGo() != 0) {
+		if (stepperR.distanceToGo() != 0) stepperR.run();
+		if (stepperL.distanceToGo() != 0) stepperL.run();
+	}
+
+	stepperR.setSpeed(zeroSpeed_1 * ConvBelt * limitDirectionX);
+	stepperL.setSpeed(zeroSpeed_1 * ConvBelt * limitDirectionX);
+	while (digitalRead(LIMIT_MACH_X0) == HIGH) {
+		stepperR.runSpeed();
+		stepperL.runSpeed();
+	}
+
+	stepperR.setMaxSpeed(maxSpeedAB/2);
+	stepperL.setMaxSpeed(maxSpeedAB/2);
+	stepperR.setAcceleration(maxAccelAB/2);
+	stepperL.setAcceleration(maxAccelAB/2);
+
+	// float currentPos = stepperR.currentPosition() * 1.0f / ConvBelt;		// NOTE: for calculating xOffset
+	// Serial.printf("Current X position: %.2f\n", currentPos);
+	
+	stepperR.move(((xRangeHard/2) - xLimitOffset) * ConvBelt * (-limitDirectionX));
+	stepperL.move(((xRangeHard/2) - xLimitOffset) * ConvBelt * (-limitDirectionX));
+	while (stepperR.distanceToGo() != 0 && stepperL.distanceToGo() != 0) {
+		if (stepperR.distanceToGo() != 0) stepperR.run();
+		if (stepperL.distanceToGo() != 0) stepperL.run();
+	}
+
+	// Y axis homing (positive direction)
+	// stepperR.setCurrentPosition(0);			// NOTE: for calculating yOffset
+	// stepperL.setCurrentPosition(0);
+
+	stepperR.setSpeed(zeroSpeed_0 * ConvBelt * limitDirectionY);
+	stepperL.setSpeed(-zeroSpeed_0 * ConvBelt * limitDirectionY);
+	while (digitalRead(LIMIT_MACH_Y0) == HIGH) {
+		stepperR.runSpeed();
+		stepperL.runSpeed();
+	}
+
+	stepperR.move(-retract * ConvBelt * limitDirectionY);
+	stepperL.move(retract * ConvBelt * limitDirectionY);
+	while (stepperR.distanceToGo() != 0 && stepperL.distanceToGo() != 0) {
+		if (stepperR.distanceToGo() != 0) stepperR.run();
+		if (stepperL.distanceToGo() != 0) stepperL.run();
+	}
+
+	stepperR.setSpeed(zeroSpeed_1 * ConvBelt * limitDirectionY);
+	stepperL.setSpeed(-zeroSpeed_1 * ConvBelt * limitDirectionY);
+	while (digitalRead(LIMIT_MACH_Y0) == HIGH) {
+		stepperR.runSpeed();
+		stepperL.runSpeed();
+	}
+
+	stepperR.setMaxSpeed(maxSpeedAB/2);
+	stepperL.setMaxSpeed(maxSpeedAB/2);
+	stepperR.setAcceleration(maxAccelAB/2);
+	stepperL.setAcceleration(maxAccelAB/2);
+
+	// float currentPos = stepperR.currentPosition() * 1.0f / ConvBelt;		// NOTE: for calculating yOffset
+	// Serial.printf("Current X position: %.2f\n", currentPos);
+	
+	stepperR.move(((yRangeHard/2) - yLimitOffset) * ConvBelt * (-limitDirectionY));
+	stepperL.move(-((yRangeHard/2) - yLimitOffset) * ConvBelt * (-limitDirectionY));
+	while (stepperR.distanceToGo() != 0 && stepperL.distanceToGo() != 0) {
+		if (stepperR.distanceToGo() != 0) stepperR.run();
+		if (stepperL.distanceToGo() != 0) stepperL.run();
+	}
+
+	// Reset stepper configurations and zero position
+	stepperR.setMaxSpeed(maxSpeedAB);
+	stepperL.setMaxSpeed(maxSpeedAB);
+	stepperR.setAcceleration(maxAccelAB);
+	stepperL.setAcceleration(maxAccelAB);
+	stepperR.setCurrentPosition(0);
+	stepperL.setCurrentPosition(0);
+
+	pose = {0.0f};
 }
 
 void workspaceZeroZ() {
 	enableStepperZ();
 	stepperZ.setCurrentPosition(0);
 
-	stepperZ.setSpeed(zeroSpeed_0);
+	stepperZ.setSpeed(zeroSpeed_0 * ConvLead);
 	while (digitalRead(LIMIT_MACH_Z0) == HIGH) {
 		stepperZ.runSpeed();
 	}
 
-	stepperZ.move(-Conv*retract);
+	stepperZ.move(-retract * ConvLead);
 	while (stepperZ.distanceToGo() != 0) {
 		stepperZ.run();
 	}
 
-	stepperZ.setSpeed(zeroSpeed_1);
+	stepperZ.setSpeed(zeroSpeed_1 * ConvLead);
 	while (digitalRead(LIMIT_MACH_Z0) == HIGH) {
 		stepperZ.runSpeed();
 	}
 
-	float maxHeight = stepperZ.currentPosition()*1.0f / Conv;
+	maxHeight = stepperZ.currentPosition()*1.0f / ConvLead;
+	// Serial.printf("Current Z position: %.2f\n", maxHeight);
 
 	stepperZ.setMaxSpeed(maxSpeedZ/2);
-	stepperZ.moveTo(Conv*restHeight);
+	stepperZ.moveTo(restHeight * ConvLead);
 	while (stepperZ.distanceToGo() != 0) {
 		stepperZ.run();
 	}
@@ -129,6 +227,7 @@ void workspaceZeroZ() {
 }
 
 void workspaceZeroXY() {
+	Position desPos;
 	desPos.set(0.0f, 0.0f, 0.0f);
 	cartesianToMotor(desPos);
 
@@ -137,7 +236,7 @@ void workspaceZeroXY() {
 		stepperL.run();
 	}
 
-	stepperZ.moveTo(Conv*restHeight);
+	stepperZ.moveTo(ConvLead*restHeight);
 	while (stepperZ.distanceToGo() != 0) {
 		stepperZ.run();
 	}
@@ -146,11 +245,14 @@ void workspaceZeroXY() {
 	pose = {0.0f};
 }
 
+// Convert the position to motor coordinates, using the coreXY system
+// Inputs:
+// 	- pos - the position in the router's BFF coordinate system (mm)
 void cartesianToMotor(Position pos) {
 	// actuate coreXY system
 	float a = pos.getX() + pos.getY();
 	float b = pos.getX() - pos.getY();
 	stepperR.moveTo(a * ConvBelt);
 	stepperL.moveTo(b * ConvBelt);
-	stepperZ.moveTo(pos.getZ() * Conv);
+	stepperZ.moveTo(pos.getZ() * ConvLead);
 }

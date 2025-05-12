@@ -9,6 +9,7 @@
 #define SS2					31
 #define SS3					32
 #define LIMIT_MACH_X0       6
+#define LIMIT_MACH_Y0		7	// NOTE: this is currently soldered, not on PCB
 #define LIMIT_MACH_Z0       5
 #define BUTT_HANDLE_L       2
 #define BUTT_HANDLE_R       3
@@ -60,22 +61,22 @@ const int uSteps = 4;							// microstep configuration
 const float beltPitch = 2.0;					// belt pitch (mm)
 const int pulleyTeeth = 16;						// pulley teeth on drive pulley
 const float ConvBelt = (stepsPerRev*uSteps)/(beltPitch*pulleyTeeth);	// conversion factor (mm -> steps)
-const float maxSpeedAB = 140.0*ConvBelt;			// max velocity A and B motors can move at (step/s)
-const float maxAccelAB = 2000.0*ConvBelt;			// A/B motor max acceleration (step/s^2)
 // Z Motor (lead screw)
 const float lead = 8;							// lead screw lead (mm)
-const float Conv = (stepsPerRev*uSteps)/lead;	// conversion factor (mm -> steps)
+const float ConvLead = (stepsPerRev*uSteps)/lead;	// conversion factor (mm -> steps)
 // Other motor properties
 const float stepPulseWidth = 20.0;				// min pulse width (from Mark Rober's code)
 const float maxCurrent_RMS = 1273.0;			// motor RMS current rating (mA)
-const float maxSpeedZ = 180.0*Conv;				// max velocity Z motor can move at (step/s)
-const float maxAccelZ = 3000.0*Conv;			// z max acceleration (step/s^2)
-const float retract = 5;						// distance to retract (mm)
-const float zeroSpeed_0 = 20.0 * Conv;			// zeroing speed (step/s)
-const float zeroSpeed_1 = 4.0 * Conv;			// secondary zeroing speed (step/s)
-const float zeroAccel = 200.0 * Conv;			// zeroing acceleration (step/s^2)
+const float maxSpeedAB = 140.0*ConvBelt;			// max velocity A and B motors can move at (step/s)
+const float maxAccelAB = 2000.0*ConvBelt;			// A/B motor max acceleration (step/s^2)
+const float maxSpeedZ = 180.0*ConvLead;				// max velocity Z motor can move at (step/s)
+const float maxAccelZ = 3000.0*ConvLead;			// z max acceleration (step/s^2)
+const float retract = 2.0;						// distance to retract (mm)
+const float zeroSpeed_0 = 20.0;					// zeroing speed (mm/s)
+const float zeroSpeed_1 = 4.0;					// secondary zeroing speed (mm/s)
+const float zeroAccel = 200.0;					// zeroing acceleration (mm/s^2)
 const float feedrate = 5.0;						// speed of tracking (mm/s)			TODO: make this modifiable (and change units to mm)
-const float holeFeedrate = 5.0 * Conv; 			// default hole feedrate (step/s)		TODO: make this modifiable (and change units to mm)
+const float holeFeedrate = 5.0; 				// default hole feedrate (mm/s)		TODO: make this modifiable (and change units to mm)
 
 // Material properties
 const float maxThickness = 15.0;				// upper bound of thickness knob (mm)
@@ -84,10 +85,14 @@ const float holeTolerance = 0.25;					// tolerance for hole positioning (mm)
 
 // Gantry geometry
 const float xRange = 20.0;						// usable range of x-axis (mm)
+const float xRangeHard = 24.0;					// hard limit of x-axis (mm)
 const float yRange = 20.0;						// usable range of y-axis (mm)
+const float yRangeHard = 24.0;					// hard limit of y-axis (mm)
 const float zRange = 34.0;						// usable length of z-axis (mm)
-const float xLimitOffset = 2.54;				// distance from wall of stepper when zeroed (mm)
-const float zLimitOffset = 2.13;				// distance from wall when zeroed (mm)
+const float zRangeHard = 34.0;					// hard limit of z-axis (mm)
+const float xLimitOffset = 1.32;				// distance from wall of stepper when zeroed (mm)
+const float yLimitOffset = 1.48;				// distance from wall of stepper when zeroed (mm)
+const float zLimitOffset = 2.29;				// distance from wall when zeroed (mm)
 const float wallBuffer = 3.0;						// safety buffer between tool body and walls (mm)
 
 // Timing constants

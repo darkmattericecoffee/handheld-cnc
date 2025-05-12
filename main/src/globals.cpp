@@ -7,7 +7,6 @@ AccelStepper stepperZ(motorInterfaceType, MOT_STEP_Z, MOT_DIR_Z);
 TMC2209Stepper driverR(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS_R);
 TMC2209Stepper driverL(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS_L);
 TMC2209Stepper driverZ(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS_Z);
-Position desPos;
 PMW3360 sensors[4];
 EncoderButton encoder(ENCODER_PIN_A, ENCODER_PIN_B, ENCODER_BUTT);
 Arduino_DataBus *bus = new Arduino_HWSPI(TFT_DC, TFT_CS, &SPI1);
@@ -17,15 +16,13 @@ SdFat sd;
 // State variables
 State state = POWER_ON;
 CutState cutState = NOT_CUT_READY;
-bool path_started = false;
+bool running = false;
 bool valid_sensors = true;
 DesignType designType = PRESET;
 bool plungeReady = false;
 
 // Path data
 Path path;
-// int num_paths = 0;
-// int current_path_idx = 0;
 int current_point_idx = 0;
 
 // SD Stuff

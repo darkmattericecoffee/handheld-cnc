@@ -6,13 +6,14 @@
 #include "../config.h"
 #include "../globals.h"
 #include "../math/geometry.h"
+#include "../actuation/actuator.h"
 
 // Serial logging functions
 void handleSerial();
 void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos);
 
 // Debugging functions
-void debugging(Point point1);
+void debugging(Point point1, Position pos);
 void debugging(const char* format, ...);
 void debugging(const __FlashStringHelper* format, ...);
 void stopwatch();

@@ -9,7 +9,9 @@
 
 class ActuationController {
 public:
-	ActuationController();
+	ActuationController(Position &desPos);
+
+	bool validMotion = false;
 
 	// Compute actuator adjustments (in local device frame)
 	void update(
@@ -19,6 +21,7 @@ public:
 	);
 
 private:
+	Position *desPos;
 	PIDController pidX, pidY, pidZ;
 	const float actuatorRangeX = xRange;
 	const float actuatorRangeY = yRange;

@@ -3,6 +3,8 @@
 
 #include "config.h"
 
+extern float maxHeight;	// max height of the workspace (mm)
+
 // State values
 typedef enum State {
 	POWER_ON,
@@ -57,26 +59,26 @@ class Position {
 			clamp();
 		}
 	
-		void set(float newX, float newY, float newZ) {
+		bool set(float newX, float newY, float newZ) {
 			x = newX;
 			y = newY;
 			z = newZ;
-			clamp();
+			return clamp();
 		}
 	
-		void setX(float newX) {
+		bool setX(float newX) {
 			x = newX;
-			clamp();
+			return clamp();
 		}
 	
-		void setY(float newY) {
+		bool setY(float newY) {
 			y = newY;
-			clamp();
+			return clamp();
 		}
 	
-		void setZ(float newZ) {
+		bool setZ(float newZ) {
 			z = newZ;
-			clamp();
+			return clamp();
 		}
 	
 		float getX() const { return x; }
@@ -86,15 +88,21 @@ class Position {
 	private:
 		float x, y, z;
 	
-		void clamp() {
-			x = constrainValue(x, -xRange / 2, xRange / 2);
-			y = constrainValue(y, -yRange / 2, yRange / 2);
-			z = constrainValue(z, 0, zRange);
+		bool clamp() {
+			bool validMotionX = false;
+			bool validMotionY = false;
+			bool validMotionZ = false;
+			x = constrainValue(x, -xRange / 2, xRange / 2, validMotionX);
+			y = constrainValue(y, -yRange / 2, yRange / 2, validMotionY);
+			z = constrainValue(z, maxHeight - zRange + zLimitOffset, maxHeight, validMotionZ);
+			if (validMotionX && validMotionY && validMotionZ) return true;
+			return false;
 		}
 	
-		float constrainValue(float value, float min, float max) {
+		float constrainValue(float value, float min, float max, bool& b) {
 			if (value < min) return min;
 			if (value > max) return max;
+			b = true;
 			return value;
 		}
 };

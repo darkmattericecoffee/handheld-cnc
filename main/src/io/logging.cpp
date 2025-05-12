@@ -238,7 +238,7 @@ void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos) {
 	}
 }
 
-void debugging(Point point1) {
+void debugging(Point point1, Position pos) {
 	// TODO: make this sequential timing work better
 	void* currentCaller = __builtin_return_address(0);
     if(millis() - timeLastDebug < dtDebug) {
@@ -261,7 +261,7 @@ void debugging(Point point1) {
 	// Print debug data
 	Serial.printf("x:%f, y:%f, theta:%f\n", pose.x, pose.y, pose.yaw * 180.0 / PI);
 	Serial.printf("idx:%i, goal.x:%f,goal.y:%f,goal.z:%f\n", current_point_idx, point1.x, point1.y, point1.z);
-	Serial.printf("desPos.x:%f,desPos.y:%f,desPos.z:%f\n", desPos.getX(), desPos.getY(), desPos.getZ());
+	Serial.printf("desPos.x:%f,desPos.y:%f,desPos.z:%f\n", pos.getX(), pos.getY(), pos.getZ());
 
 	// Additional debug info can be uncommented as needed:
 	/*
