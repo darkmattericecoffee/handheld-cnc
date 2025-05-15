@@ -49,9 +49,9 @@ void setup() {
 	}
 	Serial.println("Initialization done.");
 
+	drawCenteredText("Zero Machine XY", 2);
 	encoder.setClickHandler(onClickZeroMachineXY);
 	encoder.setTripleClickHandler(onClickGoToSetThickness);
-	onClickResetState(encoder);
 }
 
 void loop() {

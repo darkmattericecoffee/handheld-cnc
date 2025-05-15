@@ -70,6 +70,6 @@ void TrajectoryGenerator::update(long deltaTime, Point& goal) {
 	// Log data and close SD
 	closeSDFile();
 
-	state = POWER_ON;
+	state = ZEROED;
 	encoderDesignType();
 }

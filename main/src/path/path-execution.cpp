@@ -43,7 +43,6 @@ void handleChickenHead() {
 }
 
 void handleCutting(long deltaTime) {
-	// TODO: work this out for 3D
 	// Start of cutting Logic
 	trajectory.update(deltaTime, goal);			// update goal point
 	if (matThickness == 0.0 && designType == FROM_FILE && goal.z < 0.0) {

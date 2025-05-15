@@ -14,14 +14,12 @@ void onClickGoToDesignMode(EncoderButton &eb) {
 	encoderDesignType();
 }
 
-void onClickGoToSetThickness(EncoderButton &eb) {
-	encoderSetThickness();
-}
-
+// Reset design (from triple click)
 void onClickResetState(EncoderButton &eb) {
-	drawCenteredText("Zero Machine XY", 2);
-	state = POWER_ON;
-	encoder.setClickHandler(onClickZeroMachineXY);
+	state = ZEROED;
+	// TODO: reset goal point after triple click
+
+	encoderSetThickness();
 }
 
 void onClickZeroMachineXY(EncoderButton &eb) {
@@ -189,6 +187,7 @@ void encoderDesignSelect() {
 	}
 
 	// Hack for opensauce, auto-zero XY
+	// TODO: remove this
 	workspaceZeroXY();
 
 	// Reset cutting path
