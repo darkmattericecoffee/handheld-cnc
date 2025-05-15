@@ -78,12 +78,27 @@ void handleCutting(long deltaTime) {
 
 	// TODO: handle valid_sensors better (want to prompt re-zeroing if sensors are bad)
 	// if (handle_buttons_ok && valid_sensors && path.points[current_point_idx].feature == NORMAL) {
-	if (valid_sensors && actuator.validMotion) {
+	if (!actuator.validMotion) {
+		// Out of bounds...
+		running = false;
+		cutState = NOT_CUT_READY;
+
+		stepperZ.moveTo(ConvLead*restHeight);
+	} else if (!handle_buttons_ok && valid_sensors) {
+		// User not ready...
+		running = false;
+		cutState = NOT_USER_READY;
+
+		cartesianToMotor(desPos);
+		stepperZ.moveTo(ConvLead*restHeight);
+	} else if (valid_sensors){
+		// All good to go!
 		running = true;
 		cutState = CUTTING;
 		
 		cartesianToMotor(desPos);
 	} else {
+		// ...catch all
 		running = false;
 		cutState = NOT_CUT_READY;
 

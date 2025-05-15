@@ -337,7 +337,7 @@ void drawUI(Position desPosition, uint8_t i) {
 
 			if (cutState == NOT_CUT_READY) {
 				screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, RED);
-			} else if (cutState == CUT_READY) {
+			} else if (cutState == NOT_USER_READY) {
 				screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, YELLOW);
 			} else {
 				screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GREEN);

@@ -23,6 +23,7 @@ typedef enum State {
 
 typedef enum CutState {
 	NOT_CUT_READY,
+	NOT_USER_READY,
 	CUT_READY,
 	CUTTING,
 	PLUNGING,
