@@ -105,7 +105,7 @@ void handleCutting(long deltaTime) {
 	}
 
 	// Update UI
-	updateUI(desPos);
+	updateUI(desPos, (float)current_point_idx/(float)path.numPoints);
 
 	// Path logging
 	// TODO: make this more clean (without pass by reference)

@@ -313,14 +313,17 @@ void drawFixedUI() {
 	);
 }
 
-void drawUI(Position desPosition, uint8_t i) {
+void drawUI(Position desPosition, float progress, uint8_t i) {
 	float padding = 6;
 	float windowSize = rectangleWidth - 2*padding;
+	int progressRadius = (screen->width()/2) - 10;
+	float progressAngle = progress * TWO_PI;
+	Serial.printf("progress: %f\n", progress);
 	
 	float dx = mapF(desPosition.getX(), -xRange/2, xRange/2, -windowSize/2, windowSize/2);
 	float dy = -mapF(desPosition.getY(), -yRange/2, yRange/2, -windowSize/2, windowSize/2);
 
-	switch (i%6) {
+	switch (i%4) {
 		case 0:
 			// draw the center target
 			screen->drawLine(centerX, centerY-5, centerX, centerY+5, WHITE);
@@ -344,15 +347,22 @@ void drawUI(Position desPosition, uint8_t i) {
 			}
 				
 			break;
+		case 3:
+			for (int i = 0; i < 3; i++) {
+				int x = centerX + (progressRadius-1+i) * sinf(progressAngle);
+				int y = centerY - (progressRadius-1+i) * cosf(progressAngle);
+				screen->drawPixel(x, y, GREEN);
+			}
+			break;
 	}
 }
 
-void updateUI(Position desPosition) {
+void updateUI(Position desPosition, float progress) {
 	if ((millis()-lastDraw) > 15) {
-		iter = (iter + 1)%3;
+		iter = (iter + 1)%4;
 		// unsigned long now = micros();
 		// motorPosX = stepperX.currentPosition()*1.0f/ConvLead;
-		drawUI(desPosition, iter);
+		drawUI(desPosition, progress, iter);
 		// Serial.printf("draw %d took %i us\n", iter, micros()-now);
 		lastDraw = millis();
 	}

@@ -51,7 +51,7 @@ void setup() {
 
 	drawCenteredText("Zero Machine XY", 2);
 	encoder.setClickHandler(onClickZeroMachineXY);
-	encoder.setTripleClickHandler(onClickGoToSetThickness);
+	encoder.setTripleClickHandler(onClickResetState);
 }
 
 void loop() {
