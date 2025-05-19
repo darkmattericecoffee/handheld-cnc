@@ -91,6 +91,16 @@ void handleFileSelection() {
 	}
 }
 
+void handleSpeedRun() {
+	String selectedFile = "RMRRF/rmrrf.nc";
+	
+	// Handle file selection
+	parseGCodeFile(selectedFile);
+	logPath();
+		
+	delay(100);
+}
+
 bool validCommand(const char* gLine) {
 	// Returns true if the line contains a valid GCode command
 
@@ -209,7 +219,7 @@ void parseGCodeFile(const String& sFilename) {
 					hasNewCoordinate = true;
 					if (newPoint.z < activePath->minZ) {
 						activePath->minZ = newPoint.z;			// TODO: maybe not necessary
-						Serial.printf("Minimum z = %f", activePath->minZ);
+						// Serial.printf("Minimum z = %f", activePath->minZ);
 					}
 					if (newPoint.z > 4.0) {
 						// TODO: this is bandaid for shitty gcode! Remove this
@@ -232,7 +242,7 @@ void parseGCodeFile(const String& sFilename) {
 					// Add a normal point
 					activePath->points[activePath->numPoints] = newPoint;
 					activePath->numPoints++;
-					Serial.printf("Point: X(%f), Y(%f), Z(%f)\n", newPoint.x, newPoint.y, newPoint.z);
+					// Serial.printf("Point: X(%f), Y(%f), Z(%f)\n", newPoint.x, newPoint.y, newPoint.z);
 				} else if (activePath->numPoints + 2 < MAX_POINTS){
 					// Make a drill cycle
 					// TODO: make this cleaner and more universal for drill cycles
@@ -241,7 +251,7 @@ void parseGCodeFile(const String& sFilename) {
 						activePath->points[activePath->numPoints] = newPoint;
 						activePath->points[activePath->numPoints].z = zVals[i];
 						activePath->numPoints++;
-						Serial.printf("Point: X(%f), Y(%f), Z(%f)\n", newPoint.x, newPoint.y, zVals[i]);
+						// Serial.printf("Point: X(%f), Y(%f), Z(%f)\n", newPoint.x, newPoint.y, zVals[i]);
 					}
 				} else {
 					Serial.println("Path is full!");

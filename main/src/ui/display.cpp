@@ -318,7 +318,6 @@ void drawUI(Position desPosition, float progress, uint8_t i) {
 	float windowSize = rectangleWidth - 2*padding;
 	int progressRadius = (screen->width()/2) - 10;
 	float progressAngle = progress * TWO_PI;
-	Serial.printf("progress: %f\n", progress);
 	
 	float dx = mapF(desPosition.getX(), -xRange/2, xRange/2, -windowSize/2, windowSize/2);
 	float dy = -mapF(desPosition.getY(), -yRange/2, yRange/2, -windowSize/2, windowSize/2);

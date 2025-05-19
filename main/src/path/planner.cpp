@@ -71,5 +71,6 @@ void TrajectoryGenerator::update(long deltaTime, Point& goal) {
 	closeSDFile();
 
 	state = ZEROED;
+	if (designType == SPEED_RUN) encoderEndScreen();
 	encoderDesignType();
 }

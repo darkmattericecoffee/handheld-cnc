@@ -45,6 +45,9 @@ CalParams cal[4];
 float selfCal[2][3] = {{1.0f,0.997606f,0.989168f},
 						{1.0f,1.004717f,1.000850f}};				// (UNUSED)
 
+// Kinematics
+float feedrate = feedrate_default;						// speed of tracking (mm/s)			TODO: make this modifiable (and change units to mm)
+
 // Mode select
 bool plottingOn = false;			// plot values  (1 = yes; 0 = no)
 bool debuggingOn = false;			// print values (1 = yes; 0 = no)
@@ -72,4 +75,5 @@ long unsigned timeLastPoll = 0;
 long unsigned sensingTime = 0;
 elapsedMicros runTimer;
 elapsedMicros filemicros;
+elapsedMillis speedRunTimer;
 uint8_t iter = 0;

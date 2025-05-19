@@ -53,6 +53,9 @@ extern float calPos[2][4];
 extern CalParams cal[4];
 extern float selfCal[2][3];
 
+// Kinematics
+extern float feedrate;						// speed of tracking (mm/s)
+
 // Mode flags
 extern bool plottingOn;
 extern bool debuggingOn;
@@ -80,6 +83,7 @@ extern long unsigned timeLastPoll;
 extern long unsigned sensingTime;
 extern elapsedMicros runTimer;
 extern elapsedMicros filemicros;
+extern elapsedMillis speedRunTimer;
 extern uint8_t iter;
 
 #endif

@@ -34,7 +34,8 @@ typedef enum CutState {
 // Type of design
 typedef enum DesignType {
 	PRESET,
-	FROM_FILE
+	FROM_FILE,
+	SPEED_RUN
  } DesignType;
 
 // Feature type
@@ -121,7 +122,7 @@ typedef struct Point {
 	float x;				// target position (mm)
 	float y;				// target position (mm)
 	float z;				// target position (mm)
-	float f = feedrate;		// feedrate (mm/s)
+	float f = feedrate_default;			// feedrate (mm/s)
 	Feature feature = NORMAL;	// type of feature
 } Point;
 

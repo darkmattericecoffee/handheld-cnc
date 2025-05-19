@@ -67,13 +67,20 @@ void onClickMakePath(EncoderButton &eb) {
 	if (designType == PRESET) {
 		makePresetPath();
 		state = DESIGN_SELECTED;
-	} else {
+	} else if (designType == FROM_FILE) {
 		handleFileSelection();
 		if (state != DESIGN_SELECTED) {
 			updateFileList();
 			listFiles();
 		}
+	} else {
+		handleSpeedRun();
+		state = DESIGN_SELECTED;
 	}
+}
+
+void onClickEndScreen(EncoderButton &eb) {
+	state = POWER_ON;
 }
 
 // ENCODER HANDLERS ----------------------------------------
@@ -103,9 +110,9 @@ void onEncoderAcceptCalibration(EncoderButton &eb) {
 }
 
 void onEncoderSwitchType(EncoderButton &eb) {
-	designType = (DesignType)((2 + designType + eb.increment()) % 2);
-	const char* options[] = {"Preset", "From File"};
-	drawMenu(options, 2, designType);
+	designType = (DesignType)((3 + designType + eb.increment()) % 3);
+	const char* options[] = {"Preset", "From File", "Speed Run"};
+	drawMenu(options, 3, designType);
 }
 
 void onEncoderUpdateDesign(EncoderButton &eb) {
@@ -114,8 +121,24 @@ void onEncoderUpdateDesign(EncoderButton &eb) {
 		drawShape();
 	} else {
 		current_file_idx = (totalFiles + current_file_idx + eb.increment()) % totalFiles;
+		Serial.printf("File index: %i\n", current_file_idx);
 		listFiles();
 	}
+
+}
+
+void onEncoderSetSpeed(EncoderButton &eb) {
+	float maxSpeed = 0.5 * maxSpeedAB;
+	float incrScalar = 1.0;
+	float tempSpeed = feedrate + eb.increment()*incrScalar;
+
+	if (tempSpeed <= maxSpeed && tempSpeed >= 1.0) {
+		feedrate = tempSpeed;
+	}
+	
+	char text2send[50];
+	sprintf(text2send, "Turn to\nset speed\n%.2f mm/s", feedrate);
+	drawCenteredText(text2send, 2);
 
 }
 
@@ -154,8 +177,8 @@ void encoderDesignOrCalibrate() {
 }
 
 void encoderDesignType() {
-	const char* options[] = {"Preset", "From File"};
-	drawMenu(options, 2, designType);
+	const char* options[] = {"Preset", "From File", "Speed Run"};
+	drawMenu(options, 3, designType);
 
 	encoder.setEncoderHandler(onEncoderSwitchType);
 	encoder.setClickHandler(onClickSetType);
@@ -168,18 +191,24 @@ void encoderDesignType() {
 }
 
 void encoderDesignSelect() {
-	if (designType == PRESET) {
-		drawShape();
-	} else {
-		updateFileList();
-		listFiles();
-	}
-	
-	closeSDFile();
-
 	state = SELECTING_DESIGN;
 	encoder.setEncoderHandler(onEncoderUpdateDesign);
 	encoder.setClickHandler(onClickMakePath);
+
+	if (designType == PRESET) {
+		drawShape();
+	} else if (designType == FROM_FILE){
+		updateFileList();
+		listFiles();
+	} else {
+		char text2send[50];
+		sprintf(text2send, "Turn to\nset speed\n%.2f mm/s", feedrate);
+		drawCenteredText(text2send, 2);
+
+		encoder.setEncoderHandler(onEncoderSetSpeed);
+	}
+	
+	closeSDFile();
 
 	while (state != DESIGN_SELECTED) {
 		encoder.update();
@@ -193,6 +222,8 @@ void encoderDesignSelect() {
 	// Reset cutting path
 	running = true;
 	current_point_idx = 0;
+	if (designType != SPEED_RUN) feedrate = feedrate_default;	// reset feedrate to default (NOTE: only RMRRF addition)
+	speedRunTimer = 0;
 
 	state = READY;
 	cutState = NOT_CUT_READY;
@@ -229,4 +260,21 @@ void encoderZeroWorkspaceXY() {
 
 	screen->fillScreen(BLACK);
 	drawFixedUI();
+}
+
+void encoderEndScreen() {
+	if (designType != SPEED_RUN) {
+		drawCenteredText("WOOO nice job!", 2);
+	} else {
+		char text2send[50];
+		sprintf(text2send, "WOW!\nYour time was:\n%.2fs", speedRunTimer/1000.0);
+		drawCenteredText(text2send, 2);
+		feedrate = feedrate_default;	// reset feedrate to default (NOTE: only RMRRF addition)
+	}
+
+	// stay here until encoder is clicked
+	encoder.setClickHandler(onClickEndScreen); // prevent accidental state changes
+	while (state != POWER_ON) {
+		encoder.update();
+	}
 }

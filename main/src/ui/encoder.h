@@ -32,6 +32,8 @@ void onEncoderUpdateDesign(EncoderButton &eb);
 void onClickMakePath(EncoderButton &eb);
 
 // Path execution handlers
+void onEncoderSetSpeed(EncoderButton &eb);
+void onClickSetSpeed(EncoderButton &eb);
 
 // Calibration handlers
 void onClickCalibrationAdvance(EncoderButton &eb);
@@ -44,5 +46,6 @@ void encoderDesignOrCalibrate();
 void encoderDesignType();
 void encoderDesignSelect();
 void encoderZeroWorkspaceXY();
+void encoderEndScreen();
 
 #endif

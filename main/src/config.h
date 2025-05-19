@@ -74,7 +74,7 @@ const float retract = 2.0;						// distance to retract (mm)
 const float zeroSpeed_0 = 20.0;					// zeroing speed (mm/s)
 const float zeroSpeed_1 = 4.0;					// secondary zeroing speed (mm/s)
 const float zeroAccel = 200.0;					// zeroing acceleration (mm/s^2)
-const float feedrate = 5.0;						// speed of tracking (mm/s)			TODO: make this modifiable (and change units to mm)
+const float feedrate_default = 5.0;				// default feedrate (mm/s)
 const float holeFeedrate = 5.0; 				// default hole feedrate (mm/s)		TODO: make this modifiable (and change units to mm)
 
 // Material properties

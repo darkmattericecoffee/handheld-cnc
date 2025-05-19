@@ -91,6 +91,7 @@ void stopwatch();
 void updateFileList();
 String getParentPath(const char* path);
 void handleFileSelection();
+void handleSpeedRun();
 bool validCommand(const char* gLine);
 bool validCoordinate(const char* gLine);
 void parseGCodeFile(const String& sFilename);
