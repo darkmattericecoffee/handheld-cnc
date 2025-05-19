@@ -128,7 +128,7 @@ void onEncoderUpdateDesign(EncoderButton &eb) {
 }
 
 void onEncoderSetSpeed(EncoderButton &eb) {
-	float maxSpeed = 0.5 * maxSpeedAB;
+	float maxSpeed = 0.5 * maxSpeedAB / ConvBelt;
 	float incrScalar = 1.0;
 	float tempSpeed = feedrate + eb.increment()*incrScalar;
 
