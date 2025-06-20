@@ -16,12 +16,12 @@
 #define ENCODER_PIN_A       22
 #define ENCODER_PIN_B       21
 #define ENCODER_BUTT	  	4
-#define MOT_EN_R    		23
-#define MOT_DIR_R   		18
-#define MOT_STEP_R  		19
-#define MOT_EN_L    		15
-#define MOT_DIR_L   		38
-#define MOT_STEP_L  		39
+#define MOT_EN_L    		23
+#define MOT_DIR_L   		18
+#define MOT_STEP_L  		19
+#define MOT_EN_R    		15
+#define MOT_DIR_R   		38
+#define MOT_STEP_R  		39
 #define MOT_EN_Z    		41
 #define MOT_DIR_Z   		36
 #define MOT_STEP_Z  		33
@@ -31,8 +31,8 @@
 #define TFT_BL				24
 
 // Driver settings
-#define DRIVER_ADDRESS_R	0b00
-#define DRIVER_ADDRESS_L  	0b01
+#define DRIVER_ADDRESS_L	0b00
+#define DRIVER_ADDRESS_R  	0b01
 #define DRIVER_ADDRESS_Z	0b10
 #define R_SENSE            	0.11f
 #define SERIAL_PORT     	Serial4
