@@ -79,6 +79,29 @@ void onClickMakePath(EncoderButton &eb) {
 	}
 }
 
+void onClickPauseCut(EncoderButton &eb) {
+	if (cutState == CUTTING) {
+		cutState = NOT_USER_READY;
+	} else if (cutState == NOT_USER_READY) {
+		cutState = CUT_READY;
+	}
+
+	state = STANDBY;
+	encoderHandlePause();
+}
+
+void onClickPauseSelect(EncoderButton &eb) {
+	if (pauseSelection == 0) {
+		// Re-zero XY
+		workspaceZeroXY();
+		state = WORKSPACE_XY_ZERO;
+	} else {
+		// Go to main menu
+		state = ZEROED;
+		encoderSetThickness();
+	}
+}
+
 void onClickEndScreen(EncoderButton &eb) {
 	state = POWER_ON;
 }
@@ -127,6 +150,12 @@ void onEncoderUpdateDesign(EncoderButton &eb) {
 
 }
 
+void onEncoderPauseMenu(EncoderButton &eb) {
+	designOrCalibrate = (2 + designOrCalibrate + eb.increment()) % 2;
+	const char* options[] = {"Re-zero XY", "Main Menu"};
+	drawMenu(options, 2, designOrCalibrate);
+}
+
 void onEncoderSetSpeed(EncoderButton &eb) {
 	float maxSpeed = 0.5 * maxSpeedAB / ConvBelt;
 	float incrScalar = 1.0;
@@ -136,10 +165,24 @@ void onEncoderSetSpeed(EncoderButton &eb) {
 		feedrate = tempSpeed;
 	}
 	
-	char text2send[50];
-	sprintf(text2send, "Turn to\nset speed\n%.2f mm/s", feedrate);
-	drawCenteredText(text2send, 2);
+	if (state != READY) {
+		char text2send[50];
+		sprintf(text2send, "Turn to\nset speed\n%.2f mm/s", feedrate);
+		drawCenteredText(text2send, 2);
+	} else {
+		Serial.printf("Feedrate set to: %.2f mm/s\n", feedrate);
+	}
+}
 
+void onEncoderSetBoost(EncoderButton &eb) {
+	float incrScalar = 0.1;
+	float tempBoost = feedrateBoost + eb.increment()*incrScalar;
+
+	if (tempBoost >= 0.1 && tempBoost <= 5.0) {
+		feedrateBoost = tempBoost;
+	}
+
+	Serial.printf("Feedrate boost set to: %.2f\n", feedrateBoost);
 }
 
 // FUNCTIONS ------------------------------------------------
@@ -223,11 +266,12 @@ void encoderDesignSelect() {
 	running = true;
 	current_point_idx = 0;
 	if (designType != SPEED_RUN) feedrate = feedrate_default;	// reset feedrate to default (NOTE: only RMRRF addition)
+	feedrateBoost = 1.0;	// reset feedrate boost to default
 	speedRunTimer = 0;
 
 	state = READY;
 	cutState = NOT_CUT_READY;
-	encoder.setEncoderHandler(nullHandler);
+	encoder.setEncoderHandler(onEncoderSetBoost);
 	encoder.setClickHandler(nullHandler);
 
 	screen->fillScreen(BLACK);
@@ -236,6 +280,18 @@ void encoderDesignSelect() {
 	// Clear out sensors in case we moved while in design mode
 	for (int i = 0; i < 4; i++) {
 		sensors[i].readBurst();
+	}
+}
+
+void encoderHandlePause() {
+	const char* options[] = {"Re-zero XY", "Main Menu"};
+	drawMenu(options, 2, designOrCalibrate);
+
+	encoder.setEncoderHandler(onEncoderPauseMenu);
+	encoder.setClickHandler(onClickPauseSelect);
+
+	while (state != DOC_SELECTED) {
+		encoder.update();
 	}
 }
 

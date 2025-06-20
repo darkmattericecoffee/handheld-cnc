@@ -20,7 +20,7 @@ void TrajectoryGenerator::update(long deltaTime, Point& goal) {
 		// Find the segment we're in
 		while (current_point_idx < path.numPoints - 1) {
 			// TODO: careful of infinite loops
-			float feedrate = path.points[current_point_idx].f;
+			float f = path.points[current_point_idx].f * feedrateBoost;
 	
 			float segmentDistance = sqrt(
 				pow(path.points[current_point_idx + 1].x - path.points[current_point_idx].x, 2) +
@@ -33,7 +33,7 @@ void TrajectoryGenerator::update(long deltaTime, Point& goal) {
 				return;
 			}
 			// This is the time at which the segment will be completed
-			segmentTime = segmentDistance / feedrate;
+			segmentTime = segmentDistance / f;
 			// Serial.printf("tCurr:%f, tSeg:%f, f:%f\n", currentTime, segmentTime, feedrate);
 	
 			if (currentTime <= segmentTime) {

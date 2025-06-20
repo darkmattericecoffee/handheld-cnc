@@ -33,7 +33,11 @@ void onClickMakePath(EncoderButton &eb);
 
 // Path execution handlers
 void onEncoderSetSpeed(EncoderButton &eb);
+void onEncoderSetBoost(EncoderButton &eb);
 void onClickSetSpeed(EncoderButton &eb);
+void onClickPauseCut(EncoderButton &eb);
+void onEncoderPauseMenu(EncoderButton &eb);
+void onClickPauseSelect(EncoderButton &eb);
 
 // Calibration handlers
 void onClickCalibrationAdvance(EncoderButton &eb);
@@ -46,6 +50,7 @@ void encoderDesignOrCalibrate();
 void encoderDesignType();
 void encoderDesignSelect();
 void encoderZeroWorkspaceXY();
+void encoderHandlePause();
 void encoderEndScreen();
 
 #endif

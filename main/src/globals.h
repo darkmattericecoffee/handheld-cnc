@@ -55,6 +55,7 @@ extern float selfCal[2][3];
 
 // Kinematics
 extern float feedrate;						// speed of tracking (mm/s)
+extern float feedrateBoost;
 
 // Mode flags
 extern bool plottingOn;
@@ -65,6 +66,7 @@ extern bool outputSDOn;
 extern int designOrCalibrate;
 extern int acceptCal;
 extern int designPreset;
+extern int pauseSelection;
 
 // Material properties
 extern float matThickness;

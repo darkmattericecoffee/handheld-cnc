@@ -7,6 +7,7 @@ extern float maxHeight;	// max height of the workspace (mm)
 
 // State values
 typedef enum State {
+	// TODO: reorganize these states and make strict rules for updating them
 	POWER_ON,
 	MACHINE_XY_ZERO,
 	WORKSPACE_Z_ZERO,
@@ -19,7 +20,8 @@ typedef enum State {
 	SELECTING_DESIGN,
 	DESIGN_SELECTED,
 	WORKSPACE_XY_ZERO,
-	READY
+	READY,
+	STANDBY
 } State;
 
 typedef enum CutState {

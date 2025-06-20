@@ -47,6 +47,7 @@ float selfCal[2][3] = {{1.0f,0.997606f,0.989168f},
 
 // Kinematics
 float feedrate = feedrate_default;						// speed of tracking (mm/s)			TODO: make this modifiable (and change units to mm)
+float feedrateBoost = 1;								// feedrate boost factor (i.e. 1.0 = no boost, 2.0 = double speed, etc.)
 
 // Mode select
 bool plottingOn = false;			// plot values  (1 = yes; 0 = no)
@@ -56,7 +57,8 @@ bool outputSerialOn = false;				// output data to serial
 bool outputSDOn = false;				// output data to SD card
 int designOrCalibrate = 0;			// choose design or calibrate (0 or 1)
 int acceptCal = 0;					// accept calibration or not
-int designPreset = 0;				// choose the design 
+int designPreset = 0;				// choose the design
+int pauseSelection = 0;					// pause menu selection
 
 // Material properties
 float matThickness = 0.0;
