@@ -8,9 +8,10 @@ connectors:
     # supplier: Digimouse
     # spn: 1234
     image:
-      src: ../img/GH-8.jpg
+      src: resources/GH-8.jpg
       caption: JST GH 8-pin
       height: 100
+    notes: 2cm heat shrink tubing is used.
   X2:
     <<: *pmw3360 # reuse template
 
@@ -26,6 +27,12 @@ cables:
     #shield: true # add cable shielding
     type: CAT5
     notes: Similar colors are in a twisted pair.
+
+# TODO: make this work
+sheathing:
+  Heat shrink 1:
+    cables: [X1, X2]
+    length: 0.02
 
 connections:
   -

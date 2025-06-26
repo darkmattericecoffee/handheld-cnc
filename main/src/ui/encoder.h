@@ -2,6 +2,13 @@
 #define ENCODER_CALLBACKS_H
 
 #include <EncoderButton.h>
+#include "../config.h"
+#include "../globals.h"
+#include "../actuation/motors.h"
+#include "display.h"
+#include "../path/path-generators.h"
+#include "../io/logging.h"
+#include "../sensors/sensors.h"
 
 // Basic handlers
 void nullHandler(EncoderButton &eb);
@@ -9,7 +16,7 @@ void onClickGoToSetThickness(EncoderButton &eb);
 void onClickResetState(EncoderButton &eb);
 
 // Zeroing handlers
-void onClickZeroMachineX(EncoderButton &eb);
+void onClickZeroMachineXY(EncoderButton &eb);
 void onClickZeroWorkspaceZ(EncoderButton &eb);
 void onClickZeroWorkspaceXY(EncoderButton &eb);
 
@@ -24,7 +31,8 @@ void onEncoderUpdateDesign(EncoderButton &eb);
 void onClickMakePath(EncoderButton &eb);
 
 // Path execution handlers
-void onClickExecutePath(EncoderButton &eb);
+void onEncoderSetSpeed(EncoderButton &eb);
+void onClickSetSpeed(EncoderButton &eb);
 
 // Calibration handlers
 void onClickCalibrationAdvance(EncoderButton &eb);
@@ -37,5 +45,6 @@ void encoderDesignOrCalibrate();
 void encoderDesignType();
 void encoderDesignSelect();
 void encoderZeroWorkspaceXY();
+void encoderEndScreen();
 
 #endif

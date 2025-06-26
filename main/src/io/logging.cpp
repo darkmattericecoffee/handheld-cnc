@@ -1,8 +1,4 @@
 #include "logging.h"
-#include "../config.h"
-#include "../globals.h"
-#include <Arduino.h>
-#include "../math/geometry.h"
 
 char filename[MAX_STRING_LENGTH];
 
@@ -95,6 +91,16 @@ void handleFileSelection() {
 	}
 }
 
+void handleSpeedRun() {
+	String selectedFile = "RMRRF/rmrrf.nc";
+	
+	// Handle file selection
+	parseGCodeFile(selectedFile);
+	logPath();
+		
+	delay(100);
+}
+
 bool validCommand(const char* gLine) {
 	// Returns true if the line contains a valid GCode command
 
@@ -128,56 +134,50 @@ bool validCoordinate(const char* gLine) {
 }
 
 void parseGCodeFile(const String& sFilename) {
-	snprintf(filename, MAX_STRING_LENGTH, "%s", sFilename.c_str());
+	char currentDirName[256];
+	currentDir.getName(currentDirName, sizeof(currentDirName));
+	
+	// Construct full path by combining current directory and filename
+	String fullPath;
+	if (strcmp(currentDirName, "/") == 0) {
+		fullPath = String("/") + sFilename;
+	} else {
+		fullPath = String(currentDirName) + "/" + sFilename;
+	}
+
+	const char* filePath = fullPath.c_str();
 
 	FsFile file;
-	if (!file.open(filename, O_READ)) {
+	if (!file.open(filePath, O_READ)) {
+		Serial.printf("Failed to open file: %s\n", filePath);
 		return;
 	}
-	Serial.print("Filename: ");
-	Serial.println(filename);
+	Serial.printf("Opened file: %s\n", filePath);
 
-	// Reset paths
-	for (int i = 0; i < MAX_PATHS; i++) {
-		paths[i].feature = NORMAL;
-		paths[i].numPoints = 0;
-		
-		// Reset all points in the path
-		for (int j = 0; j < MAX_POINTS; j++) {
-			paths[i].points[j] = {0.0f};
-		}
+	// Reset path
+	// TODO: make the feature part of the point object instead of the path object
+	// path.feature = NORMAL;
+	path.numPoints = 0;
+	
+	// Reset all points in the path
+	for (int j = 0; j < MAX_POINTS; j++) {
+		path.points[j] = {0.0f};
+		path.points[j].feature = NORMAL;
 	}
 
-	int currentPathIndex = -1;
 	char line[LINE_BUFFER_SIZE];
-	Path* currentPath = &paths[0];
+	Path* activePath = &path;
 	bool activeFeature = false;
 	Point lastPoint = {0};
-	num_paths = 0;
 
 	while (file.fgets(line, sizeof(line))) {
 		bool hasNewCoordinate = false;
 
 		// Check for new path command
 		if (strncmp(line, "M800", 4) == 0) {
-			if (currentPathIndex < MAX_PATHS) {
-				activeFeature = true;
-				currentPathIndex++;
-				currentPath = &paths[currentPathIndex];
-				lastPoint = {0};
-				currentPath->minZ = 0.0f;
-				
-				// Parse the M800 parameters
-				char* ptr = line;
-				while (*ptr) {
-					// if (*ptr == 'D') currentPath->direction = atoi(ptr + 1);		// direction not needed anymore
-					// if (*ptr == 'F') currentPath->feature = (Feature)atoi(ptr + 1);		// feauture not used
-					// if (*ptr == 'A') currentPath->angle = atof(ptr + 1);
-					ptr++;
-				}
-				num_paths++;
-				Serial.printf("New Path%i!\n", currentPathIndex);
-			}
+			// TODO: handle different kinds of features
+			// NOTE: M800 is unnecessary for the new version
+			activeFeature = true;
 			continue;
 		}
 
@@ -195,38 +195,71 @@ void parseGCodeFile(const String& sFilename) {
 			char* ptr = line;
 			
 			// Parse X, Y, Z coordinates from line
+			// TODO: needs some work
 			while (*ptr) {
-				if (*ptr == 'G') {
+				switch (*ptr) {
+				case 'G':
 					// TODO: make this cleaner and more universal
-					if (atof(ptr+1) == 98) {
-						currentPath->feature = DRILL;
-					}
-				}
-				if (*ptr == 'X') {
+					// TODO: handle G28 call to home device
+					if (atof(ptr+1) == 98) newPoint.feature = DRILL;
+					else if (atof(ptr+1) == 0) newPoint.feature = NORMAL;
+					else if (atof(ptr+1) == 1) newPoint.feature = NORMAL;
+					else if (atof(ptr+1) == 80) newPoint.feature = NORMAL; 		// G80 cancels current command (used in drill cycle)
+					break;
+				case 'X':
 					newPoint.x = atof(ptr + 1);
 					hasNewCoordinate = true;
-				}
-				if (*ptr == 'Y') {
+					break;
+				case 'Y':
 					newPoint.y = atof(ptr + 1);
 					hasNewCoordinate = true;
-				}
-				if (*ptr == 'Z') {
+					break;
+				case 'Z':
 					newPoint.z = atof(ptr + 1);
 					hasNewCoordinate = true;
-					if (newPoint.z < currentPath->minZ) {
-						currentPath->minZ = newPoint.z;			// TODO: maybe not necessary
-						Serial.printf("Minimum z = %f", currentPath->minZ);
+					if (newPoint.z < activePath->minZ) {
+						activePath->minZ = newPoint.z;			// TODO: maybe not necessary
+						// Serial.printf("Minimum z = %f", activePath->minZ);
 					}
+					if (newPoint.z > 4.0) {
+						// TODO: this is bandaid for shitty gcode! Remove this
+						newPoint.z = 4.0;
+					}
+					break;
+				// TODO: parse feedrate (F) and, for holes, retract height (R)
+				// case 'F':
+				// 	newPoint.f = atof(ptr + 1);
+				// 	break;
+				// case 'R':
 				}
-				// TODO: For holes - parse feedrate (F) and retract height (R)
+				newPoint.f = feedrate;
 				ptr++;
 			}
 
 			// Add point to current path if there's space
-			if (hasNewCoordinate && currentPath->numPoints < MAX_POINTS) {
-				currentPath->points[currentPath->numPoints] = newPoint;
-				currentPath->numPoints++;
-				Serial.printf("Point: X(%f), Y(%f), Z(%f)\n", newPoint.x, newPoint.y, newPoint.z);
+			if (hasNewCoordinate && activePath->numPoints < MAX_POINTS) {
+				if (newPoint.feature != DRILL) {
+					// Add a normal point
+					activePath->points[activePath->numPoints] = newPoint;
+					activePath->numPoints++;
+					// Serial.printf("Point: X(%f), Y(%f), Z(%f)\n", newPoint.x, newPoint.y, newPoint.z);
+				} else if (activePath->numPoints + 2 < MAX_POINTS){
+					// Make a drill cycle
+					// TODO: make this cleaner and more universal for drill cycles
+					float zVals[3] = {restHeight, newPoint.z, restHeight};
+					for (int i = 0; i < 3; i++) {
+						activePath->points[activePath->numPoints] = newPoint;
+						activePath->points[activePath->numPoints].z = zVals[i];
+						activePath->numPoints++;
+						// Serial.printf("Point: X(%f), Y(%f), Z(%f)\n", newPoint.x, newPoint.y, zVals[i]);
+					}
+				} else {
+					Serial.println("Path is full!");
+					break;
+				}
+			} else if (activePath->numPoints >= MAX_POINTS) {
+				Serial.println("Path is full!");
+				break;
 			}
 
 			lastPoint = newPoint;
@@ -265,7 +298,7 @@ void outputSerial(Point goal, float toolPos, float desPos) {
 	}
 }
 
-void debugging(Point point1, Point point2) {
+void debugging(Point point1, Position pos) {
 	// TODO: make this sequential timing work better
 	void* currentCaller = __builtin_return_address(0);
     if(millis() - timeLastDebug < dtDebug) {
@@ -286,9 +319,9 @@ void debugging(Point point1, Point point2) {
 	timeLastDebug = millis();
 
 	// Print debug data
-	// print unsigned long time
-	Serial.printf("time:,%lu, x:%f, y:%f, theta:%f, dir:%i\n", filemicros/1'000'000, pose.x, pose.y, pose.yaw * 180.0 / PI, direction(point1, point2));
-	// Serial.printf("goal.x:%f,goal.y:%f,goal.z%f, next.x:%f,next.y:%f,next.z%f\n", point1.x, point1.y, point1.z, point2.x, point2.y, point2.z);
+	Serial.printf("x:%f, y:%f, theta:%f\n", pose.x, pose.y, pose.yaw * 180.0 / PI);
+	Serial.printf("idx:%i, goal.x:%f,goal.y:%f,goal.z:%f\n", current_point_idx, point1.x, point1.y, point1.z);
+	Serial.printf("desPos.x:%f,desPos.y:%f,desPos.z:%f\n", pos.getX(), pos.getY(), pos.getZ());
 
 	// Additional debug info can be uncommented as needed:
 	/*
@@ -381,6 +414,14 @@ bool initializeLogFile() {
 		logFile.close();
 	}
 	
+	// Create logFiles directory if it doesn't exist
+	if (!sd.exists("logFiles")) {
+		if (!sd.mkdir("logFiles")) {
+			Serial.println("Could not create logFiles directory!");
+			return false;
+		}
+	}
+	
 	// Create a new file with an incremental name
 	char filename[20];
 	int fileNumber = 0;
@@ -404,7 +445,7 @@ bool initializeLogFile() {
 }
 
 // Function to write header information
-void writeFileHeader(const char* designName, uint16_t numPaths) {
+void writeFileHeader(const char* designName, uint16_t numPoints) {
 	if (logFile) {
 		FileHeader fileHeader;
 		fileHeader.packetType = PACKET_HEADER;
@@ -418,7 +459,7 @@ void writeFileHeader(const char* designName, uint16_t numPaths) {
 		}
 		
 		// TODO: add UNIX timestamp
-		fileHeader.numPaths = numPaths;
+		fileHeader.numPoints = numPoints;
 		
 		// Write the header to file
 		logFile.write((uint8_t*)&fileHeader, sizeof(FileHeader));
@@ -429,31 +470,17 @@ void writeFileHeader(const char* designName, uint16_t numPaths) {
 	}
 }
 
-// Function to write path information
-void writePathInfo(uint16_t pathIndex, uint8_t featureType) {
-	if (logFile) {
-		PathInfo pathInfo;
-		pathInfo.packetType = PACKET_PATH;
-		pathInfo.pathIndex = pathIndex;
-		pathInfo.featureType = featureType;
-		// pathInfo.numPoints = numPoints;
-		// pathInfo.toolParams = toolParams;
-		
-		// Write the path info to file
-		logFile.write((uint8_t*)&pathInfo, sizeof(PathInfo));
-	}
-}
-
 // Function to write a single point in a path
-void writePathPoint(uint16_t pathIndex, uint16_t pointIndex, Point point) {
+void writePathPoint(uint16_t pointIndex, Point point) {
 	if (logFile) {
 		PathPoint pathPoint;
 		pathPoint.packetType = PACKET_PATH_POINT;
-		pathPoint.pathIndex = pathIndex;
+		// pathPoint.pathIndex = pathIndex;
 		pathPoint.pointIndex = pointIndex;
 		pathPoint.x = point.x;
 		pathPoint.y = point.y;
 		pathPoint.z = point.z;
+		pathPoint.featureType = point.feature;
 		
 		// Write the point to file
 		logFile.write((uint8_t*)&pathPoint, sizeof(PathPoint));
@@ -488,7 +515,7 @@ void writeSensorData(uint32_t time,  SensorData sensorArray[ns], uint32_t dt) {
 }
 
 // Write auxilliary data to SD card for datalogging
-void writeAuxData(Point goal, float toolPos, float desPos) {
+void writeAuxData(Point goal, float toolX, float toolY, float toolZ, Position desPos) {
 	if (millis() - timeLastOutputSD >= dtOutputSD) {
 		timeLastOutputSD = millis();
 		
@@ -498,11 +525,15 @@ void writeAuxData(Point goal, float toolPos, float desPos) {
 			packet.packetType = PACKET_AUX;
 			packet.time = filemicros;
 			packet.pose = pose;
-			packet.currPathIndex = current_path_idx;
+			// packet.currPathIndex = current_path_idx;
 			packet.currPointIndex = current_point_idx;
 			packet.goal = goal;
-			packet.toolPos = toolPos;
-			packet.desPos = desPos;
+			packet.toolX = toolX;
+			packet.toolY = toolY;
+			packet.toolZ = toolZ;
+			packet.desX = desPos.getX();
+			packet.desY = desPos.getY();
+			packet.desZ = desPos.getZ();
 			packet.cutState = cutState;
 			packet.packetEnd = PACKET_END;
 			
@@ -544,22 +575,39 @@ void logPath() {
 			char designName[MAX_STRING_LENGTH];
 			sprintf(designName, "preset_%i", designPreset);
 			Serial.printf("Logging to preset design: %s\n", designName);
-			writeFileHeader(designName, num_paths);
+			writeFileHeader(designName, path.numPoints);
 		} else {
-			writeFileHeader(filename, num_paths);
+			writeFileHeader(filename, path.numPoints);
 		}
 		
-
-		for (int i = 0; i < num_paths; i++) {
-			// Write path information
-			writePathInfo(i, paths[i].feature);
-			for (int j = 0; j < paths[i].numPoints; j++) {
-				// Write each point in the path
-				writePathPoint(i, j, paths[i].points[j]);
-			}
+		for (int i = 0; i < path.numPoints; i++) {
+			// Write each point in the path
+			writePathPoint(i, path.points[i]);
 		}
 
 		if (logFile) logFile.flush();
+	} else {
+		Serial.println("Logging to SD card is disabled.");
+			// Log path data to serial if enabled
+		// for (int j = 0; j < path.numPoints; j++) {
+		for (int i = 0; i < 50; i++) {
+			Serial.printf(
+				"POINT[%i]:%f,%f,%f\n",
+				i,
+				path.points[i].x,
+				path.points[i].y,
+				path.points[i].z
+			);
+		}
+		Serial.println("...");
+		for (int i = path.numPoints - 50; i < path.numPoints; i++) {
+			Serial.printf(
+				"POINT[%i]:%f,%f,%f\n",
+				i,
+				path.points[i].x,
+				path.points[i].y,
+				path.points[i].z
+			);
+		}
 	}
-
 }

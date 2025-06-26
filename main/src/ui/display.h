@@ -1,8 +1,11 @@
 #ifndef DISPLAY_H
 #define DISPLAY_H
 
-#include <Arduino.h>
 #include "../types.h"
+#include "../config.h"
+#include "../globals.h"
+#include "../math/geometry.h"
+#include "../actuation/actuator.h"
 
 const int displayLines = 7;
 const int centerLine = 3;
@@ -15,7 +18,7 @@ void updateFileList();
 void handleFileSelection();
 void drawCenteredText(const char* text, int size);
 void drawFixedUI();
-void drawUI(float desPosition, Point goal, Point next, uint8_t i);
-void updateUI(float desPosition, Point goal, Point next);
+void drawUI(Position desPosition, float progress, uint8_t i);
+void updateUI(Position desPosition, float progress);
 
 #endif

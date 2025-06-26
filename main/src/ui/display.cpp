@@ -1,11 +1,15 @@
 #include "display.h"
-#include "../config.h"
-#include "../globals.h"
-#include "../math/geometry.h"
-#include <Arduino.h>
 
-static int16_t lastX0, lastY0, lastX1, lastY1, lastX2, lastY2, lastX3, lastY3;
 static int16_t lastTargetCircleX, lastTargetCircleY;
+
+// Display properties
+int16_t tftWidth = screen->width();
+int16_t tftHeight = screen->height();
+int16_t centerX = tftWidth / 2;
+int16_t centerY = tftHeight / 2;
+
+// Runtime UI properties
+float rectangleWidth = screen->width() / 2;
 
 unsigned long lastScrollTime = 0;
 int scrollPosition = 0;
@@ -55,10 +59,6 @@ void drawMenu(const char* options[], const int numOptions, int select) {
 }
 
 void drawShape() {
-	int16_t tftWidth = screen->width();
-	int16_t tftHeight = screen->height();
-	int16_t centerX = tftWidth / 2;
-	int16_t centerY = tftHeight / 2;
 	int16_t size = min(tftWidth, tftHeight) / 3;
 	int16_t dot_size = 2;
 
@@ -154,8 +154,6 @@ void drawShape() {
 void listFiles() {
 	screen->fillScreen(BLACK);
 	screen->setTextSize(2);
-
-	int16_t tftHeight = screen->height();
 
 	// Calculate vertical centering
 	int totalHeight = displayLines * 20;  				// Total height of all lines (7 lines * 20px)
@@ -296,11 +294,6 @@ void drawCenteredText(const char* text, int size) {
 
 	screen->fillScreen(BLACK);
 
-	int16_t tftWidth = screen->width();
-	int16_t tftHeight = screen->height();
-	int16_t centerX = tftWidth / 2;
-	int16_t centerY = tftHeight / 2;
-
 	// screen->setFont(u8g2_font_littlemissloudonbold_tr);
 	screen->setTextSize(size);
 	screen->setTextColor(WHITE);
@@ -332,129 +325,66 @@ void drawCenteredText(const char* text, int size) {
 
 void drawFixedUI() {
 	screen->fillScreen(BLACK);
-
-	int16_t r = screen->width()*0.95 / 2;
-	int16_t centerX = screen->width() / 2;
-	int16_t centerY = screen->width() / 2;
-	float angleInc = 0.01;			// angle increment
-
-	// Draw arcs
-	for (float th = angleThreshold; th < (PI - angleThreshold); th += angleInc) {
-		screen->drawPixel(r*cosf(th) + centerX, r*sinf(th) + centerY, WHITE);
-		screen->drawPixel(r*cosf(th) + centerX, -r*sinf(th) + centerY, WHITE);
-	}
 	
-	// Draw bounds circle
-	int16_t radiusBounds = screen->width() / 4;
-	screen->drawCircle(centerX, centerY, radiusBounds, WHITE);
+	// Draw bounds rectangle
+	screen->drawRect(
+		centerX - rectangleWidth/2,
+		centerY - rectangleWidth/2,
+		rectangleWidth,
+		rectangleWidth,
+		WHITE
+	);
 }
 
-void drawUI(float desPosition, Point goal, Point next, uint8_t i) {
-	int16_t radiusBounds = screen->width() / 4;
-	int16_t radiusInner = screen->width() / 10;
-	int16_t centerX = screen->width() / 2;
-	int16_t centerY = screen->width() / 2;
+void drawUI(Position desPosition, float progress, uint8_t i) {
+	float padding = 6;
+	float windowSize = rectangleWidth - 2*padding;
+	int progressRadius = (screen->width()/2) - 10;
+	float progressAngle = progress * TWO_PI;
+	
+	float dx = mapF(desPosition.getX(), -xRange/2, xRange/2, -windowSize/2, windowSize/2);
+	float dy = -mapF(desPosition.getY(), -yRange/2, yRange/2, -windowSize/2, windowSize/2);
 
-	float dTheta = pose.yaw - atan2f(next.y-goal.y, next.x-goal.x);			// angle between pose and next point
-
-	// float xMap = mapF(desPosition, -gantryLengthRouter/2, gantryLengthRouter/2, -radiusBounds, radiusBounds);
-	// float yMap = mapF();
-	float dx = 0.0f;
-	float dy = 0.0f;
-	if (paths[current_path_idx].feature != DRILL) {
-		dx = (next.x-pose.x)*cosf(-pose.yaw) - (next.y-pose.y)*sinf(-pose.yaw);
-		dy = (next.x-pose.x)*sinf(-pose.yaw) + (next.y-pose.y)*cosf(-pose.yaw);
-	} else {
-		dx = (goal.x-pose.x)*cosf(-pose.yaw) - (goal.y-pose.y)*sinf(-pose.yaw);
-		dy = (goal.x-pose.x)*sinf(-pose.yaw) + (goal.y-pose.y)*cosf(-pose.yaw);
-	}
-
-	float dySkewed = 5*exponentialSkew(dy);
-	// float theta = pose.yaw - atan2f(dySkewed, next.x-pose.x);
-	float theta = atan2f(dySkewed, dx);
-	// float thetaTool = pose.yaw - atan2f(next.y-(pose.y+motorPosX*sinf(pose.yaw)), next.x-(pose.x+motorPosX*cosf(pose.yaw)));
-	// float dist = myDist(pose.x, pose.y, next.x, pose.y + dySkewed);
-	float dist = sqrt(pow(dx,2)+pow(dySkewed,2));
-	float desPosHole = desPosSimple(pose, goal);
-	float holeDistance = abs(signedDist(pose, goal));
-	bool within_hole_tol = (holeDistance < holeTolerance) && (abs(desPosHole) < (xUsable/2));
-
-
-	// Serial.printf("yaw: %f\n", degrees(pose.yaw));
-
-	float offsetRadius = radiusBounds*0.9*tanh(dist*0.05);
-	//float offsetRadius = (radius - radiusInner)*0.8*tanh(dist*0.1);
-
-	switch (i%6) {
+	switch (i%4) {
 		case 0:
 			// draw the center target
 			screen->drawLine(centerX, centerY-5, centerX, centerY+5, WHITE);
 			screen->drawLine(centerX-15, centerY, centerX+15, centerY, WHITE);
 			break;
 		case 1:
-			// draw outer up/down marker
-			screen->drawLine(centerX+radiusBounds, centerY, centerX+radiusBounds-5, centerY, WHITE);
-			screen->drawLine(centerX-radiusBounds, centerY, centerX-radiusBounds+5, centerY, WHITE);
-			break;
-		case 2:
-			// clear the old compass line
-			screen->drawLine(lastX0, lastY0, lastX1, lastY1, BLACK);
-			break;
-		case 3:
-			// draw the new compass line
-			lastX0 = centerX + 1.4*radiusBounds*cosf(dTheta);
-			lastY0 = centerY + 1.4*radiusBounds*sinf(dTheta);
-			lastX1 = centerX + (radiusBounds+6)*cosf(dTheta);
-			lastY1 = centerY + (radiusBounds+6)*sinf(dTheta);
-
-			if (paths[current_path_idx].feature != DRILL) {
-				screen->drawLine(lastX0, lastY0, lastX1, lastY1, WHITE);
-			} else {
-				screen->drawLine(lastX0, lastY0, lastX1, lastY1, BLACK);
-			}
-			break;
-		case 4:
 			// clear the old target circle
 			screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, BLACK);
 			break;
-		case 5:
+		case 2:
 			// draw new target circle
-			// float toolX = radiusBounds*cosf(thetaTool);
-			// float toolY = radiusBounds*sinf(thetaTool);
-			lastTargetCircleX = centerX + (offsetRadius)*cosf(theta);
-			lastTargetCircleY = centerY - (offsetRadius)*sinf(theta);     // TODO: this shouldn't be negative, just a hack
-			// lastTargetCircleX = centerX + ((offsetRadius)*cosf(theta) + toolX)/2;
-			// lastTargetCircleY = centerY + ((offsetRadius)*sinf(theta) + toolY)/2;
-			// lastTargetCircleX = centerX + xMap;
-			// lastTargetCircleY = centerY + radiusInner*sqrt((1-pow(xMap/radiusBounds,2)));
-			if (paths[current_path_idx].feature != DRILL){
-				if (cutState == NOT_CUT_READY) {
-					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, RED);
-				} else if (cutState == CUT_READY) {
-					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, YELLOW);
-				} else {
-					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GREEN);
-				}
-				
+			lastTargetCircleX = centerX + dx;
+			lastTargetCircleY = centerY + dy;
+
+			if (cutState == NOT_CUT_READY) {
+				screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, RED);
+			} else if (cutState == NOT_USER_READY) {
+				screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, YELLOW);
 			} else {
-				if (holeDistance <= holeTolerance && within_hole_tol) {
-					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GREEN);
-				} else if (holeDistance <= holeTolerance*10 && within_hole_tol) {
-					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, YELLOW);
-				} else {
-					screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, RED);
-				}
+				screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, GREEN);
+			}
+				
+			break;
+		case 3:
+			for (int i = 0; i < 3; i++) {
+				int x = centerX + (progressRadius-1+i) * sinf(progressAngle);
+				int y = centerY - (progressRadius-1+i) * cosf(progressAngle);
+				screen->drawPixel(x, y, GREEN);
 			}
 			break;
 	}
 }
 
-void updateUI(float desPosition, Point goal, Point next) {
+void updateUI(Position desPosition, float progress) {
 	if ((millis()-lastDraw) > 15) {
-		iter = (iter + 1)%6;
+		iter = (iter + 1)%4;
 		// unsigned long now = micros();
-		// motorPosX = stepperX.currentPosition()*1.0f/Conv;
-		drawUI(desPosition, goal, next, iter);
+		// motorPosX = stepperX.currentPosition()*1.0f/ConvLead;
+		drawUI(desPosition, progress, iter);
 		// Serial.printf("draw %d took %i us\n", iter, micros()-now);
 		lastDraw = millis();
 	}

@@ -1,13 +1,14 @@
 #include "globals.h"
-#include "config.h"
 
 // Initialize hardware objects
-AccelStepper stepperX(motorInterfaceType, MOT_STEP_X, MOT_DIR_X);
+AccelStepper stepperR(motorInterfaceType, MOT_STEP_R, MOT_DIR_R);
+AccelStepper stepperL(motorInterfaceType, MOT_STEP_L, MOT_DIR_L);
 AccelStepper stepperZ(motorInterfaceType, MOT_STEP_Z, MOT_DIR_Z);
-TMC2209Stepper driverX(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS_X);
+TMC2209Stepper driverR(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS_R);
+TMC2209Stepper driverL(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS_L);
 TMC2209Stepper driverZ(&SERIAL_PORT, R_SENSE, DRIVER_ADDRESS_Z);
 PMW3360 sensors[4];
-EncoderButton encoder(ENCODER_PIN_A, ENCODER_PIN_B, ENCODER_BUTTON_PIN);
+EncoderButton encoder(ENCODER_PIN_A, ENCODER_PIN_B, ENCODER_BUTT);
 Arduino_DataBus *bus = new Arduino_HWSPI(TFT_DC, TFT_CS, &SPI1);
 Arduino_GFX *screen = new Arduino_GC9A01(bus, TFT_RST, 0, true);
 SdFat sd;
@@ -15,16 +16,14 @@ SdFat sd;
 // State variables
 State state = POWER_ON;
 CutState cutState = NOT_CUT_READY;
-bool path_started = false;
+bool running = false;
 bool valid_sensors = true;
 DesignType designType = PRESET;
 bool plungeReady = false;
 
 // Path data
-Path paths[MAX_PATHS];
-uint16_t num_paths = 0;
-uint16_t current_path_idx = 0;
-uint16_t current_point_idx = 0;
+Path path;
+int current_point_idx = 0;
 
 // SD Stuff
 FsFile logFile;
@@ -44,17 +43,15 @@ float calPos[2][4] = {{0.0f,0.0f,0.0f,0.0f},
 						{0.0f,0.0f,0.0f,0.0f}};		// used for calibration
 CalParams cal[4];
 
-// Display variables
-int16_t radius = 0;
-int16_t centerX = 0;
-int16_t centerY = 0;
+// Kinematics
+float feedrate = feedrate_default;						// speed of tracking (mm/s)			TODO: make this modifiable (and change units to mm)
 
 // Mode select
 bool plottingOn = false;			// plot values
 bool debuggingOn = false;			// print debug statements
 bool stopwatchOn = false;
-bool outputSerialOn = false;		// output data to serial
-bool outputSDOn = true;				// output data to SD card
+bool outputSerialOn = false;				// output data to serial
+bool outputSDOn = false;				// output data to SD card
 int designOrCalibrate = 0;			// choose design or calibrate (0 or 1)
 int acceptCal = 0;					// accept calibration or not
 int designPreset = 0;				// choose the design 
@@ -75,5 +72,7 @@ long unsigned timeLastDebounce = 0;
 long unsigned lastDraw = 0;
 long unsigned timeLastPoll = 0;
 long unsigned sensingTime = 0;
+elapsedMicros runTimer;
 elapsedMicros filemicros;
+elapsedMillis speedRunTimer;
 uint8_t iter = 0;

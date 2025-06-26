@@ -2,19 +2,21 @@
 #define GLOBALS_H
 
 #include <Arduino.h>
-#include "config.h"
-#include "types.h"
 #include <AccelStepper.h>
 #include <TMCStepper.h>
 #include <PMW3360.h>
 #include <SdFat.h>
 #include <Arduino_GFX_Library.h>
 #include <EncoderButton.h>
+#include "config.h"
+#include "types.h"
 
 // Global object declarations
-extern AccelStepper stepperX;
+extern AccelStepper stepperR;
+extern AccelStepper stepperL;
 extern AccelStepper stepperZ;
-extern TMC2209Stepper driverX;
+extern TMC2209Stepper driverR;
+extern TMC2209Stepper driverL;
 extern TMC2209Stepper driverZ;
 extern PMW3360 sensors[4];
 extern EncoderButton encoder;
@@ -24,17 +26,15 @@ extern SdFat sd;
 // State variables
 extern State state;
 extern CutState cutState;
-extern bool path_started;
+extern bool running;
 extern bool valid_sensors;
 extern float motorPosX;
 extern DesignType designType;
 extern bool plungeReady;
 
 // Path data
-extern Path paths[MAX_PATHS];
-extern uint16_t num_paths;
-extern uint16_t current_path_idx;
-extern uint16_t current_point_idx;
+extern Path path;
+extern int current_point_idx;
 
 // SD stuff
 extern FsFile logFile;
@@ -52,10 +52,8 @@ extern float calPos[2][4];
 // Calibration data
 extern CalParams cal[4];
 
-// Display variables
-extern int16_t radius;
-extern int16_t centerX;
-extern int16_t centerY;
+// Kinematics
+extern float feedrate;						// speed of tracking (mm/s)
 
 // Mode flags
 extern bool plottingOn;
@@ -83,7 +81,9 @@ extern long unsigned timeLastDebounce;
 extern long unsigned lastDraw;
 extern long unsigned timeLastPoll;
 extern long unsigned sensingTime;
+extern elapsedMicros runTimer;
 extern elapsedMicros filemicros;
+extern elapsedMillis speedRunTimer;
 extern uint8_t iter;
 
 #endif

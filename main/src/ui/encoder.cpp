@@ -1,11 +1,8 @@
 #include "encoder.h"
-#include "../config.h"
-#include "../globals.h"
-#include "../motors/motors.h"
-#include "display.h"
-#include "../path/path-generators.h"
-#include "../io/logging.h"
-#include "../sensors/sensors.h"
+
+// #define NUM_DESIGNS 		9
+#define NUM_DESIGNS 		8
+
 
 void nullHandler(EncoderButton &eb) {
 	Serial.println("null handler called");
@@ -13,25 +10,22 @@ void nullHandler(EncoderButton &eb) {
 }
 
 // CLICK HANDLERS ----------------------------------------
-void onClickGoToSetThickness(EncoderButton &eb) {
-	// Close SD if open
-	closeSDFile();
-	Serial.println("SD card file has been closed.");
+void onClickGoToDesignMode(EncoderButton &eb) {
+	encoderDesignType();
+}
 
-	state = RESET;
+// Reset design (from triple click)
+void onClickResetState(EncoderButton &eb) {
+	state = ZEROED;
+	// TODO: reset goal point after triple click
+
 	encoderSetThickness();
 }
 
-void onClickResetState(EncoderButton &eb) {
-	drawCenteredText("Zero Machine X", 2);
-	state = POWER_ON;
-	encoder.setClickHandler(onClickZeroMachineX);
-}
-
-void onClickZeroMachineX(EncoderButton &eb) {
-	drawCenteredText("Zeroing Machine X...", 2);
-	machineZeroX();
-	state = MACHINE_X_ZERO;
+void onClickZeroMachineXY(EncoderButton &eb) {
+	drawCenteredText("Zeroing Machine XY...", 2);
+	machineZeroXY();
+	state = MACHINE_XY_ZERO;
 	drawCenteredText("Zero Workspace Z", 2);
 	encoder.setClickHandler(onClickZeroWorkspaceZ);
 }
@@ -73,20 +67,20 @@ void onClickMakePath(EncoderButton &eb) {
 	if (designType == PRESET) {
 		makePresetPath();
 		state = DESIGN_SELECTED;
-	} else {
+	} else if (designType == FROM_FILE) {
 		handleFileSelection();
 		if (state != DESIGN_SELECTED) {
 			updateFileList();
 			listFiles();
 		}
+	} else {
+		handleSpeedRun();
+		state = DESIGN_SELECTED;
 	}
 }
 
-void onClickExecutePath(EncoderButton &eb) {
-	if (paths[current_path_idx].feature == DRILL) {
-		Serial.println("Plunge ready!");
-		plungeReady = true;
-	}
+void onClickEndScreen(EncoderButton &eb) {
+	state = POWER_ON;
 }
 
 // ENCODER HANDLERS ----------------------------------------
@@ -116,9 +110,9 @@ void onEncoderAcceptCalibration(EncoderButton &eb) {
 }
 
 void onEncoderSwitchType(EncoderButton &eb) {
-	designType = (DesignType)((2 + designType + eb.increment()) % 2);
-	const char* options[] = {"Preset", "From File"};
-	drawMenu(options, 2, designType);
+	designType = (DesignType)((3 + designType + eb.increment()) % 3);
+	const char* options[] = {"Preset", "From File", "Speed Run"};
+	drawMenu(options, 3, designType);
 }
 
 void onEncoderUpdateDesign(EncoderButton &eb) {
@@ -127,8 +121,24 @@ void onEncoderUpdateDesign(EncoderButton &eb) {
 		drawShape();
 	} else {
 		current_file_idx = (totalFiles + current_file_idx + eb.increment()) % totalFiles;
+		Serial.printf("File index: %i\n", current_file_idx);
 		listFiles();
 	}
+
+}
+
+void onEncoderSetSpeed(EncoderButton &eb) {
+	float maxSpeed = 0.5 * maxSpeedAB / ConvBelt;
+	float incrScalar = 1.0;
+	float tempSpeed = feedrate + eb.increment()*incrScalar;
+
+	if (tempSpeed <= maxSpeed && tempSpeed >= 1.0) {
+		feedrate = tempSpeed;
+	}
+	
+	char text2send[50];
+	sprintf(text2send, "Turn to\nset speed\n%.2f mm/s", feedrate);
+	drawCenteredText(text2send, 2);
 
 }
 
@@ -167,8 +177,8 @@ void encoderDesignOrCalibrate() {
 }
 
 void encoderDesignType() {
-	const char* options[] = {"Preset", "From File"};
-	drawMenu(options, 2, designType);
+	const char* options[] = {"Preset", "From File", "Speed Run"};
+	drawMenu(options, 3, designType);
 
 	encoder.setEncoderHandler(onEncoderSwitchType);
 	encoder.setClickHandler(onClickSetType);
@@ -181,35 +191,44 @@ void encoderDesignType() {
 }
 
 void encoderDesignSelect() {
+	state = SELECTING_DESIGN;
+	encoder.setEncoderHandler(onEncoderUpdateDesign);
+	encoder.setClickHandler(onClickMakePath);
+
 	if (designType == PRESET) {
 		drawShape();
-	} else {
+	} else if (designType == FROM_FILE){
 		updateFileList();
 		listFiles();
+	} else {
+		char text2send[50];
+		sprintf(text2send, "Turn to\nset speed\n%.2f mm/s", feedrate);
+		drawCenteredText(text2send, 2);
+
+		encoder.setEncoderHandler(onEncoderSetSpeed);
 	}
 	
 	closeSDFile();
 
-	encoder.setEncoderHandler(onEncoderUpdateDesign);
-	encoder.setClickHandler(onClickMakePath);
-
-	while (state != DESIGN_SELECTED && state != READY) {
+	while (state != DESIGN_SELECTED) {
 		encoder.update();
 		if (designType == FROM_FILE) listFiles();
 	}
 
 	// Hack for opensauce, auto-zero XY
+	// TODO: remove this
 	workspaceZeroXY();
 
 	// Reset cutting path
-	path_started = false;
-	current_path_idx = 0;
+	running = true;
 	current_point_idx = 0;
+	if (designType != SPEED_RUN) feedrate = feedrate_default;	// reset feedrate to default (NOTE: only RMRRF addition)
+	speedRunTimer = 0;
 
 	state = READY;
 	cutState = NOT_CUT_READY;
 	encoder.setEncoderHandler(nullHandler);
-	encoder.setClickHandler(onClickExecutePath);
+	encoder.setClickHandler(nullHandler);
 
 	screen->fillScreen(BLACK);
 	drawFixedUI();
@@ -228,17 +247,34 @@ void encoderZeroWorkspaceXY() {
 		encoder.update();
 	}
 
-	if (!path_started) {
+	if (!running) {
+		// TODO: look into this. Not really sure the use case here. Maybe re-zeroing mid cut?
 		// Reset cutting path
-		path_started = false;
-		current_path_idx = 0;
+		running = true;
 		current_point_idx = 0;
 	}
 
 	state = READY;
 	encoder.setEncoderHandler(nullHandler);
-	encoder.setClickHandler(onClickExecutePath);
+	encoder.setClickHandler(nullHandler);
 
 	screen->fillScreen(BLACK);
 	drawFixedUI();
+}
+
+void encoderEndScreen() {
+	if (designType != SPEED_RUN) {
+		drawCenteredText("WOOO nice job!", 2);
+	} else {
+		char text2send[50];
+		sprintf(text2send, "WOW!\nYour time was:\n%.2fs", speedRunTimer/1000.0);
+		drawCenteredText(text2send, 2);
+		feedrate = feedrate_default;	// reset feedrate to default (NOTE: only RMRRF addition)
+	}
+
+	// stay here until encoder is clicked
+	encoder.setClickHandler(onClickEndScreen); // prevent accidental state changes
+	while (state != POWER_ON) {
+		encoder.update();
+	}
 }

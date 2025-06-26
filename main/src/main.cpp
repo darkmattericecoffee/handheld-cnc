@@ -2,7 +2,7 @@
 #include "config.h"
 #include "types.h"
 #include "globals.h"
-#include "motors/motors.h"
+#include "actuation/motors.h"
 #include "sensors/sensors.h"
 #include "ui/display.h"
 #include "ui/encoder.h"
@@ -20,10 +20,6 @@ void setup() {
 	if (!screen->begin()) { Serial.println("screen->begin() failed!"); }
 
 	screen->fillScreen(BLACK);
-
-	radius = screen->width()*0.95 / 4;
-	centerX = screen->width() / 2;
-	centerY = screen->width() / 2;
 
 	drawCenteredText("Initializing...", 2);
 	delay(200);
@@ -54,32 +50,26 @@ void setup() {
 		Serial.println("Initialization done.");
 	}
 
-	encoder.setClickHandler(onClickZeroMachineX);
-	encoder.setTripleClickHandler(onClickGoToSetThickness);
-	onClickResetState(encoder);
+	drawCenteredText("Zero Machine XY", 2);
+	encoder.setClickHandler(onClickZeroMachineXY);
+	encoder.setTripleClickHandler(onClickResetState);
 }
 
 void loop() {
-	timeLoopStart = micros();
-
 	// Sensing
-	unsigned long startSensingTime = micros();
-	if(micros() - timeLastPoll >= dt) {
-		doSensing();
-	}
-	sensingTime_debug = micros() - startSensingTime;
+    if(micros() - timeLastPoll >= dt) {
+        sensingTime = micros() - timeLastPoll;
+        doSensing();
+    }
 
 	// Run steppers
-	unsigned long startStepperTime = micros();
-	stepperX.run();
+	stepperR.run();
+	stepperL.run();
 	stepperZ.run();
 	encoder.update();
-	stepperTime = micros() - startStepperTime;
 
 	// Serial handling
-	unsigned long startSerialTime = micros();
 	handleSerial();
-	serialTime = micros() - startSerialTime;
 
 	// --Break here until we are ready to cut--
 	if (state != READY) {
@@ -88,20 +78,19 @@ void loop() {
 	}
 
 	// Safety stuff
-	unsigned long startSafetyTime = micros();
 	if (!checkEndstops()) {
-		safetyTime = micros() - startSafetyTime;
-		totalLoopTime = micros() - timeLoopStart;
+		// safetyTime = micros() - startSafetyTime;
+		// totalLoopTime = micros() - timeLoopStart;
 		return;
 	}
-	safetyTime = micros() - startSafetyTime;
 
 	// Cutting
-	unsigned long startCuttingTime = micros();
-	handleCutting();
-	cuttingTime = micros() - startCuttingTime;
-
-	totalLoopTime = micros() - timeLoopStart;
+	// handleChickenHead();
+	if (runTimer >= dtControl) {
+		// TODO: tighten this control loop
+		runTimer = 0;
+		handleCutting(dtControl);		// TODO: make deltaTime a variable
+	}
 
 	// Debugging
 	if (stopwatchOn) {

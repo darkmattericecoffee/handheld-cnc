@@ -1,7 +1,4 @@
 #include "geometry.h"
-#include "../globals.h"
-#include "../config.h"
-#include <Arduino.h>
 
 float myDist(float x1, float y1, float x2, float y2) {
 	// Calculate the Euclidean distance between two points
@@ -33,7 +30,7 @@ float principalAngleRad(float x) {
 	return x;
 }
 
-float mapF(long x, float in_min, float in_max, float out_min, float out_max) {
+float mapF(float x, float in_min, float in_max, float out_min, float out_max) {
 	// Maps a float value from one range to another
 	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
@@ -87,91 +84,4 @@ int direction(Point g, Point n) {
 	} else {
 		return 0;
 	}
-}
-
-float desPosIntersect(RouterPose rPose, Point point3, Point point4) {
-	// Returns the desired stepperX position such that the cutting tool intersects 
-	// the infinite line from point3 to point4.
-	// If the gantry does not intersect the line, this returns NAN.
-	// rPose is the current pose of the router.
-	
-	// Calculate gantry endpoints
-	float x1 = rPose.x - (cosf(rPose.yaw) * xUsable / 2);
-	float y1 = rPose.y - (sinf(rPose.yaw) * xUsable / 2);
-	float x2 = rPose.x + (cosf(rPose.yaw) * xUsable / 2);
-	float y2 = rPose.y + (sinf(rPose.yaw) * xUsable / 2);
-	
-	// Calculate intersection using line-line intersection formula
-	float den = (x1 - x2) * (point3.y - point4.y) - (y1 - y2) * (point3.x - point4.x);
-
-	// Check for parallel lines (denominator is zero)
-	if (den == 0) {
-		// Serial.println("parallel");
-		return NAN;
-	}
-
-	float t = ((x1 - point3.x) * (point3.y - point4.y) - (y1 - point3.y) * (point3.x - point4.x)) / den;
-	
-	// Check if the intersection point is on the gantry
-	if (t < 0 || t > 1) {
-		// Serial.println("not on gantry");
-		return NAN;
-	}
-	
-	// Calculate intersection point
-	float x = x1 + t * (x2 - x1);
-	float y = y1 + t * (y2 - y1);
-
-	// Convert to gantry coordinates
-	float dx = x - rPose.x;
-	float dy = y - rPose.y;
-
-	return dx * cosf(rPose.yaw) + dy * sinf(rPose.yaw);
-}
-
-float desPosClosestToIntersect(RouterPose rPose, Point point3, Point point4) {
-	// Returns the desired stepperX position such that the cutting tool intersects 
-	// the infinite line from point3 to point4.
-	// If the gantry does not intersect the line, this returns the position
-	// that gets the tool closest to intersecting the line.
-	
-	// Calculate gantry endpoints
-	float x1 = rPose.x - (cosf(rPose.yaw) * xUsable / 2);
-	float y1 = rPose.y - (sinf(rPose.yaw) * xUsable / 2);
-	float x2 = rPose.x + (cosf(rPose.yaw) * xUsable / 2);
-	float y2 = rPose.y + (sinf(rPose.yaw) * xUsable / 2);
-	
-	float den = (x1 - x2) * (point3.y - point4.y) - (y1 - y2) * (point3.x - point4.x);
-
-	// Check for parallel lines (denominator is zero)
-	if (den == 0) {
-		return stepperX.currentPosition() * 1.0f / Conv;
-	}
-
-	float t = ((x1 - point3.x) * (point3.y - point4.y) - (y1 - point3.y) * (point3.x - point4.x)) / den;
-	
-	// Calculate intersection point
-	float x = x1 + t * (x2 - x1);
-	float y = y1 + t * (y2 - y1);
-
-	// Convert to gantry coordinates
-	float dx = x - rPose.x;
-	float dy = y - rPose.y;
-
-	float desiredPos = dx * cosf(rPose.yaw) + dy * sinf(rPose.yaw);
-	float maxPos = (xUsable / 2.0);
-
-	return clamp(desiredPos, -maxPos, maxPos);
-}
-
-float desPosSimple(RouterPose rPose, Point goal) {
-	float dx = goal.x - rPose.x;
-	float dy = goal.y - rPose.y;
-	// Calculate the desired position for the tool perpenidcular 
-	float desiredPos = (dx + tanf(rPose.yaw) * dy) * cosf(rPose.yaw);
-	// This can also be written as:
-	// return dx * cosf(rPose.yaw) + dy * sinf(rPose.yaw);
-	float maxPos = (xUsable / 2.0);
-
-	return clamp(desiredPos, -maxPos, maxPos);
 }
