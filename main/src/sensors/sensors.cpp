@@ -91,14 +91,15 @@ void doSensing() {
 		float dx = -convTwosComp(data[i].dx);
 		float dy = convTwosComp(data[i].dy);
 		surfaceQuality[i] = data[i].SQUAL;
-		if (surfaceQuality[i] > 20) {
-			measVel[0][i] = cal[i].x * (dx*cosf(cal[i].r) - dy*sinf(cal[i].r)) / sensingTime;
-			measVel[1][i] = cal[i].y * (dx*sinf(cal[i].r) + dy*cosf(cal[i].r)) / sensingTime;
-		} else {
-			// TODO: why are we evaluating the sensor validity below instead of here?
-			measVel[0][i] = NAN;
-			measVel[1][i] = NAN;
-		}
+		// TODO: find better way to check for bad readings. surfaceQuality does not seem to be reliable
+		// if (surfaceQuality[i] > 20) {
+		measVel[0][i] = cal[i].x * (dx*cosf(cal[i].r) - dy*sinf(cal[i].r)) / sensingTime;
+		measVel[1][i] = cal[i].y * (dx*sinf(cal[i].r) + dy*cosf(cal[i].r)) / sensingTime;
+		// } else {
+		// 	// TODO: why are we evaluating the sensor validity below instead of here?
+		// 	measVel[0][i] = NAN;
+		// 	measVel[1][i] = NAN;
+		// }
 
 		// Store sensor data for logging
 		// TODO: store the raw int and byte data instead and do twosComp in the decoder
