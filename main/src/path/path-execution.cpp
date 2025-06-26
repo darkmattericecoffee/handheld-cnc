@@ -104,13 +104,6 @@ void handleCutting(long deltaTime) {
 		stepperZ.moveTo(ConvLead*restHeight);
 	}
 
-	// Path logging
-	if (outputSerialOn) outputSerial(goal, stepperX.currentPosition()*1.0f/Conv, desPos);
-	if (outputSDOn)	writeAuxData(goal, stepperX.currentPosition()*1.0f/Conv, desPos);
-
-	// Debugging
-	if (debuggingOn) debugging(goal, next);
-
 	// Update UI
 	updateUI(desPos, (float)current_point_idx/(float)path.numPoints);
 
