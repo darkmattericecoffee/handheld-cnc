@@ -8,9 +8,9 @@
 #define SS1					10
 #define SS2					31
 #define SS3					32
-#define LIMIT_MACH_X0       6
-#define LIMIT_MACH_Y0		7	// NOTE: this is currently soldered, not on PCB
-#define LIMIT_MACH_Z0       5
+#define LIMIT_MACH_X0       5
+#define LIMIT_MACH_Y0		6
+#define LIMIT_MACH_Z0       7
 #define BUTT_HANDLE_L       2
 #define BUTT_HANDLE_R       3
 #define ENCODER_PIN_A       22
