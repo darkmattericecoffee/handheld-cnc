@@ -114,9 +114,9 @@ class Position {
 
 // Calibration parameters
 typedef struct CalParams {
-	float x = 0.01f;		// x scalar
-	float y = 0.01f;		// y scalar
-	float r = 0.0f;			// sensor rotation
+	float x = 25.4 / CPI;		// x scalar (default based on sensor CPI)
+	float y = 25.4 / CPI;		// y scalar (default based on sensor CPI)
+	float r = 0.0f;				// sensor rotation
 } CalParams;
 
 // Coordinate

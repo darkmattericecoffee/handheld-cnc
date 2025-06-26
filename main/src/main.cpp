@@ -37,7 +37,7 @@ void setup() {
 	pinMode(BUTT_HANDLE_L, INPUT);
 	pinMode(BUTT_HANDLE_R, INPUT);
 
-	// Setup systems
+	// Set up systems
 	sensorSetup();
 	motorSetup(); 
 	driverSetup();
@@ -45,9 +45,10 @@ void setup() {
 	Serial.print("Initializing SD card...");
 	if (!sd.begin(SdioConfig(FIFO_SDIO))) {
 		Serial.println("Initialization failed!");
-		return;
+		outputSDOn = false;
+	} else {
+		Serial.println("Initialization done.");
 	}
-	Serial.println("Initialization done.");
 
 	drawCenteredText("Zero Machine XY", 2);
 	encoder.setClickHandler(onClickZeroMachineXY);

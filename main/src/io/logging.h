@@ -79,7 +79,7 @@ struct AuxPacket {
 
 // Serial logging functions
 void handleSerial();
-void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos);
+void outputSerial(Point goal, float toolPos, float desPos);
 
 // Debugging functions
 void debugging(Point point1, Position pos);

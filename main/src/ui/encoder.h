@@ -12,7 +12,6 @@
 
 // Basic handlers
 void nullHandler(EncoderButton &eb);
-void onClickGoToDesignMode(EncoderButton &eb);
 void onClickGoToSetThickness(EncoderButton &eb);
 void onClickResetState(EncoderButton &eb);
 

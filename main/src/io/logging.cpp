@@ -269,23 +269,23 @@ void parseGCodeFile(const String& sFilename) {
 	file.close();
 }
 
-// Write ------------------------------------------------------
-void outputSerial(RouterPose rPose, Point goal, float toolPos, float desPos) {
+// Write to Serial ------------------------------------------------------
+void outputSerial(Point goal, float toolPos, float desPos) {
 	if(millis() - timeLastOutput >= dtOutput) {
 		timeLastOutput = millis();
 
 		// Calculate tool and desired positions
-		float toolX = rPose.x + toolPos*cosf(rPose.yaw);
-		float toolY = rPose.y + toolPos*sinf(rPose.yaw);
+		float toolX = pose.x + toolPos*cosf(pose.yaw);
+		float toolY = pose.y + toolPos*sinf(pose.yaw);
 
-		float desX = rPose.x + desPos*cosf(rPose.yaw);
-		float desY = rPose.y + desPos*sinf(rPose.yaw);
+		float desX = pose.x + desPos*cosf(pose.yaw);
+		float desY = pose.y + desPos*sinf(pose.yaw);
 
 		Serial.printf(
 			"POS:%f,%f,%f,%f,%f,%f,%f,%f,%f,%i,%f\n",
-			rPose.x,
-			rPose.y,
-			rPose.yaw,
+			pose.x,
+			pose.y,
+			pose.yaw,
 			goal.x,
 			goal.y,
 			toolX,
@@ -401,6 +401,8 @@ void stopwatch() {
 		Serial.println(safetyTime);
 		Serial.print("Cutting Time: ");
 		Serial.println(cuttingTime);
+		Serial.print("SD Log Time: ");
+		Serial.println(SDLogTime);
 		Serial.println("=====================================");
 	}
 }

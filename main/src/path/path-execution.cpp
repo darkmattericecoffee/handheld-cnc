@@ -64,16 +64,18 @@ void handleCutting(long deltaTime) {
 	// bool within_hole_tol = abs(signedDist(pose, goal)) < holeTolerance;
 
 	// TODO: delete me
-	// bool newChecks[4] = {handle_buttons_ok};
-	// bool logged = false;
-	// for (int i=0; i<4; i++) {
-	// 	if (prevChecks[i] != newChecks[i] && !logged) {
-	// 	Serial.println("Checks have changed:");
-	// 	Serial.printf("\thandle_buttons_ok: %d\n", handle_buttons_ok);
-	// 	logged = true;
-	// 	}
-	// 	prevChecks[i] = newChecks[i];
-	// }
+	bool newChecks[3] = {handle_buttons_ok, valid_sensors, actuator.validMotion};
+	bool logged = false;
+	for (int i=0; i<3; i++) {
+		if (prevChecks[i] != newChecks[i] && !logged) {
+		Serial.printf("Checks have changed t=%d:", millis());
+		Serial.printf("\thandle_buttons_ok: %d\n", handle_buttons_ok);
+		Serial.printf("\tvalid_sensors: %d\n", valid_sensors);
+		Serial.printf("\tactuator.validMotion: %d\n", actuator.validMotion);
+		logged = true;
+		}
+		prevChecks[i] = newChecks[i];
+	}
 
 	// TODO: handle valid_sensors better (want to prompt re-zeroing if sensors are bad)
 	// if (handle_buttons_ok && valid_sensors && path.points[current_point_idx].feature == NORMAL) {

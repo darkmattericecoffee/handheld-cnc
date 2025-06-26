@@ -8,20 +8,20 @@
 #define SS1					10
 #define SS2					31
 #define SS3					32
-#define LIMIT_MACH_X0       6
-#define LIMIT_MACH_Y0		7	// NOTE: this is currently soldered, not on PCB
-#define LIMIT_MACH_Z0       5
+#define LIMIT_MACH_X0       5
+#define LIMIT_MACH_Y0		6
+#define LIMIT_MACH_Z0       7
 #define BUTT_HANDLE_L       2
 #define BUTT_HANDLE_R       3
 #define ENCODER_PIN_A       22
 #define ENCODER_PIN_B       21
 #define ENCODER_BUTT	  	4
-#define MOT_EN_R    		23
-#define MOT_DIR_R   		18
-#define MOT_STEP_R  		19
-#define MOT_EN_L    		15
-#define MOT_DIR_L   		38
-#define MOT_STEP_L  		39
+#define MOT_EN_L    		23
+#define MOT_DIR_L   		18
+#define MOT_STEP_L  		19
+#define MOT_EN_R    		15
+#define MOT_DIR_R   		38
+#define MOT_STEP_R  		39
 #define MOT_EN_Z    		41
 #define MOT_DIR_Z   		36
 #define MOT_STEP_Z  		33
@@ -31,8 +31,8 @@
 #define TFT_BL				24
 
 // Driver settings
-#define DRIVER_ADDRESS_R	0b00
-#define DRIVER_ADDRESS_L  	0b01
+#define DRIVER_ADDRESS_L	0b00
+#define DRIVER_ADDRESS_R  	0b01
 #define DRIVER_ADDRESS_Z	0b10
 #define R_SENSE            	0.11f
 #define SERIAL_PORT     	Serial4
@@ -97,10 +97,10 @@ const float wallBuffer = 3.0;						// safety buffer between tool body and walls 
 // Timing constants
 const long unsigned debounceDelay = 50;			// the debounce time; increase if the output flickers
 const long unsigned dtDebug = 500;				// (ms)
-const long unsigned dtStopwatch = 500;				// time interval for loop timing (ms)
+const long unsigned dtStopwatch = 500;			// time interval for loop timing (ms)
 const long unsigned dtPlot = 50;				// (ms)
 const long unsigned dtOutput = 20;				// (ms)
-const long unsigned dtOutputSD = 10;			// (ms)
+const long unsigned dtOutputSD = 10;			// time interval for auxiliary SD logging (ms)
 const long unsigned dt = 900;					// length of sensor timestep (us)(freq = 1,000,000/timestepPoll [Hz])
 const long unsigned dtControl = 500;			// length of control timestep (us)(freq = 1,000,000/timestepControl [Hz])
 

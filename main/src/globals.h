@@ -51,7 +51,6 @@ extern float calPos[2][4];
 
 // Calibration data
 extern CalParams cal[4];
-extern float selfCal[2][3];
 
 // Kinematics
 extern float feedrate;						// speed of tracking (mm/s)
@@ -78,6 +77,7 @@ extern long unsigned stepperTime;
 extern long unsigned serialTime;
 extern long unsigned safetyTime;
 extern long unsigned cuttingTime;
+extern long unsigned SDLogTime;
 extern long unsigned timeLoopStart;
 extern long unsigned timeLastDebounce;
 extern long unsigned lastDraw;

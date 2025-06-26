@@ -194,7 +194,7 @@ void encoderSetThickness() {
 	encoder.setEncoderHandler(onEncoderUpdateThickness);
 	encoder.setClickHandler(onClickSetThickness);
 
-	while (state != THICKNESS_SET) {
+	while (state != THICKNESS_SET  && state != READY) {
 		encoder.update();
 	}
 
@@ -208,7 +208,7 @@ void encoderDesignOrCalibrate() {
 	encoder.setEncoderHandler(onEncoderDesignOrCalibrate);
 	encoder.setClickHandler(onClickSetDoC);
 
-	while (state != DOC_SELECTED) {
+	while (state != DOC_SELECTED  && state != READY) {
 		encoder.update();
 	}
 
@@ -226,7 +226,7 @@ void encoderDesignType() {
 	encoder.setEncoderHandler(onEncoderSwitchType);
 	encoder.setClickHandler(onClickSetType);
 
-	while (state != TYPE_SELECTED) {
+	while (state != TYPE_SELECTED  && state != READY) {
 		encoder.update();
 	}
 		
@@ -299,7 +299,7 @@ void encoderZeroWorkspaceXY() {
 	drawCenteredText("Zero workspace XY", 2);
 	encoder.setClickHandler(onClickZeroWorkspaceXY);
 
-	while (state != WORKSPACE_XY_ZERO) {
+	while (state != WORKSPACE_XY_ZERO  && state != READY) {
 		encoder.update();
 	}
 

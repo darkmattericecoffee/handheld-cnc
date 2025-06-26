@@ -13,8 +13,6 @@ Angle signage: +CCW
 static long unsigned timeLastPlot = 0;
 
 // Additional tracking variables
-static float estPosSen[2][4] = {{0.0f,0.0f,0.0f,0.0f},
-							   {0.0f,0.0f,0.0f,0.0f}};
 static int surfaceQuality[4] = {0,0,0,0};
 static float estVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
 							{0.0f,0.0f,0.0f,0.0f}};
@@ -29,6 +27,15 @@ void sensorSetup() {
 	int16_t centerY = screen->height() / 2;
 	int16_t totalHeight = 4 * size * 10;			// 4 lines, size 2, 10px per line
 	int16_t yStart = centerY - totalHeight / 2;
+	int16_t x1, y1;
+	uint16_t w, h;
+	char text[10];
+
+	sprintf(text, "v%s", FIRMWARE_VERSION);
+	screen->getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
+	int16_t xStart = centerX - w / 2;
+	screen->setCursor(xStart, yStart - size *10);
+	screen->println(text);
 
 	for (int i = 0; i < 4; i++) {
 		// display each sensors' initialization status on the screen, showing each sensor on a new line
@@ -47,12 +54,9 @@ void sensorSetup() {
 			Serial.println(" initialization failed");
 		}
 
-		int16_t x1, y1;
-		uint16_t w, h;
-		char text[10];
 		sprintf(text, "Sensor %i", i);
 		screen->getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
-		int16_t xStart = centerX - w / 2;
+		xStart = centerX - w / 2;
 		screen->setCursor(xStart, yStart + i * size * 10);
 		screen->println(text);
 	}
@@ -67,29 +71,41 @@ int16_t convTwosComp(int16_t value) {
 }
 
 void doSensing() {
+	// TODO: fix how sensingTime is implemented. Currently, on the first iteration, sensingTime
+	// 	is incredibly large because timeLastPoll is either 0 or set from a while ago. This usually
+	// 	isn't a huge issue because the router starts from rest, but there are certain cases where
+	//  this isn't true.
+	sensingTime = micros() - timeLastPoll;
 	timeLastPoll = micros();
+	unsigned long logTime = filemicros;
 
 	// Collect sensor data
 	PMW3360_DATA data[ns];
+	SensorData logData[ns];
 	for (int i = 0; i < ns; i++) {
 		data[i] = sensors[i].readBurst();
 	}
 
 	// Process sensor data
 	for (int i = 0; i < ns; i++) {
+		float dx = -convTwosComp(data[i].dx);
+		float dy = convTwosComp(data[i].dy);
 		surfaceQuality[i] = data[i].SQUAL;
-		if (surfaceQuality[i] > 20) {
-			float dx = -convTwosComp(data[i].dx);
-			float dy = convTwosComp(data[i].dy);
-			measVel[0][i] = cal[i].x * (dx*cosf(cal[i].r) - dy*sinf(cal[i].r)) / sensingTime;
-			measVel[1][i] = cal[i].y * (dx*sinf(cal[i].r) + dy*cosf(cal[i].r)) / sensingTime;
+		// TODO: find better way to check for bad readings. surfaceQuality does not seem to be reliable
+		// if (surfaceQuality[i] > 20) {
+		measVel[0][i] = cal[i].x * (dx*cosf(cal[i].r) - dy*sinf(cal[i].r)) / sensingTime;
+		measVel[1][i] = cal[i].y * (dx*sinf(cal[i].r) + dy*cosf(cal[i].r)) / sensingTime;
+		// } else {
+		// 	// TODO: why are we evaluating the sensor validity below instead of here?
+		// 	measVel[0][i] = NAN;
+		// 	measVel[1][i] = NAN;
+		// }
 
-			estPosSen[0][i] = estPosSen[0][i] + measVel[0][i]*sensingTime;
-			estPosSen[1][i] = estPosSen[1][i] + measVel[1][i]*sensingTime;
-		} else {
-			measVel[0][i] = NAN;
-			measVel[1][i] = NAN;
-		}
+		// Store sensor data for logging
+		// TODO: store the raw int and byte data instead and do twosComp in the decoder
+		logData[i].dx = dx;
+		logData[i].dy = dy;
+		logData[i].sq = data[i].SQUAL;
 	}
 
 	// Calculate angular velocities
@@ -105,24 +121,26 @@ void doSensing() {
 	// Average angular velocities
 	float sumAngVel = 0.0f;
 	float estAngVel1 = 0.0f;
-	int valalScalars = 0;
+	int num_good_calcs = 0;				// number of measurements that are valid
 	for (int i = 0; i < 8; i++) {
+		// filter out bad measurements
 		if (!isnan(estAngVel[i])) {
 			sumAngVel = sumAngVel + estAngVel[i];
-			valalScalars++;
+			num_good_calcs++;
 		}
 	}
 
-	if (valalScalars == 0) {
+	if (num_good_calcs == 0) {
 		// Serial.print("Sensors are poo-poo!");
 		valid_sensors = false;
 		return;
 	} else {
 		valid_sensors = true;
-		estAngVel1 = sumAngVel / valalScalars;
+		estAngVel1 = sumAngVel / num_good_calcs;
 	}
 
 	// Body position estimation
+	// TODO: turn this into "matrix" math
 	estVel[0][0] = measVel[0][0]*cosf(pose.yaw)-measVel[1][0]*sinf(pose.yaw) + 0.5*estAngVel1*(lx*cosf(pose.yaw)-(ly)*sinf(pose.yaw));
 	estVel[0][1] = measVel[0][1]*cosf(pose.yaw)-measVel[1][1]*sinf(pose.yaw) + 0.5*estAngVel1*(lx*cosf(pose.yaw)+(ly)*sinf(pose.yaw));
 	estVel[0][2] = measVel[0][2]*cosf(pose.yaw)-measVel[1][2]*sinf(pose.yaw) + 0.5*estAngVel1*(-lx*cosf(pose.yaw)-(ly)*sinf(pose.yaw));
@@ -136,15 +154,16 @@ void doSensing() {
 	float sumVelX = 0.0f;
 	float sumVelY = 0.0f;
 	float estVel1[2] = {0.0f, 0.0f};
-	valalScalars = 0;
+	num_good_calcs = 0;
 	for (int i = 0; i<ns; i++) {
+		// filter out bad measurements
 		if (!isnan(estVel[0][i]) && !isnan(estVel[1][i])) {
 			sumVelX = sumVelX + estVel[0][i];
 			sumVelY = sumVelY + estVel[1][i];
-			valalScalars++;
+			num_good_calcs++;
 		}
 	}
-	if (valalScalars == 0) {
+	if (num_good_calcs == 0) {
 		// TODO: make this prompt a re-zeroing
 		// Serial.print("Sensors are poo-poo!");
 		valid_sensors = false;
@@ -163,9 +182,12 @@ void doSensing() {
 	pose.x = pose.x + estVel1[0]*sensingTime;
 	pose.y = pose.y + estVel1[1]*sensingTime;
 
-	// Sensor plotting
-	if (plottingOn) {
-		sensorPlotting();
+	if (sensingTime > 1000 || sensingTime < 800) {
+		Serial.printf("%lu: sensing time = %lu\n", millis(), sensingTime);
+	}
+	// Write to SD card
+	if (outputSDOn) {
+		writeSensorData(logTime, logData, sensingTime);
 	}
 }
 
@@ -176,12 +198,13 @@ void doSensingLinear() {
     // Collect sensor data (raw)
  
     PMW3360_DATA data[4];
-    for (int i = 0; i < 4; i++) {
+	// TODO: SensorData logData[ns];
+    for (int i = 0; i < ns; i++) {
       data[i] = sensors[i].readBurst();
       surfaceQuality[i] = data[i].SQUAL;
     }
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < ns; i++) {
       // Sensor velocity sensing
       // measVel[0][i] = -convTwosComp(data[i].dx);     // '-' convention is used to flip sensor's z axis
       measVel[0][i] = -convTwosComp(data[i].dx);
@@ -193,7 +216,7 @@ void doSensingLinear() {
     }
 
     // Sensor plotting
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < ns; i++) {
 		float angle = 0.0f;
 		if (abs(calPos[0][i]) > abs(calPos[1][i])) {
 			angle = atan2f(-calPos[1][i],calPos[0][i]);
@@ -204,15 +227,18 @@ void doSensingLinear() {
 		Serial.println();
 	}
 	Serial.println();
+
+	// TODO: add in calibration logging
 }
 
 void sensorPlotting() {
 	if(millis() - timeLastPlot >= dtPlot) {
 		timeLastPlot = millis();
 
-		for (int i = 0; i < 4; i++) {
-			Serial.printf("x_%i:%f,y_%i:%f",i,estPosSen[0][i],i,estPosSen[1][i]);
-			Serial.println();
+		for (int i = 0; i < ns; i++) {
+			// NOTE: indiviudal sensor plotting is now done in calibration
+			// Serial.printf("x_%i:%f,y_%i:%f",i,estPosSen[0][i],i,estPosSen[1][i]);
+			// Serial.println();
 			Serial.printf("sq_%i:%d",i,surfaceQuality[i]);
 			Serial.println();
 		}
@@ -294,7 +320,7 @@ void calibrate() {
 			state = CALIBRATION;
 			
 			// Flush sensor readings then reset
-			for (int i = 0; i < 4; i++) {
+			for (int i = 0; i < ns; i++) {
 				sensors[i].readBurst();
 				calPos[0][i] = 0.0f;
 				calPos[1][i] = 0.0f;
@@ -311,7 +337,10 @@ void calibrate() {
 			}
 
 			while (state != CALIBRATION_ADVANCE) {
-				doSensingLinear();
+				if(micros() - timeLastPoll >= dt) {
+					doSensingLinear();
+				}
+
 				encoder.update();
 			}
 			

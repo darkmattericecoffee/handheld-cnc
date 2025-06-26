@@ -37,21 +37,19 @@ String fileList[MAX_FILES];
 RouterPose pose = {0.0f};
 float measVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
 						{0.0f,0.0f,0.0f,0.0f}};
-float calPos[2][4] = {{0.0f,0.0f,0.0f,0.0f},
-						{0.0f,0.0f,0.0f,0.0f}};
 
 // Calibration data
+float calPos[2][4] = {{0.0f,0.0f,0.0f,0.0f},
+						{0.0f,0.0f,0.0f,0.0f}};		// used for calibration
 CalParams cal[4];
-float selfCal[2][3] = {{1.0f,0.997606f,0.989168f},
-						{1.0f,1.004717f,1.000850f}};				// (UNUSED)
 
 // Kinematics
 float feedrate = feedrate_default;						// speed of tracking (mm/s)			TODO: make this modifiable (and change units to mm)
 float feedrateBoost = 1;								// feedrate boost factor (i.e. 1.0 = no boost, 2.0 = double speed, etc.)
 
 // Mode select
-bool plottingOn = false;			// plot values  (1 = yes; 0 = no)
-bool debuggingOn = false;			// print values (1 = yes; 0 = no)
+bool plottingOn = false;			// plot values
+bool debuggingOn = false;			// print debug statements
 bool stopwatchOn = false;
 bool outputSerialOn = false;				// output data to serial
 bool outputSDOn = false;				// output data to SD card
@@ -70,6 +68,7 @@ long unsigned stepperTime = 0;
 long unsigned serialTime = 0;
 long unsigned safetyTime = 0;
 long unsigned cuttingTime = 0;
+long unsigned SDLogTime = 0;
 long unsigned timeLoopStart = 0;
 long unsigned timeLastDebounce = 0;
 long unsigned lastDraw = 0;
