@@ -29,6 +29,7 @@ int current_point_idx = 0;
 FsFile logFile;
 FsFile root;
 FsFile currentDir;
+String currentPath = "/";
 int current_file_idx = 0;
 int totalFiles = 0;
 String fileList[MAX_FILES];
@@ -51,7 +52,7 @@ bool plottingOn = false;			// plot values
 bool debuggingOn = false;			// print debug statements
 bool stopwatchOn = false;
 bool outputSerialOn = false;				// output data to serial
-bool outputSDOn = false;				// output data to SD card
+bool outputSDOn = true;				// output data to SD card
 int designOrCalibrate = 0;			// choose design or calibrate (0 or 1)
 int acceptCal = 0;					// accept calibration or not
 int designPreset = 0;				// choose the design 

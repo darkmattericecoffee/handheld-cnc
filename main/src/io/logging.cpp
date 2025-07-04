@@ -70,12 +70,17 @@ void handleFileSelection() {
 			if (selectedFile == "..") {
 				// Handle going up one directory
 				currentDir.close();
+				currentPath = getParentPath(currentPath.c_str());
 				currentDir = sd.open(getParentPath(currentDirName));
 			} else {
 				// Handle entering a subdirectory
 				currentDir.close();
-				String newPath = String(currentDirName) + "/" + selectedFile;
-				currentDir = sd.open(newPath);
+				if (currentPath == "/") {
+					currentPath += selectedFile;
+				} else {
+					currentPath += "/" + selectedFile;
+				}
+				currentDir = sd.open(currentPath);
 			}
 			
 			current_file_idx = 0;
@@ -134,15 +139,12 @@ bool validCoordinate(const char* gLine) {
 }
 
 void parseGCodeFile(const String& sFilename) {
-	char currentDirName[256];
-	currentDir.getName(currentDirName, sizeof(currentDirName));
-	
-	// Construct full path by combining current directory and filename
+	// Construct full path by combining current path and filename
 	String fullPath;
-	if (strcmp(currentDirName, "/") == 0) {
+	if (currentPath == "/") {
 		fullPath = String("/") + sFilename;
 	} else {
-		fullPath = String(currentDirName) + "/" + sFilename;
+		fullPath = currentPath + "/" + sFilename;
 	}
 
 	const char* filePath = fullPath.c_str();
