@@ -40,6 +40,7 @@ extern int current_point_idx;
 extern FsFile logFile;
 extern FsFile root;
 extern FsFile currentDir;
+extern String currentPath;
 extern int current_file_idx;
 extern int totalFiles;
 extern String fileList[MAX_FILES];
