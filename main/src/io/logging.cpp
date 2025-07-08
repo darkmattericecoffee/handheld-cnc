@@ -139,6 +139,8 @@ bool validCoordinate(const char* gLine) {
 }
 
 void parseGCodeFile(const String& sFilename) {
+	// Update filename variable (for logging purposes only)
+	snprintf(filename, MAX_STRING_LENGTH, "%s", sFilename.c_str());
 	// Construct full path by combining current path and filename
 	String fullPath;
 	if (currentPath == "/") {
@@ -477,13 +479,12 @@ void writePathPoint(uint16_t pointIndex, Point point) {
 	if (logFile) {
 		PathPoint pathPoint;
 		pathPoint.packetType = PACKET_PATH_POINT;
-		// pathPoint.pathIndex = pathIndex;
 		pathPoint.pointIndex = pointIndex;
 		pathPoint.x = point.x;
 		pathPoint.y = point.y;
 		pathPoint.z = point.z;
 		pathPoint.featureType = point.feature;
-		
+
 		// Write the point to file
 		logFile.write((uint8_t*)&pathPoint, sizeof(PathPoint));
 	}
@@ -527,7 +528,6 @@ void writeAuxData(Point goal, float toolX, float toolY, float toolZ, Position de
 			packet.packetType = PACKET_AUX;
 			packet.time = filemicros;
 			packet.pose = pose;
-			// packet.currPathIndex = current_path_idx;
 			packet.currPointIndex = current_point_idx;
 			packet.goal = goal;
 			packet.toolX = toolX;
@@ -576,7 +576,6 @@ void logPath() {
 		if (designType == PRESET) {
 			char designName[MAX_STRING_LENGTH];
 			sprintf(designName, "preset_%i", designPreset);
-			Serial.printf("Logging to preset design: %s\n", designName);
 			writeFileHeader(designName, path.numPoints);
 		} else {
 			writeFileHeader(filename, path.numPoints);

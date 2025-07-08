@@ -36,7 +36,6 @@ struct FileHeader {
 // Path point structure
 struct PathPoint {
 	uint8_t packetType;
-	uint16_t pathIndex;
 	uint16_t pointIndex;
 	float x;
 	float y;

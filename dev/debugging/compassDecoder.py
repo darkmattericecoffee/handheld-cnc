@@ -10,29 +10,28 @@ import mplcursors
 PACKET_START = 0xAA
 PACKET_END = 0x55
 PACKET_HEADER = 0xA0
-PACKET_PATH = 0xA2
 PACKET_PATH_POINT = 0xA3
 PACKET_SENSORS = 0x01
 PACKET_AUX = 0x02
 MAX_STRING_LENGTH = 32
 
 """NOTE: The following decoder is based on the following firmware version"""
-working_version = "0.1.1"
+working_version = "0.3.1"
 
 num_sensors = 4
 
 class CutState(IntEnum):
 	NOT_CUT_READY = 0
-	CUT_READY = 1
-	CUTTING = 2
-	PLUNGING = 3
-	RETRACTING = 4
+	NOT_USER_READY = 1
+	CUT_READY = 2
+	CUTTING = 3
+	PLUNGING = 4
+	RETRACTING = 5
 
 class BinaryLogDecoder:
 	def __init__(self, filename):
 		self.filename = filename
 		self.design_info = {}
-		self.paths = []
 		self.points = []
 		self.sensor_data = []
 		self.aux_data = []
@@ -52,13 +51,12 @@ class BinaryLogDecoder:
 						
 					# Rewind one byte so we can process the packet type in the appropriate function
 					f.seek(-1, os.SEEK_CUR)
-					
+					byte_index = f.tell()
+
 					# Process based on packet type
 					packet_type_val = int.from_bytes(packet_type, byteorder='little')
 
-					if packet_type_val == PACKET_PATH:
-						self._decode_path_info(f)
-					elif packet_type_val == PACKET_PATH_POINT:
+					if packet_type_val == PACKET_PATH_POINT:
 						self._decode_path_point(f)
 					elif packet_type_val == PACKET_START:
 						# Read the next byte to determine real packet type
@@ -116,9 +114,7 @@ class BinaryLogDecoder:
 			if firmware_version != working_version:
 				raise ValueError(f"Firmware version mismatch: expected {working_version}, got {firmware_version}")
 			design_name = f.read(MAX_STRING_LENGTH).decode('utf-8').rstrip('\x00')
-			f.read(1)  # Skip the padding byte
-			f.read(1)  # Skip the padding byte
-			f.read(1)  # Skip the padding byte
+			f.read(3)	 # Skip 3 bytes (padding)
 			cal_params = []
 			for i in range(num_sensors):
 				(cx, cy, cr) = struct.unpack('fff', f.read(12))
@@ -127,73 +123,44 @@ class BinaryLogDecoder:
 					'cy': cy,
 					'cr': cr
 				})
-			num_paths = struct.unpack('<H', f.read(2))[0]  # uint16_t
+			num_points = struct.unpack('<H', f.read(2))[0]  # uint16_t
 			
 			self.design_info = {
 				'firmware_version': firmware_version,
 				'design_name': design_name,
 				'cal_params': cal_params,
-				'num_paths': num_paths
+				'num_points': num_points
 			}
 
-			f.read(1)
-			f.read(1)
+			f.read(2)
 			
 			print(f"File Header: {self.design_info}")
+			print("byte index after header:", f.tell())
 			
 		except Exception as e:
 			print(f"Error decoding header: {e}")
 	
-	def _decode_path_info(self, f):
-		"""Decode path information."""
-		try:
-			# packet_type = int.from_bytes(f.read(1), byteorder='little')
-			# TODO: remove need for manual skipping of bytes
-			f.read(1)
-			f.read(1)
-			path_index = struct.unpack('<H', f.read(2))[0]  # uint16_t
-			feature_type = int.from_bytes(f.read(1), byteorder='little')
-			f.read(1)
-			
-			path_info = {
-				'path_index': path_index,
-				'feature_type': feature_type,
-				'points': []  # Will be filled with point indices
-			}
-			
-			self.paths.append(path_info)
-			print(f"Path Info: {path_info}")
-			
-		except Exception as e:
-			print(f"Error decoding path info: {e}")
-	
 	def _decode_path_point(self, f):
 		"""Decode a path point."""
 		try:
-			# packet_type = int.from_bytes(f.read(1), byteorder='little')
+			packet_type = int.from_bytes(f.read(1), byteorder='little')
 			f.read(1)
-			f.read(1)
-			(path_index, point_index) = struct.unpack('HH', f.read(4))  # uint16_t
-			f.read(1)
-			f.read(1)
+			point_index = struct.unpack('<H', f.read(2))[0]  # uint16_t
+			# f.read(2)
 			# Read point coordinates
 			(x,y,z) = struct.unpack('fff', f.read(12))
+			feature = int.from_bytes(f.read(1), byteorder='little')
+			f.read(3)
 			
 			point = {
-				'path_index': path_index,
 				'point_index': point_index,
 				'x': x,
 				'y': y,
-				'z': z
+				'z': z,
+				'feature': feature
 			}
 			
 			self.points.append(point)
-			
-			# Add point reference to the appropriate path
-			for path in self.paths:
-				if path['path_index'] == path_index:
-					path['points'].append(point_index)
-					break
 					
 		except Exception as e:
 			print(f"Error decoding path point: {e}")
@@ -248,18 +215,21 @@ class BinaryLogDecoder:
 		"""Decode an auxiliary data packet."""
 		try:
 			# We've already read packetType in the caller
-			byte_index = f.tell()
-			f.read(1)
-			f.read(1)
+			# byte_index = f.tell()
+			# print("entering aux at ", byte_index)
+			f.read(2)
 			time = struct.unpack('I', f.read(4))[0]  # uint32_t
-			#f.read(1)
 			(pose_x, pose_y, pose_yaw) = struct.unpack('fff', f.read(12))		# float x, y, z
-			curr_path_index = struct.unpack('<H', f.read(2))[0]					# uint16_t
 			curr_point_index = struct.unpack('<H', f.read(2))[0]				# uint16_t
-			(goal_x, goal_y, goal_z) = struct.unpack('fff', f.read(12))			# float x, y, z
-			(tool_pos,des_pos) = struct.unpack('ff', f.read(8))					# float x, y
+			# print("...after reading pose and curr_point_index", f.tell())
+			f.read(2)
+			(goal_x, goal_y, goal_z, fr) = struct.unpack('ffff', f.read(16))	# float x, y, z, fr
+			feature = int.from_bytes(f.read(1), byteorder='little')
+			f.read(3)
+			(tool_x, tool_y, tool_z) = struct.unpack('fff', f.read(12))			# float x, y, z
+			(des_x, des_y, des_z) = struct.unpack('fff', f.read(12))			# float x, y, z
 			cut_state = int.from_bytes(f.read(1), byteorder='little')			# int8_t
-			#f.read(1)
+			# f.read(1)
 			# f.read(1)
 			
 			end_marker = int.from_bytes(f.read(1), byteorder='little')
@@ -276,17 +246,30 @@ class BinaryLogDecoder:
 					'y': pose_y,
 					'yaw': pose_yaw
 				},
-				'curr_path_index': curr_path_index,
+				# 'curr_path_index': curr_path_index,
 				'curr_point_index': curr_point_index,
 				'goal': {
 					'x': goal_x,
 					'y': goal_y,
-					'z': goal_z
+					'z': goal_z,
+					'fr': fr,
+					'feature': feature
 				},
-				'tool_pos': tool_pos,
-				'des_pos': des_pos,
+				'tool_pos': {
+					'x': tool_x,
+					'y': tool_y,
+					'z': tool_z
+				},
+				'des_pos': {
+					'x': des_x,
+					'y': des_y,
+					'z': des_z
+				},
 				'cut_state': CutState(cut_state).name if cut_state < len(CutState) else f"UNKNOWN({cut_state})"
 			})
+
+			if (curr_point_index > 10):
+				blah = 1
 			
 		except Exception as e:
 			print(f"Error decoding aux packet: {e}")
@@ -333,7 +316,7 @@ class BinaryLogDecoder:
 				'pose_x': data['pose']['x'],
 				'pose_y': data['pose']['y'],
 				'pose_yaw': data['pose']['yaw'],
-				'curr_path_index': data['curr_path_index'],
+				# 'curr_path_index': data['curr_path_index'],
 				'curr_point_index': data['curr_point_index'],
 				'goal_x': data['goal']['x'],
 				'goal_y': data['goal']['y'],
@@ -366,12 +349,15 @@ class BinaryLogDecoder:
 		processed_data = []
 		last_pose = {'x': 0.0, 'y': 0.0, 'yaw': 0.0}  # Initial pose
 		cal_params = self.design_info['cal_params']
-		# Create interpolation function for tool position
-		tool_pos_interp = np.interp(
-			df['time'].unique(),
-			df_aux['time'],
-			df_aux['tool_pos']
-		)
+		# Interpolate tool_pos for each dimension
+		aux_times = df_aux['time'].to_numpy()
+		tool_pos_interp = {}
+		for dim in ['x', 'y', 'z']:
+			tool_pos_interp[dim] = np.interp(
+				df['time'].unique(),
+				aux_times,
+				df_aux['tool_pos'].apply(lambda d: d[dim]).to_numpy()
+			)
 
 		sensor_offsets = np.array([
 			[lx, lx, -lx, -lx],     # x offsets
@@ -382,7 +368,7 @@ class BinaryLogDecoder:
 		for ind, time in enumerate(df['time'].unique()):
 			time_df = df[df['time'] == time]
 			dt = time_df['dt'].iloc[0]				# dt is same for all sensors at this timestamp
-			tool_pos = tool_pos_interp[ind]
+			tool_pos = {dim: tool_pos_interp[dim][ind] for dim in ['x', 'y', 'z']}
 			
 			# Arrays to store measurements
 			meas_vel = [[0.0] * 4, [0.0] * 4]		# 2x4 array for x,y velocities
@@ -452,9 +438,6 @@ class BinaryLogDecoder:
 				pose['y'] += avg_vel_y * dt
 				last_pose = pose.copy()
 			
-			tool_pos_x = pose['x'] + tool_pos * np.cos(pose['yaw'])
-			tool_pos_y = pose['y'] + tool_pos * np.sin(pose['yaw'])
-			
 			processed_data.append({
 				'time': time,
 				'dt': dt,
@@ -465,10 +448,10 @@ class BinaryLogDecoder:
 				'ang_vel': avg_ang_vel,
 				'vel_x': avg_vel_x,
 				'vel_y': avg_vel_y,
-				'tool_pos_x': tool_pos_x,
-				'tool_pos_y': tool_pos_y
-			})	
-		
+				'tool_pos_x': tool_pos['x'],
+				'tool_pos_y': tool_pos['y']
+			})
+
 		return pd.DataFrame(processed_data)
 	
 	def plot_design(self):
@@ -479,22 +462,11 @@ class BinaryLogDecoder:
 			return
 			
 		plt.figure(figsize=(10, 8))
-		
-		# Group points by path
-		path_points = {}
-		for point in self.points:
-			path_idx = point['path_index']
-			if path_idx not in path_points:
-				path_points[path_idx] = []
-			path_points[path_idx].append(point)
-		
-		# Plot each path with a different color
-		for path_idx, points in path_points.items():
-			x = [p['x'] for p in sorted(points, key=lambda p: p['point_index'])]
-			y = [p['y'] for p in sorted(points, key=lambda p: p['point_index'])]
-			plt.plot(x, y, '-o', label=f'Path {path_idx}')
-		
-		plt.title('Design Paths')
+
+		# Plot each point
+		plt.plot(df['x'], df['y'])
+
+		plt.title('Design Points')
 		plt.xlabel('X')
 		plt.ylabel('Y')
 		plt.legend()
@@ -529,10 +501,8 @@ class BinaryLogDecoder:
 		# Plot the design points if available
 		design_df = self.get_design_dataframe()
 		if not design_df.empty:
-			for path_idx in design_df['path_index'].unique():
-				path_df = design_df[design_df['path_index'] == path_idx]
-				ax1.plot(path_df['x'], path_df['y'], '--k', alpha=0.5)
-		
+			ax1.plot(design_df['x'], design_df['y'], '--k', alpha=0.5)
+
 		ax1.set_title('Machine Trajectory')
 		ax1.set_xlabel('X')
 		ax1.set_ylabel('Y')
@@ -657,7 +627,7 @@ class BinaryLogDecoder:
 		
 		# Plot the machine position
 		plt.plot(unique_sens_times/1_000, dt_sens_diff, label='Sensor Diff Data')
-		plt.plot(unique_sens_times/1_000, dt_sens, label='Sensor dt Data', linestyle='--')
+		plt.plot(unique_sens_times[1:]/1_000, dt_sens[1:], label='Sensor dt Data', linestyle='--')
 		plt.scatter(df_aux['time']/1_000, dt_aux, label='Auxiliary Data')
 
 		mplcursors.cursor(hover=True)
@@ -673,12 +643,12 @@ class BinaryLogDecoder:
 if __name__ == "__main__":
 	# filename = input("Enter file name to decode: ")
 	# decoder = BinaryLogDecoder(filename)
-	decoder = BinaryLogDecoder("../logFiles/tanju/LOG003.bin")
+	decoder = BinaryLogDecoder("../logFiles/proto-v1/LOG010.bin")
 	decoder.decode_file()
 	
 	# Print summary information
 	print(f"\nDesign Info: {decoder.design_info}")
-	print(f"Total Paths: {len(decoder.paths)}")
+	# print(f"Total Paths: {len(decoder.paths)}")
 	print(f"Total Points: {len(decoder.points)}")
 	print(f"Total Sensor Data Points: {len(decoder.sensor_data)}")
 	print(f"Total Aux Data Points: {len(decoder.aux_data)}")
