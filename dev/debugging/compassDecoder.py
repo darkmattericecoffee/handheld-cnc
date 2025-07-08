@@ -246,7 +246,6 @@ class BinaryLogDecoder:
 					'y': pose_y,
 					'yaw': pose_yaw
 				},
-				# 'curr_path_index': curr_path_index,
 				'curr_point_index': curr_point_index,
 				'goal': {
 					'x': goal_x,
@@ -316,7 +315,6 @@ class BinaryLogDecoder:
 				'pose_x': data['pose']['x'],
 				'pose_y': data['pose']['y'],
 				'pose_yaw': data['pose']['yaw'],
-				# 'curr_path_index': data['curr_path_index'],
 				'curr_point_index': data['curr_point_index'],
 				'goal_x': data['goal']['x'],
 				'goal_y': data['goal']['y'],
@@ -648,7 +646,6 @@ if __name__ == "__main__":
 	
 	# Print summary information
 	print(f"\nDesign Info: {decoder.design_info}")
-	# print(f"Total Paths: {len(decoder.paths)}")
 	print(f"Total Points: {len(decoder.points)}")
 	print(f"Total Sensor Data Points: {len(decoder.sensor_data)}")
 	print(f"Total Aux Data Points: {len(decoder.aux_data)}")
