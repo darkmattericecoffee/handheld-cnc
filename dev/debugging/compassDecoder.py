@@ -172,6 +172,7 @@ class BinaryLogDecoder:
 			# f.read(1)  # Skip the packet type byte (why tho?)
 			# f.read(1)  # Skip the padding byte (why tho?)
 			byte_index = f.tell()
+			print("entering sensor at ", byte_index)
 			f.read(1)
 			f.read(1)
 			time = struct.unpack('I', f.read(4))[0]  # uint32_t
@@ -180,17 +181,21 @@ class BinaryLogDecoder:
 			sensors = []
 			for i in range(num_sensors):
 				#TODO: make this work for the raw int and byte sensor data instead
-				(dx, dy, sq) = struct.unpack('ffi', f.read(12))  # float x, y, sq
+				(dx, dy, onSurface) = struct.unpack('ff?', f.read(9))  # float x, y, onSurface (bool)
+				sq = int.from_bytes(f.read(1), byteorder='little')
+				rawDataSum = int.from_bytes(f.read(1), byteorder='little')
+				f.read(1)
 				
 				sensors.append({
 					'dx': dx,
 					'dy': dy,
-					'sq': sq
+					'onSurface': onSurface,
+					'sq': sq,
+					'rawDataSum': rawDataSum
 				})
 			
 			dt = struct.unpack('I', f.read(4))[0]  # uint32_t
-			#f.read(1)
-			#f.read(1)
+			#f.read(4)
 			
 			# Read end marker
 			end_marker = int.from_bytes(f.read(1), byteorder='little')
@@ -641,7 +646,7 @@ class BinaryLogDecoder:
 if __name__ == "__main__":
 	# filename = input("Enter file name to decode: ")
 	# decoder = BinaryLogDecoder(filename)
-	decoder = BinaryLogDecoder("../logFiles/proto-v1/LOG010.bin")
+	decoder = BinaryLogDecoder("../logFiles/proto-v1/LOG012.bin")
 	decoder.decode_file()
 	
 	# Print summary information

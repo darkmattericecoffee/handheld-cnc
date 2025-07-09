@@ -47,7 +47,9 @@ struct PathPoint {
 struct SensorData {
 	float dx;
 	float dy;
-	int sq;
+	uint8_t onSurface;
+	uint8_t sq;
+	uint8_t rawDataSum;
 };
 
 struct SensorsPacket {

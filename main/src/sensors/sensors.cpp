@@ -105,7 +105,9 @@ void doSensing() {
 		// TODO: store the raw int and byte data instead and do twosComp in the decoder
 		logData[i].dx = dx;
 		logData[i].dy = dy;
+		logData[i].onSurface = data[i].isOnSurface;
 		logData[i].sq = data[i].SQUAL;
+		logData[i].rawDataSum = data[i].rawDataSum;
 	}
 
 	// Calculate angular velocities
