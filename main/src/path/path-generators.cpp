@@ -3,7 +3,7 @@
 const float sinAmp = 5.0;
 const float sinPeriod = 50.0;
 const float pathMax_y = 100.0;
-const float circleDiameter = 800.0;
+// const float circleDiameter = 800.0;
 
 void lineGenerator() {
 	int num_points = 1000;
@@ -90,7 +90,7 @@ void doubleLineGenerator() {
 void circleGenerator() {
 	int num_points = 4000;
 	float r = 30.0;
-	Point center = Point{x: 0.0, y: 50.0, z: -matThickness};
+	Point center = Point{x: 0.0, y: r, z: -matThickness};
 
 	path.points[0] = Point{x: 0.0, y: 0.0, z: restHeight};
 

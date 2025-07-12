@@ -172,9 +172,8 @@ class BinaryLogDecoder:
 			# f.read(1)  # Skip the packet type byte (why tho?)
 			# f.read(1)  # Skip the padding byte (why tho?)
 			byte_index = f.tell()
-			print("entering sensor at ", byte_index)
-			f.read(1)
-			f.read(1)
+			# print("entering sensor at ", byte_index)
+			f.read(2)
 			time = struct.unpack('I', f.read(4))[0]  # uint32_t
 			#f.read(1)
 			
@@ -203,9 +202,7 @@ class BinaryLogDecoder:
 				byte_index = f.tell()
 				print(f"{byte_index} - Warning: Expected end marker (0x55), got {end_marker}")
 
-			f.read(1)
-			f.read(1)
-			f.read(1)
+			f.read(3)
 			
 			self.sensor_data.append({
 				'time': time,
@@ -241,8 +238,7 @@ class BinaryLogDecoder:
 			if end_marker != PACKET_END:
 				byte_index = f.tell()
 				print(f"{byte_index} - Warning: Expected aux end marker (0x55), got {end_marker}")
-			f.read(1)
-			f.read(1)
+			f.read(2)
 			
 			self.aux_data.append({
 				'time': time,
@@ -302,7 +298,9 @@ class BinaryLogDecoder:
 					'sensor_id': i,
 					'dx': sensor['dx'],
 					'dy': sensor['dy'],
-					'sq': sensor['sq']
+					'onSurface': sensor['onSurface'],
+					'sq': sensor['sq'],
+					'rawDataSum': sensor['rawDataSum']
 				})
 		
 		return pd.DataFrame(flattened_data)
@@ -384,9 +382,11 @@ class BinaryLogDecoder:
 				dx = row['dx']  # Negative convention used to flip sensor's z axis
 				dy = row['dy']
 				sq = row['sq']
+				onSurface = row['onSurface']
 				
 				# Apply calibration if surface quality is good enough
-				if sq > 20:
+				# if sq > 20:
+				if onSurface:
 					cal = cal_params[sensor_id]
 					meas_vel[0][sensor_id] = cal['cx'] * (dx*np.cos(cal['cr']) - dy*np.sin(cal['cr'])) / dt
 					meas_vel[1][sensor_id] = cal['cy'] * (dx*np.sin(cal['cr']) + dy*np.cos(cal['cr'])) / dt
@@ -546,12 +546,13 @@ class BinaryLogDecoder:
 		dt_sens = pd.Series(unique_sens_times).diff()
 				
 		# Create subplots for dx, dy, and sq
-		fig, axs = plt.subplots(4, 1, figsize=(14, 10), sharex=True)
+		fig, axs = plt.subplots(5, 1, figsize=(14, 10), sharex=True)
 
 		# Create secondary axes for time differences
 		ax2_0 = axs[0].twinx()
 		ax2_1 = axs[1].twinx()
 		ax2_2 = axs[2].twinx()
+		ax2_3 = axs[3].twinx()
 		
 		# Plot dx for each sensor
 		for sensor_id in df['sensor_id'].unique():
@@ -576,19 +577,32 @@ class BinaryLogDecoder:
 		axs[1].legend(loc='upper left')
 		ax2_1.legend(loc='upper right')
 		axs[1].grid(True)
-		
-		# Plot sq (surface quality) for each sensor
+
+		# Plot onSurface for each sensor
 		for sensor_id in df['sensor_id'].unique():
 			sensor_df = df[df['sensor_id'] == sensor_id]
-			axs[2].plot(sensor_df['time_sec'], sensor_df['sq'], label=f'Sensor {sensor_id}')
+			axs[2].plot(sensor_df['time_sec'], sensor_df['onSurface'], label=f'Sensor {sensor_id}')
 		ax2_2.plot(unique_sens_times, dt_sens, label='Δt', color='grey', alpha=0.5)
-		axs[2].set_ylabel('Surface Quality')
+		axs[2].set_ylabel('On Surface')
 		ax2_2.set_ylabel('Δt (ms)', color='red')
 		ax2_2.tick_params(axis='y', labelcolor='red')
 		axs[2].set_xlabel('Time (ms)')
 		axs[2].legend(loc='upper left')
 		ax2_2.legend(loc='upper right')
 		axs[2].grid(True)
+		
+		# Plot sq (surface quality) for each sensor
+		for sensor_id in df['sensor_id'].unique():
+			sensor_df = df[df['sensor_id'] == sensor_id]
+			axs[3].plot(sensor_df['time_sec'], sensor_df['sq'], label=f'Sensor {sensor_id}')
+		ax2_2.plot(unique_sens_times, dt_sens, label='Δt', color='grey', alpha=0.5)
+		axs[4].set_ylabel('Surface Quality')
+		ax2_2.set_ylabel('Δt (ms)', color='red')
+		ax2_2.tick_params(axis='y', labelcolor='red')
+		axs[4].set_xlabel('Time (ms)')
+		axs[4].legend(loc='upper left')
+		ax2_2.legend(loc='upper right')
+		axs[4].grid(True)
 
 		# Plot angular velocities
 		labels = [
@@ -598,16 +612,16 @@ class BinaryLogDecoder:
 		for i in range(8):
 			# Get ang_vel_array for each timestamp
 			ang_vels = [data['ang_vel_array'][i] for data in df_processed.to_dict('records')]
-			axs[3].plot(df_processed['time']/1_000, ang_vels, label=labels[i], alpha=0.7)
+			axs[4].plot(df_processed['time']/1_000, ang_vels, label=labels[i], alpha=0.7)
 
 		# Plot average angular velocity
-		axs[3].plot(df_processed['time']/1_000, df_processed['ang_vel'], 
+		axs[4].plot(df_processed['time']/1_000, df_processed['ang_vel'], 
 					'k--', label='Average', linewidth=2)
-		axs[3].set_ylabel('Angular Velocity')
-		axs[3].set_xlabel('Time (ms)')
-		axs[3].legend(loc='upper left')
-		axs[3].grid(True)
-		
+		axs[4].set_ylabel('Angular Velocity')
+		axs[4].set_xlabel('Time (ms)')
+		axs[4].legend(loc='upper left')
+		axs[4].grid(True)
+
 		plt.suptitle('Sensor Data Over Time')
 		plt.tight_layout()
 		plt.show()
@@ -646,7 +660,8 @@ class BinaryLogDecoder:
 if __name__ == "__main__":
 	# filename = input("Enter file name to decode: ")
 	# decoder = BinaryLogDecoder(filename)
-	decoder = BinaryLogDecoder("../logFiles/proto-v1/LOG012.bin")
+	# decoder = BinaryLogDecoder("../logFiles/proto-v1/LOG017.bin")
+	decoder = BinaryLogDecoder("../logFiles/stephen/LOG065.bin")
 	decoder.decode_file()
 	
 	# Print summary information

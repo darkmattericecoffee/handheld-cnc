@@ -14,6 +14,7 @@ static long unsigned timeLastPlot = 0;
 
 // Additional tracking variables
 static int surfaceQuality[4] = {0,0,0,0};
+static bool onSurface[4] = {1,1,1,1};		// 1 if sensor is on surface, 0 otherwise
 static float estVel[2][4] = {{0.0f,0.0f,0.0f,0.0f},
 							{0.0f,0.0f,0.0f,0.0f}};
 static float estAngVel[8] = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
@@ -91,15 +92,18 @@ void doSensing() {
 		float dx = -convTwosComp(data[i].dx);
 		float dy = convTwosComp(data[i].dy);
 		surfaceQuality[i] = data[i].SQUAL;
+		onSurface[i] = data[i].isOnSurface;
+		
 		// TODO: find better way to check for bad readings. surfaceQuality does not seem to be reliable
-		// if (surfaceQuality[i] > 20) {
-		measVel[0][i] = cal[i].x * (dx*cosf(cal[i].r) - dy*sinf(cal[i].r)) / sensingTime;
-		measVel[1][i] = cal[i].y * (dx*sinf(cal[i].r) + dy*cosf(cal[i].r)) / sensingTime;
-		// } else {
-		// 	// TODO: why are we evaluating the sensor validity below instead of here?
-		// 	measVel[0][i] = NAN;
-		// 	measVel[1][i] = NAN;
-		// }
+		if (onSurface[i]) {
+			measVel[0][i] = cal[i].x * (dx*cosf(cal[i].r) - dy*sinf(cal[i].r)) / sensingTime;
+			measVel[1][i] = cal[i].y * (dx*sinf(cal[i].r) + dy*cosf(cal[i].r)) / sensingTime;
+		} else {
+			// TODO: why are we evaluating the sensor validity below instead of here?
+			measVel[0][i] = NAN;
+			measVel[1][i] = NAN;
+			// Serial.printf("Sensor %i is not on surface\n", i);
+		}
 
 		// Store sensor data for logging
 		// TODO: store the raw int and byte data instead and do twosComp in the decoder
@@ -133,7 +137,6 @@ void doSensing() {
 	}
 
 	if (num_good_calcs == 0) {
-		// Serial.print("Sensors are poo-poo!");
 		valid_sensors = false;
 		return;
 	} else {
