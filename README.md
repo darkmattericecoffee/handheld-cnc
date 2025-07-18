@@ -18,7 +18,7 @@ Internal
 - [dev](dev/) - development folder for debugging and testing
 
 External
-- [BOM]([https://docs.google.com/spreadsheets/d/1jh1JRTu2ZVX3Sn2RJb8T3XTQ4klYfrgWMmJgh2YMeG0/edit?usp=sharing](https://docs.google.com/spreadsheets/d/12QS1CGSAB-lqKIOotCXDaXmJv9cjfRvVEAgQbRd7MnY/edit?gid=493643478#gid=493643478))
+- [BOM](https://docs.google.com/spreadsheets/d/12QS1CGSAB-lqKIOotCXDaXmJv9cjfRvVEAgQbRd7MnY/edit?usp=sharing)
 - [Assembly Instructions](https://drive.google.com/drive/folders/1fIALrTWUbJRqTl93RGrUaR8dMfO7AI_g?usp=sharing)
 
 ## Disclaimer
