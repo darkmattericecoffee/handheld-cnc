@@ -178,8 +178,8 @@ void doSensing() {
 		// (TODO: figure out deeper cause) Acounting for weird rotation
 		// estVel1[0] = (sumVelX / ns) - estAngVel1*(xSensorOffset*sinf(pose.yaw) + ySensorOffset*cosf(pose.yaw));
 		// estVel1[1] = (sumVelY / ns) + estAngVel1*(xSensorOffset*cosf(pose.yaw) - ySensorOffset*sinf(pose.yaw));
-		estVel1[0] = sumVelX / ns;
-		estVel1[1] = sumVelY / ns;
+		estVel1[0] = sumVelX / num_good_calcs;
+		estVel1[1] = sumVelY / num_good_calcs;
 	}
 
 	// Integrate to get position and orientation
