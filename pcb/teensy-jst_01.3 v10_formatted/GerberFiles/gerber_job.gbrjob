@@ -1,0 +1,24 @@
+{
+    "Header": {
+        "Comment": "All values are metric (mm)",
+        "CreationDate": "2025-06-05T18:33:15Z",
+        "GenerationSoftware": {
+            "Application": "Fusion Electronics",
+            "Vendor": "Autodesk",
+            "Version": "9.7.0"
+        },
+        "Part": "Single"
+    },
+    "Overall": {
+        "BoardThickness": 1.57,
+        "LayerNumber": 2,
+        "Name": {
+            "ProjectId": "teensy-jst_01.3 v9"
+        },
+        "Owner": "Cameron Chaney <camchaney@berkeley.edu>",
+        "Size": {
+            "X": 66.04,
+            "Y": 105.41
+        }
+    }
+}
