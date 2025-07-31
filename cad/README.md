@@ -2,7 +2,7 @@
 Print all parts at 40% infill or higher. 
 
 ## 3D Printed Parts (PLA, unless stated otherwise)
-- (1x) baseStage.stl
+- (2x) baseStage.stl
 - (1x) baseStagePlug.stl
 - (2x) cableClip.stl
 - (1x) displayRing.stl
