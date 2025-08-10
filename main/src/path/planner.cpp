@@ -19,7 +19,9 @@ void TrajectoryGenerator::update(long deltaTime, Point& goal) {
 
 		// Find the segment we're in
 		while (current_point_idx < path.numPoints - 1) {
-			// TODO: careful of infinite loops
+			// TODO: careful of infinite loops. Is this a problem?
+			// TODO: handle the case where feedrate would result in a greater-than-max motor speed
+
 			float f = path.points[current_point_idx].f * feedrateBoost;
 	
 			float segmentDistance = sqrt(

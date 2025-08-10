@@ -42,6 +42,7 @@ Print all parts at 40% infill or higher.
 		- same as above, but with a flange for easier alignment
 ### Jigs (PLA)
 - (1x) encoderJig.stl
+- (1x) beltShim.stl
 
 ## Aluminum Sheet Metal (6061)
 - (1x) basePlate.dxf - 6mm (1/4" also works)
