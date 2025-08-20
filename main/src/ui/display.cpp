@@ -26,6 +26,37 @@ float exponentialSkew(float x) {
 	return 0.0f;
 }
 
+// Convert 8-bit RGB to 16-bit RGB565
+uint16_t rgbTo565(uint8_t r, uint8_t g, uint8_t b) {
+  return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+}
+
+// Gradient function: returns a packed 16-bit RGB565 color
+uint16_t getGradientColor(float value, float maxValue) {
+	if (value < 0) value = 0;
+	if (value > maxValue) value = maxValue;
+
+	const float midValue = 0.5;
+	float ratio = value / maxValue;
+	uint8_t r, g, b;
+
+	if (ratio <= midValue) {
+		// Green to yellow
+		float t = ratio / midValue;
+		r = (uint8_t)(255 * t);  // 0 -> 255
+		g = 255;
+		b = 0;
+	} else {
+		// Yellow to red
+		float t = (ratio - midValue) / midValue;
+		r = 255;
+		g = (uint8_t)(255 - (255 * t));  // 255 -> 0
+		b = 0;
+	}
+
+	return rgbTo565(r, g, b);
+}
+
 void drawMenu(const char* options[], const int numOptions, int select) {
 	screen->fillScreen(BLACK);
 
@@ -324,6 +355,8 @@ void drawCenteredText(const char* text, int size) {
 }
 
 void drawFixedUI() {
+	int driftRadius = (screen->width()/2) - 20;
+
 	screen->fillScreen(BLACK);
 	
 	// Draw bounds rectangle
@@ -334,18 +367,29 @@ void drawFixedUI() {
 		rectangleWidth,
 		WHITE
 	);
+
+	float maxDriftAngle = TWO_PI * tanh(maxDrift / maxDrift);
+	// TODO: add more markers for fractions of max drift (i.e. 1/10, 2/10, etc.)
+	for (int j = 0; j < 6; j++) {
+		int x = centerX + (driftRadius-4+j) * sinf(maxDriftAngle);
+		int y = centerY - (driftRadius-4+j) * cosf(maxDriftAngle);
+		screen->drawPixel(x, y, WHITE);
+	}
 }
 
 void drawUI(Position desPosition, float progress, uint8_t i) {
 	float padding = 6;
 	float windowSize = rectangleWidth - 2*padding;
 	int progressRadius = (screen->width()/2) - 10;
+	int driftRadius = (screen->width()/2) - 20;
 	float progressAngle = progress * TWO_PI;
+	float driftAngle = TWO_PI * tanh(distanceTraveled * driftRate / maxDrift);
+	float driftColorswitch = 1.2 * maxDrift;
 	
 	float dx = mapF(desPosition.getX(), -xRange/2, xRange/2, -windowSize/2, windowSize/2);
 	float dy = -mapF(desPosition.getY(), -yRange/2, yRange/2, -windowSize/2, windowSize/2);
 
-	switch (i%4) {
+	switch (i%5) {
 		case 0:
 			// draw the center target
 			screen->drawLine(centerX, centerY-5, centerX, centerY+5, WHITE);
@@ -370,18 +414,28 @@ void drawUI(Position desPosition, float progress, uint8_t i) {
 				
 			break;
 		case 3:
-			for (int i = 0; i < 3; i++) {
-				int x = centerX + (progressRadius-1+i) * sinf(progressAngle);
-				int y = centerY - (progressRadius-1+i) * cosf(progressAngle);
+			// draw progress circle
+			for (int j = 0; j < 3; j++) {
+				int x = centerX + (progressRadius-1+j) * sinf(progressAngle);
+				int y = centerY - (progressRadius-1+j) * cosf(progressAngle);
 				screen->drawPixel(x, y, GREEN);
 			}
 			break;
+		case 4:
+			// draw the drift
+			for (int j = 0; j < 3; j++) {
+				int x = centerX + (driftRadius-1+j) * sinf(driftAngle);
+				int y = centerY - (driftRadius-1+j) * cosf(driftAngle);
+				screen->drawPixel(x, y, getGradientColor(distanceTraveled*driftRate, driftColorswitch));
+			}
+			break;
+
 	}
 }
 
 void updateUI(Position desPosition, float progress) {
 	if ((millis()-lastDraw) > 15) {
-		iter = (iter + 1)%4;
+		iter = (iter + 1)%5;
 		// unsigned long now = micros();
 		// motorPosX = stepperX.currentPosition()*1.0f/ConvLead;
 		drawUI(desPosition, progress, iter);

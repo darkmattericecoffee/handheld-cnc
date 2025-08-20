@@ -258,9 +258,9 @@ void encoderDesignSelect() {
 		if (designType == FROM_FILE) listFiles();
 	}
 
-	// Hack for opensauce, auto-zero XY
-	// TODO: remove this
+	// Reset pose
 	workspaceZeroXY();
+	distanceTraveled = 0.0f;
 
 	// Reset cutting path
 	running = true;

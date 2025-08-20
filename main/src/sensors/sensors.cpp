@@ -187,6 +187,11 @@ void doSensing() {
 	pose.x = pose.x + estVel1[0]*sensingTime;
 	pose.y = pose.y + estVel1[1]*sensingTime;
 
+	float distRatio = 0.6f;
+	dXY = distRatio*dXY + (1-distRatio)*sqrtf(estVel1[0]*estVel1[0] + estVel1[1]*estVel1[1]) * sensingTime;
+	distanceTraveled += dXY;
+	// Serial.printf("distanceTraveled: %.2f\n", distanceTraveled);
+
 	if (sensingTime > 1000 || sensingTime < 800) {
 		Serial.printf("%lu: sensing time = %lu\n", millis(), sensingTime);
 	}

@@ -49,6 +49,8 @@ extern String fileList[MAX_FILES];
 extern RouterPose pose;
 extern float measVel[2][4];
 extern float calPos[2][4];
+extern float dXY;
+extern float distanceTraveled;
 
 // Calibration data
 extern CalParams cal[4];

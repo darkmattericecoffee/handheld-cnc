@@ -43,7 +43,6 @@
 #define MAX_POINTS 			8000
 #define MAX_FILES			100
 #define GC9A01A_WEBWORK_GREEN 0x8FF1
-const float angleThreshold = PI/6;				// angle threshold for cuttable region (rads)
 
 // Sensor properties
 const int ns = 4;								// number of sensors
@@ -52,6 +51,8 @@ const float lx = 120.0f;						// x length of rectangular sensor configuration (m
 const float ly = 140.0f;						// y length of rectangular sensor configuration (mm)
 const float xSensorOffset = -2.32;				
 const float ySensorOffset = -3.2;				// offset to try to counteract weird rotation behavior (mm) (UNUSED)
+const float driftRate = 0.001;					// drift rate of positioning (unitless, drift per distance traveled - measured)
+const float maxDrift = 1;						// maximum acceptable drift (mm)
 
 // Motor properties
 const int stepsPerRev = 200;					// steps per revolution
