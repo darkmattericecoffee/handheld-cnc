@@ -98,6 +98,7 @@ void handleCutting(long deltaTime) {
 		cutState = CUTTING;
 		
 		cartesianToMotor(desPos);
+		stepperZ.moveTo(desPos.getZ()*ConvLead);
 	} else {
 		// ...catch all
 		running = false;

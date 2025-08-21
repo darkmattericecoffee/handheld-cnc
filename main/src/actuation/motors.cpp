@@ -254,7 +254,6 @@ void cartesianToMotor(Position pos) {
 	float b = pos.getX() - pos.getY();
 	stepperR.moveTo(a * ConvBelt);
 	stepperL.moveTo(b * ConvBelt);
-	stepperZ.moveTo(pos.getZ() * ConvLead);
 }
 
 // Convert the motor position to the router's BFF coordinate system

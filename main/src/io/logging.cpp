@@ -236,7 +236,7 @@ void parseGCodeFile(const String& sFilename) {
 				// 	break;
 				// case 'R':
 				}
-				newPoint.f = feedrate;
+				newPoint.f = feedrate_default;
 				ptr++;
 			}
 
