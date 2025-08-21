@@ -30,7 +30,6 @@ extern bool running;
 extern bool valid_sensors;
 extern float motorPosX;
 extern DesignType designType;
-extern bool plungeReady;
 
 // Path data
 extern Path path;

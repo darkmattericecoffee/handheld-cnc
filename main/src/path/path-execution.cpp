@@ -10,7 +10,7 @@ ActuationController actuator(desPos);
 bool checkEndstops() {
 	if (digitalRead(LIMIT_MACH_X0) == LOW) {
 		stopStepperX();
-		stepperZ.moveTo(ConvLead*restHeight);
+		stepperZ.moveTo(restHeight * ConvLead);
 		while (stepperZ.distanceToGo() != 0) {
 			stepperZ.run();
 		}
@@ -84,27 +84,35 @@ void handleCutting(long deltaTime) {
 		running = false;
 		cutState = NOT_CUT_READY;
 
-		stepperZ.moveTo(ConvLead*restHeight);
+		stepperZ.setMaxSpeed(maxSpeedZ);
+		stepperZ.moveTo(restHeight * ConvLead);
 	} else if (!handle_buttons_ok && valid_sensors) {
 		// User not ready...
 		running = false;
 		cutState = NOT_USER_READY;
 
 		cartesianToMotor(desPos);
-		stepperZ.moveTo(ConvLead*restHeight);
+		stepperZ.setMaxSpeed(maxSpeedZ);
+		stepperZ.moveTo(restHeight * ConvLead);
 	} else if (valid_sensors){
-		// All good to go!
-		running = true;
-		cutState = CUTTING;
-		
 		cartesianToMotor(desPos);
-		stepperZ.moveTo(desPos.getZ()*ConvLead);
+		stepperZ.moveTo(desPos.getZ() * ConvLead);
+
+		if (running == false) {
+			// Plunge if needed
+			plungeZ(desPos.getZ());
+		} else {
+			// All good to go!
+			running = true;
+			cutState = CUTTING;
+		}
 	} else {
 		// ...catch all
 		running = false;
 		cutState = NOT_CUT_READY;
 
-		stepperZ.moveTo(ConvLead*restHeight);
+		stepperZ.setMaxSpeed(maxSpeedZ);
+		stepperZ.moveTo(restHeight * ConvLead);
 	}
 
 	// Update UI

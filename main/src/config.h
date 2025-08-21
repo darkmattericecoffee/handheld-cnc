@@ -76,7 +76,7 @@ const float zeroSpeed_0 = 20.0;					// zeroing speed (mm/s)
 const float zeroSpeed_1 = 4.0;					// secondary zeroing speed (mm/s)
 const float zeroAccel = 200.0;					// zeroing acceleration (mm/s^2)
 const float feedrate_default = 5.0;				// default feedrate (mm/s)
-const float holeFeedrate = 5.0; 				// default hole feedrate (mm/s)		TODO: make this modifiable (and change units to mm)
+const float plungeRate_default = 5.0;			// default plunge rate (mm/s)
 
 // Material properties
 const float maxThickness = 15.0;				// upper bound of thickness knob (mm)

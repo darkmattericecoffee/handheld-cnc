@@ -236,13 +236,25 @@ void workspaceZeroXY() {
 		stepperL.run();
 	}
 
-	stepperZ.moveTo(ConvLead*restHeight);
+	stepperZ.moveTo(restHeight * ConvLead);
 	while (stepperZ.distanceToGo() != 0) {
 		stepperZ.run();
 	}
 
 	// Reset router pose
 	pose = {0.0f};
+}
+
+void plungeZ(float zPos) {
+	if (running == false) {
+		if (stepperZ.distanceToGo() != 0) {
+			stepperZ.setMaxSpeed(plungeRate_default * ConvLead);
+		} else {
+			// If the Z stepper is at the desired position, then start cutting
+			running = true;
+			cutState = CUTTING;
+		}
+	}
 }
 
 // Convert the position to motor coordinates, using the coreXY system

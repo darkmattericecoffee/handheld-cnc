@@ -19,7 +19,6 @@ CutState cutState = NOT_CUT_READY;
 bool running = false;
 bool valid_sensors = true;
 DesignType designType = PRESET;
-bool plungeReady = false;
 
 // Path data
 Path path;
