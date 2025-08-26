@@ -251,6 +251,7 @@ void plungeZ(float zPos) {
 			stepperZ.setMaxSpeed(plungeRate_default * ConvLead);
 		} else {
 			// If the Z stepper is at the desired position, then start cutting
+			stepperZ.setMaxSpeed(maxSpeedZ);
 			running = true;
 			cutState = CUTTING;
 		}
