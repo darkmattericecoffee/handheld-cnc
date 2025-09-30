@@ -177,14 +177,6 @@ void parseGCodeFile(const String& sFilename) {
 	while (file.fgets(line, sizeof(line))) {
 		bool hasNewCoordinate = false;
 
-		// Check for new path command
-		if (strncmp(line, "M800", 4) == 0) {
-			// TODO: handle different kinds of features
-			// NOTE: M800 is unnecessary for the new version
-			activeFeature = true;
-			continue;
-		}
-
 		// Skip all the nonsense
 		if (validCommand(line)) {
 			activeFeature = true;
