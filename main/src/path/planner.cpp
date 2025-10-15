@@ -24,6 +24,7 @@ void TrajectoryGenerator::update(long deltaTime, Point& goal) {
 			//	- simpler case would be to just compare feedrate to max actuation speed (combined, not single motor speed)
 
 			float f = path.points[current_point_idx].f * feedrateBoost;
+			// TODO: known bug where interpolation gets skipped if feedrateBoost is changed mid-path
 	
 			float segmentDistance = sqrt(
 				pow(path.points[current_point_idx + 1].x - path.points[current_point_idx].x, 2) +
