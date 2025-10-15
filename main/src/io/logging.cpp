@@ -215,13 +215,14 @@ void parseGCodeFile(const String& sFilename) {
 					newPoint.z = atof(ptr + 1);
 					hasNewCoordinate = true;
 					if (newPoint.z < activePath->minZ) {
-						activePath->minZ = newPoint.z;			// TODO: maybe not necessary
-						// Serial.printf("Minimum z = %f", activePath->minZ);
+						activePath->minZ = newPoint.z;			// TODO: maybe not necessary (unused right now)
 					}
 					if (newPoint.z > 4.0) {
 						// TODO: this is bandaid for shitty gcode! Remove this
 						newPoint.z = 4.0;
 					}
+					// if matThickness is set to 0 (drawing), then don't pierce!
+					if (matThickness == 0.0 && designType == FROM_FILE && newPoint.z < 0.0) newPoint.z = 0.0f;
 					break;
 				// TODO: parse feedrate (F) and, for holes, retract height (R)
 				// case 'F':
