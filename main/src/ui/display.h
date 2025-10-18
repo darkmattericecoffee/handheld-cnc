@@ -12,6 +12,7 @@ const int displayLines = 7;
 const int centerLine = 3;
 
 float exponentialSkew(float x);
+void drawIndicator(int16_t x, int16_t y, bool filled, uint16_t color);
 void drawMenu(const char* options[], const int numOptions, int select);
 void drawShape();
 void listFiles();

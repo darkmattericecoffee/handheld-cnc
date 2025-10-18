@@ -31,6 +31,16 @@ uint16_t rgbTo565(uint8_t r, uint8_t g, uint8_t b) {
   return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 }
 
+// Draw a filled or empty circle indicator
+void drawIndicator(int16_t x, int16_t y, bool filled, uint16_t color) {
+	int16_t radius = 5;
+	if (filled) {
+		screen->fillCircle(x, y, radius, color);
+	} else {
+		screen->drawCircle(x, y, radius, color);
+	}
+}
+
 // Gradient function: returns a packed 16-bit RGB565 color
 uint16_t getGradientColor(float value, float maxValue) {
 	if (value < 0) value = 0;
