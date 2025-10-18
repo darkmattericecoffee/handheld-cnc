@@ -311,6 +311,7 @@ void encoderZeroWorkspaceXY() {
 	}
 
 	state = READY;
+	resetPathPreview();  // Reset path preview when entering READY state
 	encoder.setEncoderHandler(nullHandler);
 	encoder.setClickHandler(nullHandler);
 

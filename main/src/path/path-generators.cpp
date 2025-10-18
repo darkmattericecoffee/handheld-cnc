@@ -1,4 +1,5 @@
 #include "path-generators.h"
+#include "../ui/display.h"
 // Path properties
 const float sinAmp = 5.0;
 const float sinPeriod = 50.0;
@@ -339,6 +340,9 @@ void makePresetPath() {
 			Serial.println("Square drill path generated!");
 			break;
 	}
+
+	// Reset path preview to trigger redraw with new path
+	resetPathPreview();
 
 	// Log the generated path
 	logPath();

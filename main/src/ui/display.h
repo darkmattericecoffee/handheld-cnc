@@ -6,6 +6,7 @@
 #include "../globals.h"
 #include "../math/geometry.h"
 #include "../actuation/actuator.h"
+#include "path_preview.h"
 
 const int displayLines = 7;
 const int centerLine = 3;
@@ -20,5 +21,6 @@ void drawCenteredText(const char* text, int size);
 void drawFixedUI();
 void drawUI(Position desPosition, float progress, uint8_t i);
 void updateUI(Position desPosition, float progress);
+void resetPathPreview();
 
 #endif

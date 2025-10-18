@@ -389,17 +389,26 @@ void drawUI(Position desPosition, float progress, uint8_t i) {
 	float dx = mapF(desPosition.getX(), -xRange/2, xRange/2, -windowSize/2, windowSize/2);
 	float dy = -mapF(desPosition.getY(), -yRange/2, yRange/2, -windowSize/2, windowSize/2);
 
-	switch (i%5) {
+	switch (i%6) {
 		case 0:
+			// draw the path preview as background (if enabled and update every 2nd cycle to reduce load)
+			if (enablePathPreview) {
+				static uint8_t pathUpdateCounter = 0;
+				if (pathUpdateCounter++ % 2 == 0) {
+					drawPathPreview();
+				}
+			}
+			break;
+		case 1:
 			// draw the center target
 			screen->drawLine(centerX, centerY-5, centerX, centerY+5, WHITE);
 			screen->drawLine(centerX-15, centerY, centerX+15, centerY, WHITE);
 			break;
-		case 1:
+		case 2:
 			// clear the old target circle
 			screen->drawCircle(lastTargetCircleX, lastTargetCircleY, 5, BLACK);
 			break;
-		case 2:
+		case 3:
 			// draw new target circle
 			lastTargetCircleX = centerX + dx;
 			lastTargetCircleY = centerY + dy;
@@ -413,7 +422,7 @@ void drawUI(Position desPosition, float progress, uint8_t i) {
 			}
 				
 			break;
-		case 3:
+		case 4:
 			// draw progress circle
 			for (int j = 0; j < 3; j++) {
 				int x = centerX + (progressRadius-1+j) * sinf(progressAngle);
@@ -421,7 +430,7 @@ void drawUI(Position desPosition, float progress, uint8_t i) {
 				screen->drawPixel(x, y, GREEN);
 			}
 			break;
-		case 4:
+		case 5:
 			// draw the drift
 			for (int j = 0; j < 3; j++) {
 				int x = centerX + (driftRadius-1+j) * sinf(driftAngle);
@@ -435,11 +444,16 @@ void drawUI(Position desPosition, float progress, uint8_t i) {
 
 void updateUI(Position desPosition, float progress) {
 	if ((millis()-lastDraw) > 15) {
-		iter = (iter + 1)%5;
+		iter = (iter + 1)%6;
 		// unsigned long now = micros();
 		// motorPosX = stepperX.currentPosition()*1.0f/ConvLead;
 		drawUI(desPosition, progress, iter);
 		// Serial.printf("draw %d took %i us\n", iter, micros()-now);
 		lastDraw = millis();
 	}
+}
+
+void resetPathPreview() {
+	// Clear any previously drawn path elements when path changes
+	clearPreviousPathPreview();
 }
