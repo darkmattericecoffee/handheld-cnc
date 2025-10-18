@@ -45,38 +45,24 @@ void drawPathPreview() {
     // 2. Clear previously drawn path lines (fast area clear)
     clearPreviousPathPreview();
 
-    // 3. Configure coordinate system based on mode
-    float windowSize, maxX, maxY, minX, minY;
+    // 3. Configure coordinate system
+    //    We ALWAYS use the rectangle's coordinate system for scaling
+    //    to ensure it matches the target circle in drawUI.
     int16_t centerX = screen->width() / 2;
     int16_t centerY = screen->height() / 2;
     
-    if (pathPreviewFullScreen) {
-        // Full screen mode: use entire display
-        windowSize = screen->width(); // 240 pixels
-        maxX = centerX;
-        maxY = centerY; 
-        minX = -centerX;
-        minY = -centerY;
-    } else {
-        // Rectangle mode: use same coordinate system as the UI
-        float padding = 6;
-        float rectangleWidth = screen->width() / 2; // Same as in display.cpp
-        windowSize = rectangleWidth - 2*padding; // Same calculation as in drawUI
-        maxX = windowSize/2;
-        maxY = windowSize/2;
-        minX = -windowSize/2;
-        minY = -windowSize/2;
-    }
+    float padding = 6;
+    float rectangleWidth = screen->width() / 2; // Same as in display.cpp
+    float rectWindowSize = rectangleWidth - 2*padding; // Same calculation as in drawUI
+    float rectMaxX = rectWindowSize/2;
+    float rectMaxY = rectWindowSize/2;
+    float rectMinX = -rectWindowSize/2;
+    float rectMinY = -rectWindowSize/2;
     
     // 4. Draw the path using coordinate transformation
     // Offset path points by the router's current position so the path moves with the router
     // OPTIMIZATION: Only draw every Nth point to reduce drawing operations
     int pointSkip = max(1, path.numPoints / 150); // Limit to ~150 lines max for performance
-    
-    // Calculate coordinate ranges based on mode
-    float coordRange = pathPreviewFullScreen ? 
-        max(xRange, yRange) * 1.5f :  // Full screen: use larger range for wider view
-        max(xRange, yRange);          // Rectangle mode: use current range
     
     int16_t lastPx = -1, lastPy = -1;
     bool lastPosWasRapid = true;
@@ -93,41 +79,38 @@ void drawPathPreview() {
         float relativeX = pathX - pose.x;
         float relativeY = pathY - pose.y;
 
-        // Transform coordinates based on mode
+        // [MODIFIED] Transform coordinates using the RECTANGLE mode scaling ALWAYS.
+        // This ensures 1:1 scaling correspondence with the target circle in drawUI.
         float dx, dy;
-        if (pathPreviewFullScreen) {
-            // Full screen: map to entire display
-            dx = mapF(relativeX, -coordRange/2, coordRange/2, minX, maxX);
-            dy = -mapF(relativeY, -coordRange/2, coordRange/2, minY, maxY);
-        } else {
-            // Rectangle mode: use same mapping as UI
-            dx = mapF(relativeX, -xRange/2, xRange/2, minX, maxX);
-            dy = -mapF(relativeY, -yRange/2, yRange/2, minY, maxY);
-        }
+        dx = mapF(relativeX, -xRange/2, xRange/2, rectMinX, rectMaxX);
+        dy = -mapF(relativeY, -yRange/2, yRange/2, rectMinY, rectMaxY);
         
-        // Convert to screen coordinates
+        // Convert to absolute screen coordinates
         int16_t px = centerX + dx;
         int16_t py = centerY + dy;
         
-        // Check if point is within bounds
+        // [MODIFIED] Check if point is within bounds
+        // This is the ONLY place where pathPreviewFullScreen matters.
         bool pointInBounds;
         if (pathPreviewFullScreen) {
             // Full screen: check if within circular display bounds (rough approximation)
-            float distFromCenter = sqrt(dx*dx + dy*dy);
+            // We use px and py (absolute screen coords) for the check.
+            float distFromCenter = sqrt(pow(px - centerX, 2) + pow(py - centerY, 2));
             pointInBounds = (distFromCenter <= screen->width()/2 - 5); // 5 pixel margin
         } else {
             // Rectangle mode: check if within rectangle bounds
-            pointInBounds = (abs(dx) <= windowSize/2) && (abs(dy) <= windowSize/2);
+            // We can check dx/dy (relative coords) against the rectWindowSize.
+            pointInBounds = (abs(dx) <= rectWindowSize/2) && (abs(dy) <= rectWindowSize/2);
         }
         
         // Handle different features
         if (path.points[i].feature == DRILL && pointInBounds) {
             // Draw drill points as a small cross pattern (faster than circle)
-            screen->drawPixel(px, py, YELLOW);           // center
-            screen->drawPixel(px-1, py, YELLOW);         // left
-            screen->drawPixel(px+1, py, YELLOW);         // right
-            screen->drawPixel(px, py-1, YELLOW);         // up
-            screen->drawPixel(px, py+1, YELLOW);         // down
+            screen->drawPixel(px, py, YELLOW);         // center
+            screen->drawPixel(px-1, py, YELLOW);       // left
+            screen->drawPixel(px+1, py, YELLOW);       // right
+            screen->drawPixel(px, py-1, YELLOW);       // up
+            screen->drawPixel(px, py+1, YELLOW);       // down
             
             // Store all drill pixels for clearing
             storeDot(px, py, YELLOW);
@@ -154,15 +137,15 @@ void drawPathPreview() {
                 
                 if (dotColor != BLACK) {
                     // Draw stippled line as dots every few pixels for ultra-fast drawing
-                    int dx = px - lastPx;
-                    int dy = py - lastPy;
-                    float distance = sqrt(dx*dx + dy*dy);
+                    int dist_dx = px - lastPx; // Use 'dist_dx' to avoid shadowing
+                    int dist_dy = py - lastPy; // Use 'dist_dy' to avoid shadowing
+                    float distance = sqrt(dist_dx*dist_dx + dist_dy*dist_dy);
                     int numDots = max(1, (int)(distance / 3)); // Dot every ~3 pixels
                     
                     for (int d = 0; d < numDots && numPreviousDots < MAX_STORED_DOTS - 1; d++) {
                         float t = (float)d / (float)numDots;
-                        int dotX = lastPx + (int)(t * dx);
-                        int dotY = lastPy + (int)(t * dy);
+                        int dotX = lastPx + (int)(t * dist_dx);
+                        int dotY = lastPy + (int)(t * dist_dy);
                         screen->drawPixel(dotX, dotY, dotColor);
                         storeDot(dotX, dotY, dotColor);
                     }
@@ -174,13 +157,13 @@ void drawPathPreview() {
             lastPx = px;
             lastPy = py;
             lastPointValid = true;
-        } else if (pointInBounds) {
+        } else if (i == 0 && pointInBounds) { // Handle first point
             // Set initial state for the very first point
             lastPosWasRapid = (z >= restHeight);
             lastPx = px;
             lastPy = py;
             lastPointValid = true;
-        } else {
+        } else if (!pointInBounds) {
             // Point is out of bounds, break the line continuity
             lastPointValid = false;
         }
