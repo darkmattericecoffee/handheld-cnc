@@ -105,7 +105,6 @@ const long unsigned dtOutputSD = 10;			// time interval for auxiliary SD logging
 const long unsigned dt = 900;					// length of sensor timestep (us)(freq = 1,000,000/timestepPoll [Hz])
 const long unsigned dtControl = 500;			// length of control timestep (us)(freq = 1,000,000/timestepControl [Hz])
 
-// UI Features
-const bool enablePathPreview = false;			// Enable/disable path preview in UI
+// UI Features (runtime configurable - defined in globals.cpp)
 
 #endif

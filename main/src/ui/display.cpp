@@ -391,13 +391,6 @@ void drawUI(Position desPosition, float progress, uint8_t i) {
 
 	switch (i%6) {
 		case 0:
-			// draw the path preview as background (if enabled and update every 2nd cycle to reduce load)
-			if (enablePathPreview) {
-				static uint8_t pathUpdateCounter = 0;
-				if (pathUpdateCounter++ % 2 == 0) {
-					drawPathPreview();
-				}
-			}
 			break;
 		case 1:
 			// draw the center target
@@ -436,6 +429,11 @@ void drawUI(Position desPosition, float progress, uint8_t i) {
 				int x = centerX + (driftRadius-1+j) * sinf(driftAngle);
 				int y = centerY - (driftRadius-1+j) * cosf(driftAngle);
 				screen->drawPixel(x, y, getGradientColor(distanceTraveled*driftRate, driftColorswitch));
+			}
+			
+			// draw the path preview as background (if enabled - now updates at full speed since dots are motor-friendly)
+			if (enablePathPreview) {
+				drawPathPreview();  // Update every cycle - same rate as center dot
 			}
 			break;
 

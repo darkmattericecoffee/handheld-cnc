@@ -64,10 +64,16 @@ extern bool debuggingOn;
 extern bool stopwatchOn;
 extern bool outputSerialOn;
 extern bool outputSDOn;
+extern int mainMenuSelection;
 extern int designOrCalibrate;
 extern int acceptCal;
 extern int designPreset;
 extern int pauseSelection;
+extern int previewMenuSelection;
+
+// UI Features (runtime configurable)
+extern bool enablePathPreview;
+extern bool pathPreviewFullScreen;
 
 // Material properties
 extern float matThickness;

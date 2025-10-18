@@ -54,10 +54,16 @@ bool debuggingOn = false;			// print debug statements
 bool stopwatchOn = false;
 bool outputSerialOn = false;				// output data to serial
 bool outputSDOn = true;				// output data to SD card
-int designOrCalibrate = 0;			// choose design or calibrate (0 or 1)
+int mainMenuSelection = 0;			// main menu: 0=Cut Design, 1=Calibrate, 2=Preview Settings
+int designOrCalibrate = 0;			// choose design or calibrate (0 or 1) - kept for backward compatibility
 int acceptCal = 0;					// accept calibration or not
 int designPreset = 0;				// choose the design
 int pauseSelection = 0;					// pause menu selection
+int previewMenuSelection = 0;		// preview settings menu selection
+
+// UI Features (runtime configurable)
+bool enablePathPreview = true;			// Enable/disable path preview in UI
+bool pathPreviewFullScreen = true;		// Use entire screen for path preview (not just center rectangle)
 
 // Material properties
 float matThickness = 0.0;

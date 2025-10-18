@@ -51,6 +51,39 @@ void onClickSetDoC(EncoderButton &eb) {
 	state = DOC_SELECTED;
 }
 
+void onClickPreviewSettings(EncoderButton &eb) {
+	Serial.printf("Preview click: selection=%d\n", previewMenuSelection);
+	if (previewMenuSelection == 0) {
+		// Toggle preview on/off
+		enablePathPreview = !enablePathPreview;
+		Serial.printf("Toggled preview to: %s\n", enablePathPreview ? "ON" : "OFF");
+		// Immediately update visuals - force full menu redraw
+		char option0[30], option1[30], option2[30];
+		sprintf(option0, "Preview: %s", enablePathPreview ? "ON ●" : "OFF ○");
+		sprintf(option1, "Mode: %s", pathPreviewFullScreen ? "Full ●" : "Rect ○");  
+		strcpy(option2, "← Back");
+		const char* options[] = {option0, option1, option2};
+		drawMenu(options, 3, previewMenuSelection);
+	} else if (previewMenuSelection == 1) {
+		// Toggle full screen mode (only if preview is enabled)
+		if (enablePathPreview) {
+			pathPreviewFullScreen = !pathPreviewFullScreen;
+			Serial.printf("Toggled full screen to: %s\n", pathPreviewFullScreen ? "ON" : "OFF");
+			// Immediately update visuals - force full menu redraw
+			char option0[30], option1[30], option2[30];
+			sprintf(option0, "Preview: %s", enablePathPreview ? "ON ●" : "OFF ○");
+			sprintf(option1, "Mode: %s", pathPreviewFullScreen ? "Full ●" : "Rect ○");  
+			strcpy(option2, "← Back");
+			const char* options[] = {option0, option1, option2};
+			drawMenu(options, 3, previewMenuSelection);
+		}
+	} else {
+		// Back to main menu - use a special state to signal exit
+		Serial.println("Exiting preview settings");
+		state = THICKNESS_SET;  // Signal to exit preview settings menu
+	}
+}
+
 void onClickCalibrationAdvance(EncoderButton &eb) {
 	state = CALIBRATION_ADVANCE;
 }
@@ -120,10 +153,28 @@ void onEncoderUpdateThickness(EncoderButton &eb) {
 	drawCenteredText(text2send, 2);
 }
 
-void onEncoderDesignOrCalibrate(EncoderButton &eb) {
-	designOrCalibrate = (2 + designOrCalibrate + eb.increment()) % 2;
-	const char* options[] = {"Cut Design!", "Calibrate"};
-	drawMenu(options, 2, designOrCalibrate);
+void onEncoderMainMenu(EncoderButton &eb) {
+	mainMenuSelection = (3 + mainMenuSelection + eb.increment()) % 3;
+	const char* options[] = {"Cut Design!", "Calibrate", "Preview Settings"};
+	drawMenu(options, 3, mainMenuSelection);
+}
+
+void onEncoderPreviewSettings(EncoderButton &eb) {
+	int oldSelection = previewMenuSelection;
+	previewMenuSelection = (3 + previewMenuSelection + eb.increment()) % 3;
+	
+	if (oldSelection != previewMenuSelection) {
+		Serial.printf("Preview selection changed from %d to %d\n", oldSelection, previewMenuSelection);
+	}
+	
+	// Create visual menu with icons/indicators
+	char option0[30], option1[30], option2[30];
+	sprintf(option0, "Preview: %s", enablePathPreview ? "ON ●" : "OFF ○");
+	sprintf(option1, "Mode: %s", pathPreviewFullScreen ? "Full ●" : "Rect ○");  
+	strcpy(option2, "← Back");
+	
+	const char* options[] = {option0, option1, option2};
+	drawMenu(options, 3, previewMenuSelection);
 }
 
 void onEncoderAcceptCalibration(EncoderButton &eb) {
@@ -202,21 +253,77 @@ void encoderSetThickness() {
 }
 
 void encoderDesignOrCalibrate() {
-	const char* options[] = {"Cut Design!", "Calibrate"};
-	drawMenu(options, 2, designOrCalibrate);
+	const char* options[] = {"Cut Design!", "Calibrate", "Preview Settings"};
+	drawMenu(options, 3, mainMenuSelection);
 
-	encoder.setEncoderHandler(onEncoderDesignOrCalibrate);
+	encoder.setEncoderHandler(onEncoderMainMenu);
 	encoder.setClickHandler(onClickSetDoC);
 
 	while (state != DOC_SELECTED  && state != READY) {
 		encoder.update();
 	}
 
-	if (designOrCalibrate == 0) {
+	if (mainMenuSelection == 0) {
 		encoderDesignType();
-	} else {
+	} else if (mainMenuSelection == 1) {
 		calibrate();
+	} else {
+		encoderPreviewSettings();
+		// After preview settings, return to this menu (state is still THICKNESS_SET)
+		state = THICKNESS_SET;  // Reset state to re-enter the main menu loop
+		encoderDesignOrCalibrate();
 	}
+}
+
+void encoderPreviewSettings() {
+	Serial.println("Entering preview settings menu");
+	// Set initial preview menu display
+	previewMenuSelection = 0;
+	bool inPreviewMenu = true;
+	
+	// Important: Clear encoder state and reset position
+	encoder.update(); // Clear any pending events
+	encoder.resetPosition(); // Reset encoder position to avoid carryover
+	
+	encoder.setEncoderHandler(onEncoderPreviewSettings);
+	encoder.setClickHandler(onClickPreviewSettings);
+
+	// Initial draw with explicit call (no increment)
+	char option0[30], option1[30], option2[30];
+	sprintf(option0, "Preview: %s", enablePathPreview ? "ON ●" : "OFF ○");
+	sprintf(option1, "Mode: %s", pathPreviewFullScreen ? "Full ●" : "Rect ○");  
+	strcpy(option2, "← Back");
+	const char* options[] = {option0, option1, option2};
+	drawMenu(options, 3, previewMenuSelection);
+	
+	Serial.printf("Initial preview selection: %d\n", previewMenuSelection);
+
+	while (inPreviewMenu && state != READY) {
+		encoder.update();
+		
+		// Check if user wants to exit preview settings
+		if (state == THICKNESS_SET) {
+			Serial.println("Exiting preview settings menu");
+			inPreviewMenu = false;
+		}
+		
+		// Redraw menu to update visual indicators when settings change
+		static int lastClickCount = 0;
+		if (lastClickCount == 0) {
+			// initialize sentinel to current click count on entry
+			lastClickCount = encoder.clickCount();
+		}
+		if (encoder.clickCount() != lastClickCount && previewMenuSelection < 2) {
+			lastClickCount = encoder.clickCount();
+			onEncoderPreviewSettings(encoder);
+		}
+	}
+	
+	// Reset mainMenuSelection so we return to the main menu properly
+	mainMenuSelection = 0;
+	// Don't change state - let encoderDesignOrCalibrate() handle it
+	
+	Serial.println("Preview settings function completed");
 }
 
 void encoderDesignType() {
