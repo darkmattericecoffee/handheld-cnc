@@ -7,6 +7,7 @@
 #include "../globals.h"
 #include "../math/geometry.h"
 #include "../actuation/actuator.h"
+#include "../ui/display.h"
 
 #define PACKET_START		0xAA
 #define PACKET_END			0x55

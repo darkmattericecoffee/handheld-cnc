@@ -87,6 +87,7 @@ void handleFileSelection() {
 		} else {
 			// Handle file selection
 			parseGCodeFile(selectedFile);
+			resetPathPreview();		// Reset path preview to trigger redraw with new path
 			logPath();
 
 			state = DESIGN_SELECTED;
@@ -101,6 +102,7 @@ void handleSpeedRun() {
 	
 	// Handle file selection
 	parseGCodeFile(selectedFile);
+	resetPathPreview();		// Reset path preview to trigger redraw with new path
 	logPath();
 		
 	delay(100);
@@ -265,6 +267,24 @@ void parseGCodeFile(const String& sFilename) {
 	}
 
 	file.close();
+	
+	// Print path bounds for debugging
+	float minX = 9999, maxX = -9999, minY = 9999, maxY = -9999;
+	for (int i = 0; i < activePath->numPoints; i++) {
+		if (activePath->points[i].x < minX) minX = activePath->points[i].x;
+		if (activePath->points[i].x > maxX) maxX = activePath->points[i].x;
+		if (activePath->points[i].y < minY) minY = activePath->points[i].y;
+		if (activePath->points[i].y > maxY) maxY = activePath->points[i].y;
+	}
+	Serial.printf("Path loaded: %d points\n", activePath->numPoints);
+	Serial.printf("Path bounds: X[%.2f to %.2f] (%.2fmm wide), Y[%.2f to %.2f] (%.2fmm tall)\n", 
+		minX, maxX, maxX - minX, minY, maxY, maxY - minY);
+	Serial.printf("Actuator range: X[%.2f to %.2f], Y[%.2f to %.2f]\n", 
+		-xRange/2, xRange/2, -yRange/2, yRange/2);
+	
+	if (maxX - minX > xRange || maxY - minY > yRange) {
+		Serial.println("WARNING: Path is larger than actuator range! Preview may be clipped.");
+	}
 }
 
 // Write to Serial ------------------------------------------------------
