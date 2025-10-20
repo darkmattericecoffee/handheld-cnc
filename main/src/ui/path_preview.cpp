@@ -36,136 +36,141 @@ void storeDot(int16_t x, int16_t y, uint16_t color) {
 }
 
 void drawPathPreview() {
-    // 1. Check if path is valid
+
     if (path.numPoints <= 1 || path.numPoints > MAX_POINTS) {
-        clearPreviousPathPreview(); // Clear any existing lines
-        return; // Don't draw anything if no valid path
+        clearPreviousPathPreview(); 
+        return; 
     }
 
-    // 2. Clear previously drawn path lines (fast area clear)
     clearPreviousPathPreview();
 
-    // 3. Configure coordinate system
-    //    We ALWAYS use the rectangle's coordinate system for scaling
-    //    to ensure it matches the target circle in drawUI.
     int16_t centerX = screen->width() / 2;
     int16_t centerY = screen->height() / 2;
-    
+
     float padding = 6;
-    float rectangleWidth = screen->width() / 2; // Same as in display.cpp
-    float rectWindowSize = rectangleWidth - 2*padding; // Same calculation as in drawUI
+    float rectangleWidth = screen->width() / 2; 
+    float rectWindowSize = rectangleWidth - 2*padding; 
     float rectMaxX = rectWindowSize/2;
     float rectMaxY = rectWindowSize/2;
     float rectMinX = -rectWindowSize/2;
     float rectMinY = -rectWindowSize/2;
-    
-    // 4. Draw the path using coordinate transformation
-    // Offset path points by the router's current position so the path moves with the router
-    // OPTIMIZATION: Only draw every Nth point to reduce drawing operations
-    int pointSkip = max(1, path.numPoints / 150); // Limit to ~150 lines max for performance
-    
+
+    // Skip points if path is dense to stay within MAX_STORED_DOTS limit
+    int pointSkip = max(1, path.numPoints / 150); 
+
     int16_t lastPx = -1, lastPy = -1;
     bool lastPosWasRapid = true;
     bool lastPointValid = false;
 
-    for (int i = 0; i < path.numPoints; i += pointSkip) {  // Skip points for performance
-        // Get path point coordinates
+    for (int i = 0; i < path.numPoints; i += pointSkip) {  
+
         float pathX = path.points[i].x;
         float pathY = path.points[i].y;
         float z = path.points[i].z;
 
-        // Calculate relative position of path point to router's current position
-        // This makes the path move with the router (like a heads-up display)
         float relativeX = pathX - pose.x;
         float relativeY = pathY - pose.y;
 
-        // [MODIFIED] Transform coordinates using the RECTANGLE mode scaling ALWAYS.
-        // This ensures 1:1 scaling correspondence with the target circle in drawUI.
         float dx, dy;
         dx = mapF(relativeX, -xRange/2, xRange/2, rectMinX, rectMaxX);
         dy = -mapF(relativeY, -yRange/2, yRange/2, rectMinY, rectMaxY);
-        
-        // Convert to absolute screen coordinates
+
         int16_t px = centerX + dx;
         int16_t py = centerY + dy;
-        
-        // [MODIFIED] Check if point is within bounds
-        // This is the ONLY place where pathPreviewFullScreen matters.
+
         bool pointInBounds;
         if (pathPreviewFullScreen) {
-            // Full screen: check if within circular display bounds (rough approximation)
-            // We use px and py (absolute screen coords) for the check.
+            // Check if point is within circular display boundary
             float distFromCenter = sqrt(pow(px - centerX, 2) + pow(py - centerY, 2));
-            pointInBounds = (distFromCenter <= screen->width()/2 - 5); // 5 pixel margin
+            pointInBounds = (distFromCenter <= screen->width()/2 - 5); 
         } else {
-            // Rectangle mode: check if within rectangle bounds
-            // We can check dx/dy (relative coords) against the rectWindowSize.
+            // Check if point is within rectangular preview window
             pointInBounds = (abs(dx) <= rectWindowSize/2) && (abs(dy) <= rectWindowSize/2);
         }
-        
-        // Handle different features
-        if (path.points[i].feature == DRILL && pointInBounds) {
-            // Draw drill points as a small cross pattern (faster than circle)
-            screen->drawPixel(px, py, YELLOW);         // center
-            screen->drawPixel(px-1, py, YELLOW);       // left
-            screen->drawPixel(px+1, py, YELLOW);       // right
-            screen->drawPixel(px, py-1, YELLOW);       // up
-            screen->drawPixel(px, py+1, YELLOW);       // down
+
+        if (path.points[i].feature == DRILL) {
+            // Draw drill points as yellow crosses (5 pixels) only if in bounds
+            if (pointInBounds) {
+                screen->drawPixel(px, py, YELLOW);         
+                screen->drawPixel(px-1, py, YELLOW);       
+                screen->drawPixel(px+1, py, YELLOW);       
+                screen->drawPixel(px, py-1, YELLOW);       
+                screen->drawPixel(px, py+1, YELLOW);       
+
+                storeDot(px, py, YELLOW);
+                storeDot(px-1, py, YELLOW);
+                storeDot(px+1, py, YELLOW);
+                storeDot(px, py-1, YELLOW);
+                storeDot(px, py+1, YELLOW);
+            }
+
+            lastPosWasRapid = true; 
+            lastPointValid = false; 
             
-            // Store all drill pixels for clearing
-            storeDot(px, py, YELLOW);
-            storeDot(px-1, py, YELLOW);
-            storeDot(px+1, py, YELLOW);
-            storeDot(px, py-1, YELLOW);
-            storeDot(px, py+1, YELLOW);
-            
-            lastPosWasRapid = true; // Treat as a "break" in the line
-            lastPointValid = false; // Don't connect lines to drill points
-        } else if (i > 0 && pointInBounds) {
+        } else if (i > 0) {
+            // Process all points after the first one, regardless of bounds
             bool currentPosIsRapid = (z >= restHeight);
-            
+
             if (lastPointValid) {
-                uint16_t dotColor = BLACK; // Default: don't draw
-                
+                uint16_t dotColor = BLACK;
+                int dotSpacing = 3;  // Default spacing for cutting moves
+
                 if (!lastPosWasRapid && !currentPosIsRapid) {
-                    // --- Cutting move (both points below rapid height) ---
+                    // Cutting move - green, close spacing
                     dotColor = GC9A01A_WEBWORK_GREEN;
-                } else if ((lastPosWasRapid && !currentPosIsRapid) || (!lastPosWasRapid && currentPosIsRapid)) {
-                    // --- Plunge or Retract move ---
-                    dotColor = 0x8410; // A dark gray
+                    dotSpacing = 3;
+                } else if (lastPosWasRapid && currentPosIsRapid) {
+                    // Rapid-to-rapid move - cyan, wider spacing
+                    dotColor = CYAN;
+                    dotSpacing = 7;
+                } else {
+                    // Transition move (rapid<->cutting) - gray, medium spacing
+                    dotColor = 0x8410;
+                    dotSpacing = 4;
                 }
-                
-                if (dotColor != BLACK) {
-                    // Draw stippled line as dots every few pixels for ultra-fast drawing
-                    int dist_dx = px - lastPx; // Use 'dist_dx' to avoid shadowing
-                    int dist_dy = py - lastPy; // Use 'dist_dy' to avoid shadowing
-                    float distance = sqrt(dist_dx*dist_dx + dist_dy*dist_dy);
-                    int numDots = max(1, (int)(distance / 3)); // Dot every ~3 pixels
+
+                // Interpolate dots between path points for smooth preview
+                int dist_dx = px - lastPx; 
+                int dist_dy = py - lastPy; 
+                float distance = sqrt(dist_dx*dist_dx + dist_dy*dist_dy);
+                int numDots = max(1, (int)(distance / dotSpacing)); 
+
+                for (int d = 0; d < numDots && numPreviousDots < MAX_STORED_DOTS - 1; d++) {
+                    float t = (float)d / (float)numDots;
+                    int dotX = lastPx + (int)(t * dist_dx);
+                    int dotY = lastPy + (int)(t * dist_dy);
                     
-                    for (int d = 0; d < numDots && numPreviousDots < MAX_STORED_DOTS - 1; d++) {
-                        float t = (float)d / (float)numDots;
-                        int dotX = lastPx + (int)(t * dist_dx);
-                        int dotY = lastPy + (int)(t * dist_dy);
+                    // Only draw dots that are actually on screen
+                    bool dotInBounds;
+                    if (pathPreviewFullScreen) {
+                        float distFromCenter = sqrt(pow(dotX - centerX, 2) + pow(dotY - centerY, 2));
+                        dotInBounds = (distFromCenter <= screen->width()/2 - 5);
+                    } else {
+                        int16_t dotDx = dotX - centerX;
+                        int16_t dotDy = dotY - centerY;
+                        dotInBounds = (abs(dotDx) <= rectWindowSize/2) && (abs(dotDy) <= rectWindowSize/2);
+                    }
+                    
+                    if (dotInBounds) {
                         screen->drawPixel(dotX, dotY, dotColor);
                         storeDot(dotX, dotY, dotColor);
                     }
                 }
-                // Else: (lastPosWasRapid && currentPosIsRapid) -> Do not draw rapid-to-rapid lines
             }
 
+            // Always update position tracking, even for off-screen points
+            // This maintains the drawing chain when points come back into view
             lastPosWasRapid = currentPosIsRapid;
             lastPx = px;
             lastPy = py;
             lastPointValid = true;
-        } else if (i == 0 && pointInBounds) { // Handle first point
-            // Set initial state for the very first point
+            
+        } else if (i == 0) { 
+            // Initialize first point (whether in bounds or not)
             lastPosWasRapid = (z >= restHeight);
             lastPx = px;
             lastPy = py;
             lastPointValid = true;
-        } else if (!pointInBounds) {
-            // Point is out of bounds, break the line continuity
-            lastPointValid = false;
         }
     }
 }
