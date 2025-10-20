@@ -5,6 +5,19 @@ ActuationController::ActuationController(Position &dp)
 }
 
 // Compute actuator adjustments (call in control loop)
+/**
+ * @brief Updates the actuation controller to compute desired positions based on the goal and current pose.
+ * 
+ * This function calculates the global position errors in X, Y, and Z directions relative to the goal and current router pose.
+ * It then transforms these errors into the local actuator frame using the current yaw angle.
+ * The desired positions are set directly without PID control, using the transformed errors.
+ * Note: For this build, the validMotion object is inverted (swapping and negating errX_local and errY_local) to flip the axes,
+ * as there is a bug where X and Y are actually inversed.
+ * 
+ * @param deltaTime The time elapsed since the last update, in milliseconds.
+ * @param goal The target point in global coordinates.
+ * @param currentPose The current pose of the router, including position and yaw.
+ */
 void ActuationController::update(
 	long deltaTime,
 	Point goal,
@@ -25,5 +38,7 @@ void ActuationController::update(
 	// desPos.setZ(pidZ.compute(errZ_global, deltaTime));		// TODO: does this need to be implemented differently?
 
 	// Normal control (without PID)
-	validMotion = desPos->set(errX_local, errY_local, errZ_global);
+	// Uncomment for your code: validMotion = desPos->set(errX_local, errY_local, errZ_global);
+	// TEMPORARY FIX FOR AXIS INVERSION BUG (proably in my compass build setup):
+	validMotion = desPos->set(-errY_local, -errX_local, errZ_global);
 }

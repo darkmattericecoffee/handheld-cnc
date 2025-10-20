@@ -395,9 +395,16 @@ void drawUI(Position desPosition, float progress, uint8_t i) {
 	float progressAngle = progress * TWO_PI;
 	float driftAngle = TWO_PI * tanh(distanceTraveled * driftRate / maxDrift);
 	float driftColorswitch = 1.2 * maxDrift;
+
+	//temporary fix for axis inversion bug (probably in my compass build setup)
+	// This swaps X and Y, and invert both
+	// So that pushing the router forward moves the dot up on screen
+	//Change back to normal mapping on your own setup!
+	//float dx = mapF(desPosition.getX(), -xRange/2, xRange/2, -windowSize/2, windowSize/2);
+	//float dy = -mapF(desPosition.getY(), -yRange/2, yRange/2, -windowSize/2, windowSize/2);
 	
-	float dx = mapF(desPosition.getX(), -xRange/2, xRange/2, -windowSize/2, windowSize/2);
-	float dy = -mapF(desPosition.getY(), -yRange/2, yRange/2, -windowSize/2, windowSize/2);
+	float dx = mapF(-desPosition.getY(), -xRange/2, xRange/2, -windowSize/2, windowSize/2);
+	float dy = mapF(desPosition.getX(), -yRange/2, yRange/2, -windowSize/2, windowSize/2);
 
 	switch (i%6) {
 		case 0:
