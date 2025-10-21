@@ -1,8 +1,8 @@
 #include "path_preview.h"
-#include "globals.h" // Access to 'screen' and 'path'
-#include "config.h"  // Access to 'MAX_POINTS', 'GC9A01A_WEBWORK_GREEN', etc.
-#include "types.h"   // Access to 'restHeight' and 'Feature' enum
-#include "../math/geometry.h" // Access to 'mapF' function
+#include "globals.h"
+#include "config.h"
+#include "types.h"
+#include "../math/geometry.h"
 
 // Structure to store a dot for clearing
 struct PathDot {
@@ -11,38 +11,54 @@ struct PathDot {
     bool valid;
 };
 
-// Static storage for previously drawn dots (much more efficient than lines/rects)
+// Structure to store pre-computed path segment data
+struct PrecomputedSegment {
+    float screenX, screenY;  // Screen coordinates (float for precision)
+    float z;
+    Feature feature;
+    bool isRapid;
+};
+
+// Static storage for previously drawn dots
 static const int MAX_STORED_DOTS = 300;
 static PathDot previousDots[MAX_STORED_DOTS];
 static int numPreviousDots = 0;
 
+// Cached path data
+static const int MAX_PRECOMPUTED_SEGMENTS = 500;
+static PrecomputedSegment precomputedPath[MAX_PRECOMPUTED_SEGMENTS];
+static int numPrecomputedSegments = 0;
+static float cachedTotalPathLength = 0;
+static int cachedTargetDots = 0;
+static float cachedDotsPerPixel = 0;
+
+// Cache invalidation tracking
+static int lastPathNumPoints = -1;
+static float lastPoseX = 0;
+static float lastPoseY = 0;
+static bool cacheValid = false;
+
 void clearPreviousPathPreview() {
-    // Ultra-fast clear: just clear individual dots (single pixel operations)
-    // This is much faster and less intrusive than fillRect
     for (int i = 0; i < numPreviousDots; i++) {
         if (previousDots[i].valid) {
             screen->drawPixel(previousDots[i].x, previousDots[i].y, BLACK);
         }
     }
-    numPreviousDots = 0;  // Reset the count
+    numPreviousDots = 0;
 }
 
 void storeDot(int16_t x, int16_t y, uint16_t color) {
-    // Store dot for later clearing, but don't exceed our storage limit
     if (numPreviousDots < MAX_STORED_DOTS) {
         previousDots[numPreviousDots] = {x, y, color, true};
         numPreviousDots++;
     }
 }
 
-void drawPathPreview() {
-    if (path.numPoints <= 1 || path.numPoints > MAX_POINTS) {
-        clearPreviousPathPreview(); 
-        return; 
-    }
+void invalidatePathCache() {
+    cacheValid = false;
+}
 
-    clearPreviousPathPreview();
-
+void precomputePathData() {
     int16_t centerX = screen->width() / 2;
     int16_t centerY = screen->height() / 2;
 
@@ -54,50 +70,22 @@ void drawPathPreview() {
     float rectMinX = -rectWindowSize/2;
     float rectMinY = -rectWindowSize/2;
 
-    // Calculate total path length first
-    float totalPathLength = 0;
-    int16_t lastPx = -1, lastPy = -1;
-    bool firstPointProcessed = false;
-    
-    for (int i = 0; i < path.numPoints; i++) {
-        float pathX = path.points[i].x;
-        float pathY = path.points[i].y;
-        float relativeX = pathX - pose.x;
-        float relativeY = pathY - pose.y;
-        
-        float dx = mapF(relativeX, -xRange/2, xRange/2, rectMinX, rectMaxX);
-        float dy = -mapF(relativeY, -yRange/2, yRange/2, rectMinY, rectMaxY);
-        
-        int16_t px = centerX + dx;
-        int16_t py = centerY + dy;
-        
-        if (firstPointProcessed) {
-            int dist_dx = px - lastPx;
-            int dist_dy = py - lastPy;
-            totalPathLength += sqrt(dist_dx*dist_dx + dist_dy*dist_dy);
-        }
-        
-        lastPx = px;
-        lastPy = py;
-        firstPointProcessed = true;
-    }
-    
-    // Target number of dots for the entire path
-    const int TARGET_TOTAL_DOTS = 400;
-    float dotsPerPixel = (totalPathLength > 0) ? (float)TARGET_TOTAL_DOTS / totalPathLength : 0;
-    
-    // Now draw with standardized spacing
-    lastPx = -1;
-    lastPy = -1;
-    bool lastPosWasRapid = true;
-    bool lastPointValid = false;
-    float accumulatedDistance = 0;
-    float nextDotThreshold = 0;
+    // Adaptive skip based on path density
+    int pointSkip = 1;
+    if (path.numPoints > 800) pointSkip = 3;
+    else if (path.numPoints > 400) pointSkip = 2;
 
-    for (int i = 0; i < path.numPoints; i++) {
+    // First pass: Convert to screen coordinates and calculate total length
+    numPrecomputedSegments = 0;
+    cachedTotalPathLength = 0;
+    float lastScreenX = 0, lastScreenY = 0;
+    bool firstPoint = true;
+
+    for (int i = 0; i < path.numPoints && numPrecomputedSegments < MAX_PRECOMPUTED_SEGMENTS; i += pointSkip) {
         float pathX = path.points[i].x;
         float pathY = path.points[i].y;
         float z = path.points[i].z;
+        Feature feature = path.points[i].feature;
 
         float relativeX = pathX - pose.x;
         float relativeY = pathY - pose.y;
@@ -105,18 +93,100 @@ void drawPathPreview() {
         float dx = mapF(relativeX, -xRange/2, xRange/2, rectMinX, rectMaxX);
         float dy = -mapF(relativeY, -yRange/2, yRange/2, rectMinY, rectMaxY);
 
-        int16_t px = centerX + dx;
-        int16_t py = centerY + dy;
+        float screenX = centerX + dx;
+        float screenY = centerY + dy;
+
+        // Store precomputed segment
+        precomputedPath[numPrecomputedSegments].screenX = screenX;
+        precomputedPath[numPrecomputedSegments].screenY = screenY;
+        precomputedPath[numPrecomputedSegments].z = z;
+        precomputedPath[numPrecomputedSegments].feature = feature;
+        precomputedPath[numPrecomputedSegments].isRapid = (z >= restHeight);
+
+        // Calculate segment length for total path length
+        if (!firstPoint && feature != DRILL) {
+            float dist_dx = screenX - lastScreenX;
+            float dist_dy = screenY - lastScreenY;
+            cachedTotalPathLength += sqrt(dist_dx*dist_dx + dist_dy*dist_dy);
+        }
+
+        lastScreenX = screenX;
+        lastScreenY = screenY;
+        firstPoint = false;
+        numPrecomputedSegments++;
+    }
+
+    // Calculate dots per pixel
+    cachedTargetDots = 400;  // Adjustable
+    if (path.numPoints > 1000) {
+        cachedTargetDots = 350;
+    } else if (path.numPoints < 200) {
+        cachedTargetDots = 500;
+    }
+    
+    cachedDotsPerPixel = (cachedTotalPathLength > 0) ? (float)cachedTargetDots / cachedTotalPathLength : 0;
+
+    // Mark cache as valid
+    lastPathNumPoints = path.numPoints;
+    lastPoseX = pose.x;
+    lastPoseY = pose.y;
+    cacheValid = true;
+}
+
+void drawPathPreview() {
+    if (path.numPoints <= 1 || path.numPoints > MAX_POINTS) {
+        clearPreviousPathPreview(); 
+        cacheValid = false;
+        return; 
+    }
+
+    // Check if we need to recompute the path data
+    bool poseChanged = (abs(pose.x - lastPoseX) > 0.01f || abs(pose.y - lastPoseY) > 0.01f);
+    bool pathChanged = (path.numPoints != lastPathNumPoints);
+    
+    if (!cacheValid || pathChanged || poseChanged) {
+        precomputePathData();
+    }
+
+    // Clear previous dots
+    clearPreviousPathPreview();
+
+    if (numPrecomputedSegments <= 1) return;
+
+    int16_t centerX = screen->width() / 2;
+    int16_t centerY = screen->height() / 2;
+
+    float padding = 6;
+    float rectangleWidth = screen->width() / 2; 
+    float rectWindowSize = rectangleWidth - 2*padding;
+
+    // Now render using precomputed data
+    float accumulatedDistance = 0;
+    float nextDotThreshold = 0;
+    bool lastPointValid = false;
+    float lastScreenX = 0, lastScreenY = 0;
+    bool lastPosWasRapid = true;
+
+    for (int i = 0; i < numPrecomputedSegments; i++) {
+        float screenX = precomputedPath[i].screenX;
+        float screenY = precomputedPath[i].screenY;
+        Feature feature = precomputedPath[i].feature;
+        bool currentPosIsRapid = precomputedPath[i].isRapid;
+
+        int16_t px = (int16_t)screenX;
+        int16_t py = (int16_t)screenY;
 
         bool pointInBounds;
         if (pathPreviewFullScreen) {
             float distFromCenter = sqrt(pow(px - centerX, 2) + pow(py - centerY, 2));
             pointInBounds = (distFromCenter <= screen->width()/2 - 5); 
         } else {
+            int16_t dx = px - centerX;
+            int16_t dy = py - centerY;
             pointInBounds = (abs(dx) <= rectWindowSize/2) && (abs(dy) <= rectWindowSize/2);
         }
 
-        if (path.points[i].feature == DRILL) {
+        if (feature == DRILL) {
             if (pointInBounds) {
                 screen->drawPixel(px, py, YELLOW);         
                 screen->drawPixel(px-1, py, YELLOW);       
@@ -137,10 +207,8 @@ void drawPathPreview() {
             nextDotThreshold = 0;
             
         } else if (i > 0 && lastPointValid) {
-            bool currentPosIsRapid = (z >= restHeight);
-            
-            int dist_dx = px - lastPx;
-            int dist_dy = py - lastPy;
+            float dist_dx = screenX - lastScreenX;
+            float dist_dy = screenY - lastScreenY;
             float segmentLength = sqrt(dist_dx*dist_dx + dist_dy*dist_dy);
             
             accumulatedDistance += segmentLength;
@@ -160,8 +228,8 @@ void drawPathPreview() {
                 float t = (nextDotThreshold - (accumulatedDistance - segmentLength)) / segmentLength;
                 t = constrain(t, 0.0f, 1.0f);
                 
-                int dotX = lastPx + (int)(t * dist_dx);
-                int dotY = lastPy + (int)(t * dist_dy);
+                int dotX = lastScreenX + (int)(t * dist_dx);
+                int dotY = lastScreenY + (int)(t * dist_dy);
                 
                 bool dotInBounds;
                 if (pathPreviewFullScreen) {
@@ -178,18 +246,18 @@ void drawPathPreview() {
                     storeDot(dotX, dotY, dotColor);
                 }
                 
-                nextDotThreshold += (1.0f / dotsPerPixel);
+                nextDotThreshold += (1.0f / cachedDotsPerPixel);
             }
 
             lastPosWasRapid = currentPosIsRapid;
-            lastPx = px;
-            lastPy = py;
+            lastScreenX = screenX;
+            lastScreenY = screenY;
             lastPointValid = true;
             
         } else if (i == 0) {
-            lastPosWasRapid = (z >= restHeight);
-            lastPx = px;
-            lastPy = py;
+            lastPosWasRapid = currentPosIsRapid;
+            lastScreenX = screenX;
+            lastScreenY = screenY;
             lastPointValid = true;
         }
     }

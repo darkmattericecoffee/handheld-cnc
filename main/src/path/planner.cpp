@@ -1,4 +1,5 @@
 #include "planner.h"
+#include "../ui/path_preview.h"
 
 // Load gCode path (pre-processed into a vector of GCodePoints)
 void TrajectoryGenerator::resetPath(Point& goal) {
@@ -69,7 +70,9 @@ void TrajectoryGenerator::update(long deltaTime, Point& goal) {
 	
 	// Reset the path accordingly
 	// TODO: make this more clean/robust and remove redudant resets
+	void invalidatePathCache();
 	resetPath(goal);
+
 
 	// Log data and close SD
 	closeSDFile();

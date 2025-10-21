@@ -12,4 +12,10 @@ void drawPathPreview();
  */
 void clearPreviousPathPreview();
 
+/**
+ * @brief Invalidates the cached path preview data
+ */
+
+void invalidatePathCache();
+
 #endif

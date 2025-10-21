@@ -6,12 +6,13 @@
 #include "../types.h"
 #include "../io/logging.h"
 #include "../ui/encoder.h"
+#include "../ui/path_preview.h"
 
 class TrajectoryGenerator {
 	public:
 		// Load a pre-processed gCode path
 		void resetPath(Point& goal);
-	
+		void invalidatePathCache();
 		// Update desired position based on elapsed time
 		void update(long deltaTime, Point& goal);
 	

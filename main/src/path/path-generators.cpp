@@ -342,7 +342,9 @@ void makePresetPath() {
 	}
 
 	// Reset path preview to trigger redraw with new path
+	
 	resetPathPreview();
+	
 
 	// Log the generated path
 	logPath();
