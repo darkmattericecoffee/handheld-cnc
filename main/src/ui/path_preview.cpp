@@ -9,6 +9,7 @@ struct CachedDot {
     float physicalX, physicalY; // Physical world coordinates
     uint16_t color;
     bool valid;
+    int pathIndex; // Which path segment this dot belongs to
 };
 
 // Struct to store a dot's final on-screen location for clearing
@@ -18,13 +19,7 @@ struct DrawnDot {
 };
 
 // --- CONFIGURATION & LIMITS ---
-static const int MAX_CACHED_DOTS = 1500;
-static const int MAX_DRAWN_DOTS = 400;
-const float DOTS_PER_MM = 0.5f; // One dot every 2mm
-
-// Cache eviction parameters
-static const float CACHE_REFRESH_DISTANCE_THRESHOLD = 100.0f; // mm - refresh when tool moves this far
-static const float CACHE_REGION_RADIUS = 150.0f; // mm - cache dots within this radius of current position
+// Path preview settings are now defined in globals.h/.cpp
 
 // --- STATIC STORAGE ---
 // Use DMAMEM attribute to place these large arrays in RAM2 instead of RAM1
@@ -40,6 +35,10 @@ static int lastPathNumPoints = -1;
 static bool lastFullscreenMode = false;
 static float lastCacheCenterX = 0.0f;
 static float lastCacheCenterY = 0.0f;
+static int lastCurrentPathIndex = -1; // Track which point we're currently at
+
+// Global variable to track current path index (should be set externally by your motion controller)
+extern int currentPathIndex;
 
 // --- HELPER FUNCTIONS ---
 
@@ -133,7 +132,8 @@ void precomputePathDots() {
                         dot_x_phys,
                         dot_y_phys,
                         dotColor,
-                        true
+                        true,
+                        i // Store which path segment this dot belongs to
                     };
                     numCachedDots++;
                 }
@@ -158,9 +158,11 @@ void drawPathPreview() {
     bool pathChanged = (path.numPoints != lastPathNumPoints);
     bool viewModeChanged = (pathPreviewFullScreen != lastFullscreenMode);
     bool movedTooFar = shouldRefreshCache();
+    bool progressChanged = (current_point_idx != lastCurrentPathIndex);
     
-    if (!cacheValid || pathChanged || viewModeChanged || movedTooFar) {
+    if (!cacheValid || pathChanged || viewModeChanged || movedTooFar || progressChanged) {
         precomputePathDots();
+        lastCurrentPathIndex = current_point_idx;
     }
     
     // --- 2. CLEAR PREVIOUS FRAME ---
@@ -205,7 +207,22 @@ void drawPathPreview() {
         }
         
         if (isInBounds) {
-            screen->drawPixel(px, py, cachedDots[i].color);
+            // Determine color based on completion status
+            uint16_t renderColor;
+            if (cachedDots[i].pathIndex <= current_point_idx) {
+                // Already completed - show in green
+                renderColor = GC9A01A_WEBWORK_GREEN;
+            } else {
+                // Still to be done - show in pink/magenta
+                renderColor = MAGENTA; // Or use a custom pink color like 0xF81F
+            }
+            
+            // Override with cyan for rapid moves if original was cyan
+            if (cachedDots[i].color == CYAN) {
+                renderColor = CYAN;
+            }
+            
+            screen->drawPixel(px, py, renderColor);
             storeDrawnDot(px, py);
         }
     }

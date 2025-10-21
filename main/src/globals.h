@@ -75,6 +75,13 @@ extern int previewMenuSelection;
 extern bool enablePathPreview;
 extern bool pathPreviewFullScreen;
 
+// Path preview settings
+constexpr int MAX_CACHED_DOTS = 5000;
+constexpr int MAX_DRAWN_DOTS = 400;
+constexpr float DOTS_PER_MM = 1.0f;
+constexpr float CACHE_REFRESH_DISTANCE_THRESHOLD = 100.0f;
+constexpr float CACHE_REGION_RADIUS = 150.0f;
+
 // Material properties
 extern float matThickness;
 
