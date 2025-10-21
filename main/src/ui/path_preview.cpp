@@ -36,7 +36,6 @@ void storeDot(int16_t x, int16_t y, uint16_t color) {
 }
 
 void drawPathPreview() {
-
     if (path.numPoints <= 1 || path.numPoints > MAX_POINTS) {
         clearPreviousPathPreview(); 
         return; 
@@ -55,15 +54,47 @@ void drawPathPreview() {
     float rectMinX = -rectWindowSize/2;
     float rectMinY = -rectWindowSize/2;
 
-    // Skip points if path is dense to stay within MAX_STORED_DOTS limit
-    int pointSkip = max(1, path.numPoints / 150); 
-
+    // Calculate total path length first
+    float totalPathLength = 0;
     int16_t lastPx = -1, lastPy = -1;
+    bool firstPointProcessed = false;
+    
+    for (int i = 0; i < path.numPoints; i++) {
+        float pathX = path.points[i].x;
+        float pathY = path.points[i].y;
+        float relativeX = pathX - pose.x;
+        float relativeY = pathY - pose.y;
+        
+        float dx = mapF(relativeX, -xRange/2, xRange/2, rectMinX, rectMaxX);
+        float dy = -mapF(relativeY, -yRange/2, yRange/2, rectMinY, rectMaxY);
+        
+        int16_t px = centerX + dx;
+        int16_t py = centerY + dy;
+        
+        if (firstPointProcessed) {
+            int dist_dx = px - lastPx;
+            int dist_dy = py - lastPy;
+            totalPathLength += sqrt(dist_dx*dist_dx + dist_dy*dist_dy);
+        }
+        
+        lastPx = px;
+        lastPy = py;
+        firstPointProcessed = true;
+    }
+    
+    // Target number of dots for the entire path
+    const int TARGET_TOTAL_DOTS = 400;
+    float dotsPerPixel = (totalPathLength > 0) ? (float)TARGET_TOTAL_DOTS / totalPathLength : 0;
+    
+    // Now draw with standardized spacing
+    lastPx = -1;
+    lastPy = -1;
     bool lastPosWasRapid = true;
     bool lastPointValid = false;
+    float accumulatedDistance = 0;
+    float nextDotThreshold = 0;
 
-    for (int i = 0; i < path.numPoints; i += pointSkip) {  
-
+    for (int i = 0; i < path.numPoints; i++) {
         float pathX = path.points[i].x;
         float pathY = path.points[i].y;
         float z = path.points[i].z;
@@ -71,25 +102,21 @@ void drawPathPreview() {
         float relativeX = pathX - pose.x;
         float relativeY = pathY - pose.y;
 
-        float dx, dy;
-        dx = mapF(relativeX, -xRange/2, xRange/2, rectMinX, rectMaxX);
-        dy = -mapF(relativeY, -yRange/2, yRange/2, rectMinY, rectMaxY);
+        float dx = mapF(relativeX, -xRange/2, xRange/2, rectMinX, rectMaxX);
+        float dy = -mapF(relativeY, -yRange/2, yRange/2, rectMinY, rectMaxY);
 
         int16_t px = centerX + dx;
         int16_t py = centerY + dy;
 
         bool pointInBounds;
         if (pathPreviewFullScreen) {
-            // Check if point is within circular display boundary
             float distFromCenter = sqrt(pow(px - centerX, 2) + pow(py - centerY, 2));
             pointInBounds = (distFromCenter <= screen->width()/2 - 5); 
         } else {
-            // Check if point is within rectangular preview window
             pointInBounds = (abs(dx) <= rectWindowSize/2) && (abs(dy) <= rectWindowSize/2);
         }
 
         if (path.points[i].feature == DRILL) {
-            // Draw drill points as yellow crosses (5 pixels) only if in bounds
             if (pointInBounds) {
                 screen->drawPixel(px, py, YELLOW);         
                 screen->drawPixel(px-1, py, YELLOW);       
@@ -105,68 +132,61 @@ void drawPathPreview() {
             }
 
             lastPosWasRapid = true; 
-            lastPointValid = false; 
+            lastPointValid = false;
+            accumulatedDistance = 0;
+            nextDotThreshold = 0;
             
-        } else if (i > 0) {
-            // Process all points after the first one, regardless of bounds
+        } else if (i > 0 && lastPointValid) {
             bool currentPosIsRapid = (z >= restHeight);
+            
+            int dist_dx = px - lastPx;
+            int dist_dy = py - lastPy;
+            float segmentLength = sqrt(dist_dx*dist_dx + dist_dy*dist_dy);
+            
+            accumulatedDistance += segmentLength;
 
-            if (lastPointValid) {
-                uint16_t dotColor = BLACK;
-                int dotSpacing = 3;  // Default spacing for cutting moves
-
-                if (!lastPosWasRapid && !currentPosIsRapid) {
-                    // Cutting move - green, close spacing
-                    dotColor = GC9A01A_WEBWORK_GREEN;
-                    dotSpacing = 3;
-                } else if (lastPosWasRapid && currentPosIsRapid) {
-                    // Rapid-to-rapid move - cyan, wider spacing
-                    dotColor = CYAN;
-                    dotSpacing = 7;
-                } else {
-                    // Transition move (rapid<->cutting) - gray, medium spacing
-                    dotColor = 0x8410;
-                    dotSpacing = 4;
-                }
-
-                // Interpolate dots between path points for smooth preview
-                int dist_dx = px - lastPx; 
-                int dist_dy = py - lastPy; 
-                float distance = sqrt(dist_dx*dist_dx + dist_dy*dist_dy);
-                int numDots = max(1, (int)(distance / dotSpacing)); 
-
-                for (int d = 0; d < numDots && numPreviousDots < MAX_STORED_DOTS - 1; d++) {
-                    float t = (float)d / (float)numDots;
-                    int dotX = lastPx + (int)(t * dist_dx);
-                    int dotY = lastPy + (int)(t * dist_dy);
-                    
-                    // Only draw dots that are actually on screen
-                    bool dotInBounds;
-                    if (pathPreviewFullScreen) {
-                        float distFromCenter = sqrt(pow(dotX - centerX, 2) + pow(dotY - centerY, 2));
-                        dotInBounds = (distFromCenter <= screen->width()/2 - 5);
-                    } else {
-                        int16_t dotDx = dotX - centerX;
-                        int16_t dotDy = dotY - centerY;
-                        dotInBounds = (abs(dotDx) <= rectWindowSize/2) && (abs(dotDy) <= rectWindowSize/2);
-                    }
-                    
-                    if (dotInBounds) {
-                        screen->drawPixel(dotX, dotY, dotColor);
-                        storeDot(dotX, dotY, dotColor);
-                    }
-                }
+            // Determine color based on move type
+            uint16_t dotColor;
+            if (!lastPosWasRapid && !currentPosIsRapid) {
+                dotColor = GC9A01A_WEBWORK_GREEN;
+            } else if (lastPosWasRapid && currentPosIsRapid) {
+                dotColor = CYAN;
+            } else {
+                dotColor = 0x8410;
             }
 
-            // Always update position tracking, even for off-screen points
-            // This maintains the drawing chain when points come back into view
+            // Draw dots at standardized intervals
+            while (accumulatedDistance >= nextDotThreshold && numPreviousDots < MAX_STORED_DOTS - 1) {
+                float t = (nextDotThreshold - (accumulatedDistance - segmentLength)) / segmentLength;
+                t = constrain(t, 0.0f, 1.0f);
+                
+                int dotX = lastPx + (int)(t * dist_dx);
+                int dotY = lastPy + (int)(t * dist_dy);
+                
+                bool dotInBounds;
+                if (pathPreviewFullScreen) {
+                    float distFromCenter = sqrt(pow(dotX - centerX, 2) + pow(dotY - centerY, 2));
+                    dotInBounds = (distFromCenter <= screen->width()/2 - 5);
+                } else {
+                    int16_t dotDx = dotX - centerX;
+                    int16_t dotDy = dotY - centerY;
+                    dotInBounds = (abs(dotDx) <= rectWindowSize/2) && (abs(dotDy) <= rectWindowSize/2);
+                }
+                
+                if (dotInBounds) {
+                    screen->drawPixel(dotX, dotY, dotColor);
+                    storeDot(dotX, dotY, dotColor);
+                }
+                
+                nextDotThreshold += (1.0f / dotsPerPixel);
+            }
+
             lastPosWasRapid = currentPosIsRapid;
             lastPx = px;
             lastPy = py;
             lastPointValid = true;
             
-        } else if (i == 0) { 
-            // Initialize first point (whether in bounds or not)
+        } else if (i == 0) {
             lastPosWasRapid = (z >= restHeight);
             lastPx = px;
             lastPy = py;
