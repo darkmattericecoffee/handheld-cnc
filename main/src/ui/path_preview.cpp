@@ -4,39 +4,53 @@
 #include "types.h"
 #include "../math/geometry.h"
 
-// Structure to store a dot for clearing
-struct PathDot {
-    int16_t x, y;
+// Struct to store a dot's pre-computed screen coordinates
+struct CachedDot {
+    int16_t x, y; // Base screen coordinates (relative to a zeroed pose)
     uint16_t color;
     bool valid;
 };
 
-// Structure to store pre-computed path segment data
-struct PrecomputedSegment {
-    float screenX, screenY;  // Screen coordinates (float for precision)
-    float z;
-    Feature feature;
-    bool isRapid;
+// Struct to store a dot's final on-screen location for clearing
+struct DrawnDot {
+    int16_t x, y;
+    bool valid;
 };
 
-// Static storage for previously drawn dots
-static const int MAX_STORED_DOTS = 300;
-static PathDot previousDots[MAX_STORED_DOTS];
+
+// --- CONFIGURATION & LIMITS ---
+
+// CACHE: Stores pre-computed dots for the ENTIRE path. Increase if very long paths are clipped.
+static const int MAX_CACHED_DOTS = 2000;
+
+// RENDER LIMIT: The maximum number of dots drawn ON SCREEN per frame to ensure performance.
+static const int MAX_DRAWN_DOTS = 400;
+
+// VISUAL DENSITY: Controls how many dots are generated per millimeter of real-world travel.
+const float DOTS_PER_MM = 0.5f; // One dot every 2mm
+
+
+// --- STATIC STORAGE ---
+
+// The main cache for the entire path
+static CachedDot cachedDots[MAX_CACHED_DOTS];
+static int numCachedDots = 0;
+
+// Stores the locations of dots drawn in the last frame for clearing
+static DrawnDot previousDots[MAX_DRAWN_DOTS];
 static int numPreviousDots = 0;
 
-// Cached path data
-static const int MAX_PRECOMPUTED_SEGMENTS = 500;
-static PrecomputedSegment precomputedPath[MAX_PRECOMPUTED_SEGMENTS];
-static int numPrecomputedSegments = 0;
-static float cachedTotalPathLength = 0;
-static int cachedTargetDots = 0;
-static float cachedDotsPerPixel = 0;
-
-// Cache invalidation tracking
-static int lastPathNumPoints = -1;
-static float lastPoseX = 0;
-static float lastPoseY = 0;
+// Cache validity tracking
 static bool cacheValid = false;
+static int lastPathNumPoints = -1;
+static bool lastFullscreenMode = false;
+
+
+// --- CACHE & RENDER LOGIC ---
+
+void invalidatePathCache() {
+    cacheValid = false;
+}
 
 void clearPreviousPathPreview() {
     for (int i = 0; i < numPreviousDots; i++) {
@@ -44,221 +58,137 @@ void clearPreviousPathPreview() {
             screen->drawPixel(previousDots[i].x, previousDots[i].y, BLACK);
         }
     }
-    numPreviousDots = 0;
+    numPreviousDots = 0; // Reset for the next frame
 }
 
-void storeDot(int16_t x, int16_t y, uint16_t color) {
-    if (numPreviousDots < MAX_STORED_DOTS) {
-        previousDots[numPreviousDots] = {x, y, color, true};
+void storeDrawnDot(int16_t x, int16_t y) {
+    if (numPreviousDots < MAX_DRAWN_DOTS) {
+        previousDots[numPreviousDots] = {x, y, true};
         numPreviousDots++;
     }
 }
 
-void invalidatePathCache() {
-    cacheValid = false;
-}
+/**
+ * @brief Performs the one-time, expensive calculation of all dot positions for the path.
+ * This populates the `cachedDots` array.
+ */
+void precomputePathDots() {
+    numCachedDots = 0;
+    const float DOT_INTERVAL_MM = 1.0f / DOTS_PER_MM;
 
-void precomputePathData() {
+    float accumulatedPhysicalDist = 0;
+    float nextDotDistThreshold = 0;
+
     int16_t centerX = screen->width() / 2;
     int16_t centerY = screen->height() / 2;
-
     float padding = 6;
-    float rectangleWidth = screen->width() / 2; 
-    float rectWindowSize = rectangleWidth - 2*padding; 
-    float rectMaxX = rectWindowSize/2;
-    float rectMaxY = rectWindowSize/2;
-    float rectMinX = -rectWindowSize/2;
-    float rectMinY = -rectWindowSize/2;
+    float rectangleWidth = screen->width() / 2;
+    float rectWindowSize = rectangleWidth - 2 * padding;
 
-    // Adaptive skip based on path density
-    int pointSkip = 1;
-    if (path.numPoints > 800) pointSkip = 3;
-    else if (path.numPoints > 400) pointSkip = 2;
+    for (int i = 1; i < path.numPoints; i++) {
+        if (numCachedDots >= MAX_CACHED_DOTS) break; // Stop if cache is full
 
-    // First pass: Convert to screen coordinates and calculate total length
-    numPrecomputedSegments = 0;
-    cachedTotalPathLength = 0;
-    float lastScreenX = 0, lastScreenY = 0;
-    bool firstPoint = true;
+        Point p0 = path.points[i - 1];
+        Point p1 = path.points[i];
 
-    for (int i = 0; i < path.numPoints && numPrecomputedSegments < MAX_PRECOMPUTED_SEGMENTS; i += pointSkip) {
-        float pathX = path.points[i].x;
-        float pathY = path.points[i].y;
-        float z = path.points[i].z;
-        Feature feature = path.points[i].feature;
+        if (p0.feature == DRILL) continue;
 
-        float relativeX = pathX - pose.x;
-        float relativeY = pathY - pose.y;
+        float dx_phys = p1.x - p0.x;
+        float dy_phys = p1.y - p0.y;
+        float physicalSegmentLength = sqrt(dx_phys * dx_phys + dy_phys * dy_phys);
 
-        float dx = mapF(relativeX, -xRange/2, xRange/2, rectMinX, rectMaxX);
-        float dy = -mapF(relativeY, -yRange/2, yRange/2, rectMinY, rectMaxY);
+        if (physicalSegmentLength < 0.001f) continue;
 
-        float screenX = centerX + dx;
-        float screenY = centerY + dy;
+        bool isRapid = (p0.z >= restHeight && p1.z >= restHeight);
+        uint16_t dotColor = isRapid ? CYAN : GC9A01A_WEBWORK_GREEN;
 
-        // Store precomputed segment
-        precomputedPath[numPrecomputedSegments].screenX = screenX;
-        precomputedPath[numPrecomputedSegments].screenY = screenY;
-        precomputedPath[numPrecomputedSegments].z = z;
-        precomputedPath[numPrecomputedSegments].feature = feature;
-        precomputedPath[numPrecomputedSegments].isRapid = (z >= restHeight);
+        while (nextDotDistThreshold <= accumulatedPhysicalDist + physicalSegmentLength) {
+             if (numCachedDots >= MAX_CACHED_DOTS) break;
 
-        // Calculate segment length for total path length
-        if (!firstPoint && feature != DRILL) {
-            float dist_dx = screenX - lastScreenX;
-            float dist_dy = screenY - lastScreenY;
-            cachedTotalPathLength += sqrt(dist_dx*dist_dx + dist_dy*dist_dy);
+            float distanceToNextDot = nextDotDistThreshold - accumulatedPhysicalDist;
+            float t = distanceToNextDot / physicalSegmentLength;
+
+            if (t >= 0.0f && t <= 1.0f) {
+                // Interpolate physical position of the dot
+                float dot_x_phys = p0.x + t * dx_phys;
+                float dot_y_phys = p0.y + t * dy_phys;
+
+                // Map to screen coordinates (assuming pose is at 0,0 for the cache)
+                float dx_screen = mapF(dot_x_phys, -xRange / 2, xRange / 2, -rectWindowSize / 2, rectWindowSize / 2);
+                float dy_screen = -mapF(dot_y_phys, -yRange / 2, yRange / 2, -rectWindowSize / 2, rectWindowSize / 2);
+
+                // Store in cache
+                cachedDots[numCachedDots] = {
+                    (int16_t)(centerX + dx_screen),
+                    (int16_t)(centerY + dy_screen),
+                    dotColor,
+                    true
+                };
+                numCachedDots++;
+            }
+            nextDotDistThreshold += DOT_INTERVAL_MM;
         }
-
-        lastScreenX = screenX;
-        lastScreenY = screenY;
-        firstPoint = false;
-        numPrecomputedSegments++;
+        accumulatedPhysicalDist += physicalSegmentLength;
     }
 
-    // Calculate dots per pixel
-    cachedTargetDots = 400;  // Adjustable
-    if (path.numPoints > 1000) {
-        cachedTargetDots = 350;
-    } else if (path.numPoints < 200) {
-        cachedTargetDots = 500;
-    }
-    
-    cachedDotsPerPixel = (cachedTotalPathLength > 0) ? (float)cachedTargetDots / cachedTotalPathLength : 0;
-
-    // Mark cache as valid
-    lastPathNumPoints = path.numPoints;
-    lastPoseX = pose.x;
-    lastPoseY = pose.y;
+    // Mark the cache as valid for the current path and settings
     cacheValid = true;
+    lastPathNumPoints = path.numPoints;
+    lastFullscreenMode = pathPreviewFullScreen;
 }
 
 void drawPathPreview() {
-    if (path.numPoints <= 1 || path.numPoints > MAX_POINTS) {
-        clearPreviousPathPreview(); 
-        cacheValid = false;
-        return; 
+    if (path.numPoints <= 1) {
+        clearPreviousPathPreview();
+        return;
     }
 
-    // Check if we need to recompute the path data
-    bool poseChanged = (abs(pose.x - lastPoseX) > 0.01f || abs(pose.y - lastPoseY) > 0.01f);
+    // --- 1. VALIDATE CACHE ---
+    // Re-compute only if the path or a major view setting has changed.
     bool pathChanged = (path.numPoints != lastPathNumPoints);
-    
-    if (!cacheValid || pathChanged || poseChanged) {
-        precomputePathData();
+    bool viewModeChanged = (pathPreviewFullScreen != lastFullscreenMode);
+    if (!cacheValid || pathChanged || viewModeChanged) {
+        precomputePathDots();
     }
 
-    // Clear previous dots
+    // --- 2. CLEAR PREVIOUS FRAME ---
     clearPreviousPathPreview();
 
-    if (numPrecomputedSegments <= 1) return;
+    // --- 3. RENDER FROM CACHE (FAST) ---
+    // Calculate the current offset based on the tool's pose
+    float pose_dx_screen = mapF(pose.x, -xRange / 2, xRange / 2, -screen->width()/4, screen->width()/4);
+    float pose_dy_screen = -mapF(pose.y, -yRange / 2, yRange / 2, -screen->height()/4, screen->height()/4);
 
     int16_t centerX = screen->width() / 2;
     int16_t centerY = screen->height() / 2;
-
     float padding = 6;
-    float rectangleWidth = screen->width() / 2; 
-    float rectWindowSize = rectangleWidth - 2*padding;
+    float rectangleWidth = screen->width() / 2;
+    float rectWindowSize = rectangleWidth - 2 * padding;
 
-    // Now render using precomputed data
-    float accumulatedDistance = 0;
-    float nextDotThreshold = 0;
-    bool lastPointValid = false;
-    float lastScreenX = 0, lastScreenY = 0;
-    bool lastPosWasRapid = true;
+    for (int i = 0; i < numCachedDots; i++) {
+        // Stop drawing if we hit the on-screen dot limit for this frame
+        if (numPreviousDots >= MAX_DRAWN_DOTS) break;
+        
+        if (!cachedDots[i].valid) continue;
 
-    for (int i = 0; i < numPrecomputedSegments; i++) {
-        float screenX = precomputedPath[i].screenX;
-        float screenY = precomputedPath[i].screenY;
-        Feature feature = precomputedPath[i].feature;
-        bool currentPosIsRapid = precomputedPath[i].isRapid;
+        // Apply the current tool pose offset to the cached screen coordinate
+        int16_t finalX = cachedDots[i].x - (int16_t)pose_dx_screen;
+        int16_t finalY = cachedDots[i].y - (int16_t)pose_dy_screen;
 
-        int16_t px = (int16_t)screenX;
-        int16_t py = (int16_t)screenY;
-
-        bool pointInBounds;
+        // Check if the final dot position is within the visible bounds
+        bool isInBounds;
         if (pathPreviewFullScreen) {
-            float distFromCenter = sqrt(pow(px - centerX, 2) + pow(py - centerY, 2));
-            pointInBounds = (distFromCenter <= screen->width()/2 - 5); 
+            float distFromCenter = sqrt(pow(finalX - centerX, 2) + pow(finalY - centerY, 2));
+            isInBounds = (distFromCenter <= screen->width() / 2 - 5);
         } else {
-            int16_t dx = px - centerX;
-            int16_t dy = py - centerY;
-            pointInBounds = (abs(dx) <= rectWindowSize/2) && (abs(dy) <= rectWindowSize/2);
+            float dx_from_center = finalX - centerX;
+            float dy_from_center = finalY - centerY;
+            isInBounds = (abs(dx_from_center) <= rectWindowSize / 2) && (abs(dy_from_center) <= rectWindowSize / 2);
         }
 
-        if (feature == DRILL) {
-            if (pointInBounds) {
-                screen->drawPixel(px, py, YELLOW);         
-                screen->drawPixel(px-1, py, YELLOW);       
-                screen->drawPixel(px+1, py, YELLOW);       
-                screen->drawPixel(px, py-1, YELLOW);       
-                screen->drawPixel(px, py+1, YELLOW);       
-
-                storeDot(px, py, YELLOW);
-                storeDot(px-1, py, YELLOW);
-                storeDot(px+1, py, YELLOW);
-                storeDot(px, py-1, YELLOW);
-                storeDot(px, py+1, YELLOW);
-            }
-
-            lastPosWasRapid = true; 
-            lastPointValid = false;
-            accumulatedDistance = 0;
-            nextDotThreshold = 0;
-            
-        } else if (i > 0 && lastPointValid) {
-            float dist_dx = screenX - lastScreenX;
-            float dist_dy = screenY - lastScreenY;
-            float segmentLength = sqrt(dist_dx*dist_dx + dist_dy*dist_dy);
-            
-            accumulatedDistance += segmentLength;
-
-            // Determine color based on move type
-            uint16_t dotColor;
-            if (!lastPosWasRapid && !currentPosIsRapid) {
-                dotColor = GC9A01A_WEBWORK_GREEN;
-            } else if (lastPosWasRapid && currentPosIsRapid) {
-                dotColor = CYAN;
-            } else {
-                dotColor = 0x8410;
-            }
-
-            // Draw dots at standardized intervals
-            while (accumulatedDistance >= nextDotThreshold && numPreviousDots < MAX_STORED_DOTS - 1) {
-                float t = (nextDotThreshold - (accumulatedDistance - segmentLength)) / segmentLength;
-                t = constrain(t, 0.0f, 1.0f);
-                
-                int dotX = lastScreenX + (int)(t * dist_dx);
-                int dotY = lastScreenY + (int)(t * dist_dy);
-                
-                bool dotInBounds;
-                if (pathPreviewFullScreen) {
-                    float distFromCenter = sqrt(pow(dotX - centerX, 2) + pow(dotY - centerY, 2));
-                    dotInBounds = (distFromCenter <= screen->width()/2 - 5);
-                } else {
-                    int16_t dotDx = dotX - centerX;
-                    int16_t dotDy = dotY - centerY;
-                    dotInBounds = (abs(dotDx) <= rectWindowSize/2) && (abs(dotDy) <= rectWindowSize/2);
-                }
-                
-                if (dotInBounds) {
-                    screen->drawPixel(dotX, dotY, dotColor);
-                    storeDot(dotX, dotY, dotColor);
-                }
-                
-                nextDotThreshold += (1.0f / cachedDotsPerPixel);
-            }
-
-            lastPosWasRapid = currentPosIsRapid;
-            lastScreenX = screenX;
-            lastScreenY = screenY;
-            lastPointValid = true;
-            
-        } else if (i == 0) {
-            lastPosWasRapid = currentPosIsRapid;
-            lastScreenX = screenX;
-            lastScreenY = screenY;
-            lastPointValid = true;
+        if (isInBounds) {
+            screen->drawPixel(finalX, finalY, cachedDots[i].color);
+            storeDrawnDot(finalX, finalY);
         }
     }
 }
